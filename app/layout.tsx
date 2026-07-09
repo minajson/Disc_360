@@ -20,12 +20,26 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("http://localhost:3000"),
   title: {
     default: "Disc360 — Personality Intelligence Platform",
     template: "%s · Disc360",
   },
   description:
     "Decode how people lead, communicate, decide, and respond under pressure. DISC assessment and team intelligence for individuals, coaches, and organizations.",
+  openGraph: {
+    title: "Disc360 — Personality Intelligence Platform",
+    description:
+      "Decode how people lead, communicate, decide, and respond under pressure. Profiles across four dimensions: Dominant, Influence, Stable, Analytical.",
+    siteName: "Disc360",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Disc360 — Personality Intelligence Platform",
+    description:
+      "Decode how people lead, communicate, decide, and respond under pressure.",
+  },
 };
 
 export default function RootLayout({

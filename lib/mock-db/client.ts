@@ -206,8 +206,8 @@ const globalForDb = globalThis as unknown as {
   __disc360Db?: ReturnType<typeof buildClient>;
 };
 
-export const db = globalForDb.__disc360Db ?? buildClient();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.__disc360Db = db;
-}
+// Registered on globalThis in every environment: dev hot-reload duplicates
+// modules, and production route bundles each get their own module instance —
+// both must share one store.
+export const db =
+  globalForDb.__disc360Db ?? (globalForDb.__disc360Db = buildClient());

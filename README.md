@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Disc360 — Personality Intelligence Platform
 
-## Getting Started
+> Decode how people lead, communicate, decide, and respond under pressure.
 
-First, run the development server:
+Disc360 is a premium fullstack DISC assessment platform built with Next.js App Router. Individuals take a 24-question forced-choice assessment (~7 minutes) and receive an executive-grade behavioral profile; coaches, HR leaders, and teams get a quadrant map of their whole roster with composition and coverage insights.
+
+The four dimensions, as they appear everywhere in the product:
+
+| Code | Label |
+|------|-------------|
+| D | **Dominant** |
+| I | **Influence** |
+| S | **Stable** |
+| C | **Analytical** |
+
+## Features
+
+- **Cinematic landing page** — "Cognitive Atlas" design system: midnight surfaces, glassmorphism panels, luminous accents, animated DISC orbit
+- **Forced-choice assessment** — pick MOST and LEAST like you per scenario, with autosave, resume-on-refresh, and smooth question transitions
+- **Deterministic scoring engine** — raw tallies → net → normalized 0–100 → one of 13 archetypes, fully unit-tested
+- **Full archetype report** — radar and intensity charts, strengths, blind spots, communication do/don'ts, leadership style, stress response, ideal environment, complementary types
+- **Dashboard** — latest profile, per-dimension trend sparklines, assessment history
+- **Team intelligence** — members plotted across DISC quadrants, primary-style distribution, rule-based coverage insights
+
+## Stack
+
+Next.js 16 (App Router, Turbopack) · TypeScript strict · Tailwind CSS v4 (CSS-first tokens) · Framer Motion · Zod · custom SVG charts (no chart library) · Prisma-shaped JSON-file mock DB (swap point for a real database) · Node native test runner
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Other commands:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm test           # scoring unit tests (Node runs TypeScript natively)
+npm run typecheck  # tsc --noEmit
+npm run lint       # eslint
+npm run build      # production build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Local data persists to the git-ignored `.mockdb/db.json`, so sessions and results survive dev-server restarts. Delete the folder to reset.
 
-## Learn More
+## Architecture
 
-To learn more about Next.js, take a look at the following resources:
+```
+app/          routes + API handlers (assessment, results, history, team)
+components/   landing, assessment, results, dashboard, team, charts, ui, layout, motion
+lib/          scoring pipeline, insights, mock DB, auth stub, types, schemas
+data/         question bank, archetype insight maps, demo team
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Design and engineering conventions live in [CLAUDE.md](./CLAUDE.md) — including the scoring contract, design tokens, and the motion-ready component swap points reserved for future 3D enhancements.

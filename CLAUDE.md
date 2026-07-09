@@ -11,7 +11,7 @@ npm run dev          # dev server (Turbopack)
 npm run build        # production build — must pass before every phase commit
 npm run lint         # eslint
 npm run typecheck    # tsc --noEmit
-npm test             # node --test lib/scoring/  (Node 25 runs TS natively)
+npm test             # node --test lib/scoring/*.test.ts  (Node 25 runs TS natively)
 ```
 
 ## DISC naming (mandatory)
