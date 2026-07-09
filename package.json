@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --test lib/scoring/"
+    "test": "node --test lib/scoring/*.test.ts"
   },
   "dependencies": {
     "framer-motion": "^12.42.2",

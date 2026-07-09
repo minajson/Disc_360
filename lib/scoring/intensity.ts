@@ -4,7 +4,7 @@ import {
   type Dimension,
   type DiscScores,
   type IntensityBand,
-} from "@/lib/types";
+} from "../types/index.ts";
 
 /** Band labels shown in the UI. */
 export const intensityLabels: Record<IntensityBand, string> = {
