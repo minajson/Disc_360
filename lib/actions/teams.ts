@@ -5,6 +5,35 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireOnboarded, requireTeamAdmin } from "@/lib/auth/guards";
 import { parseMemberCsv } from "@/lib/teams/csv";
+import { sendTeamInvitation } from "@/lib/email/notifications";
+
+async function inviteAndNotify(options: {
+  supabase: Awaited<ReturnType<typeof requireTeamAdmin>>["supabase"];
+  teamId: string;
+  memberId: string;
+  email: string;
+  invitedBy: string;
+  inviterName: string;
+}): Promise<void> {
+  const { data: invitation } = await options.supabase
+    .from("invitations")
+    .insert({
+      team_id: options.teamId,
+      team_member_id: options.memberId,
+      email: options.email,
+      invited_by: options.invitedBy,
+    })
+    .select("token, teams (name)")
+    .single();
+  if (!invitation) return;
+  const team = Array.isArray(invitation.teams) ? invitation.teams[0] : invitation.teams;
+  await sendTeamInvitation({
+    to: options.email,
+    teamName: team?.name ?? "your team",
+    inviterName: options.inviterName,
+    token: invitation.token,
+  });
+}
 
 export interface ActionState {
   status: "idle" | "success" | "error";
@@ -203,7 +232,7 @@ export async function addMember(
   });
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Check the member details.");
 
-  const { supabase, user } = await requireTeamAdmin(parsed.data.team_id);
+  const { supabase, user, profile } = await requireTeamAdmin(parsed.data.team_id);
   const email = parsed.data.email.toLowerCase();
 
   const { data: member, error } = await supabase
@@ -224,11 +253,13 @@ export async function addMember(
     );
   }
 
-  await supabase.from("invitations").insert({
-    team_id: parsed.data.team_id,
-    team_member_id: member.id,
+  await inviteAndNotify({
+    supabase,
+    teamId: parsed.data.team_id,
+    memberId: member.id,
     email,
-    invited_by: user.id,
+    invitedBy: user.id,
+    inviterName: profile.full_name,
   });
 
   revalidatePath(`/app/teams/${parsed.data.team_id}/members`);
@@ -247,7 +278,7 @@ export async function importMembers(
   });
   if (!parsed.success) return fail("Paste rows as: name, email, department (optional).");
 
-  const { supabase, user } = await requireTeamAdmin(parsed.data.team_id);
+  const { supabase, user, profile } = await requireTeamAdmin(parsed.data.team_id);
   const { rows, errors } = parseMemberCsv(parsed.data.csv);
   if (rows.length === 0) return fail(errors[0] ?? "No valid rows found.");
   if (rows.length > 200) return fail("Import at most 200 members at a time.");
@@ -265,11 +296,13 @@ export async function importMembers(
       continue;
     }
     added += 1;
-    await supabase.from("invitations").insert({
-      team_id: parsed.data.team_id,
-      team_member_id: member.id,
+    await inviteAndNotify({
+      supabase,
+      teamId: parsed.data.team_id,
+      memberId: member.id,
       email: row.email,
-      invited_by: user.id,
+      invitedBy: user.id,
+      inviterName: profile.full_name,
     });
   }
 
@@ -355,11 +388,11 @@ const RESEND_MAX_SENDS = 5;
 
 export async function resendInvitation(teamId: string, invitationId: string): Promise<void> {
   if (!z.uuid().safeParse(teamId).success || !z.uuid().safeParse(invitationId).success) return;
-  const { supabase } = await requireTeamAdmin(teamId);
+  const { supabase, profile } = await requireTeamAdmin(teamId);
 
   const { data: invitation } = await supabase
     .from("invitations")
-    .select("id, status, last_sent_at, send_count")
+    .select("id, status, last_sent_at, send_count, email, token, message, teams (name)")
     .eq("id", invitationId)
     .eq("team_id", teamId)
     .maybeSingle();
@@ -377,6 +410,15 @@ export async function resendInvitation(teamId: string, invitationId: string): Pr
       expires_at: new Date(Date.now() + 14 * 86_400_000).toISOString(),
     })
     .eq("id", invitationId);
+
+  const team = Array.isArray(invitation.teams) ? invitation.teams[0] : invitation.teams;
+  await sendTeamInvitation({
+    to: invitation.email,
+    teamName: team?.name ?? "your team",
+    inviterName: profile.full_name,
+    token: invitation.token,
+    message: invitation.message ?? undefined,
+  });
 
   revalidatePath(`/app/teams/${teamId}/members`);
 }

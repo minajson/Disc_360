@@ -8,7 +8,19 @@ import {
   launchStatus,
   type CampaignStatus,
 } from "@/lib/campaigns/state";
+import {
+  sendCampaignInvitation,
+  sendCampaignReminder,
+} from "@/lib/email/notifications";
 import type { ActionState } from "@/lib/actions/teams";
+
+const formatDeadline = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+      })
+    : undefined;
 
 const ok = (message: string): ActionState => ({ status: "success", message });
 const fail = (message: string): ActionState => ({ status: "error", message });
@@ -81,7 +93,7 @@ export async function launchCampaign(teamId: string, campaignId: string): Promis
 
   const { data: full } = await context.supabase
     .from("assessment_campaigns")
-    .select("starts_at")
+    .select("name, invitation_message, starts_at, deadline_at, teams (name)")
     .eq("id", campaignId)
     .single();
   const next = launchStatus(full?.starts_at ?? null, new Date());
@@ -91,10 +103,11 @@ export async function launchCampaign(teamId: string, campaignId: string): Promis
     return;
   }
 
-  // One assignment per roster member (invited state).
+  // One assignment per roster member (invited state) + campaign invitation email.
+  const teamRow = Array.isArray(full?.teams) ? full?.teams[0] : full?.teams;
   const { data: members } = await context.supabase
     .from("team_members")
-    .select("id")
+    .select("id, email, profile_id")
     .eq("team_id", teamId);
   for (const member of members ?? []) {
     await context.supabase
@@ -103,6 +116,16 @@ export async function launchCampaign(teamId: string, campaignId: string): Promis
         { campaign_id: campaignId, team_member_id: member.id },
         { onConflict: "campaign_id,team_member_id", ignoreDuplicates: true },
       );
+    if (next === "active") {
+      await sendCampaignInvitation({
+        to: member.email,
+        profileId: member.profile_id,
+        teamName: teamRow?.name ?? "your team",
+        campaignName: full?.name ?? "Assessment round",
+        message: full?.invitation_message || undefined,
+        deadline: formatDeadline(full?.deadline_at ?? null),
+      });
+    }
   }
 
   await context.supabase
@@ -160,11 +183,34 @@ export async function archiveCampaign(teamId: string, campaignId: string): Promi
   await transitionCampaign(teamId, campaignId, "archived", "campaign.archived");
 }
 
-/** Reminders for everyone who hasn't completed. Email delivery lands in Phase 6. */
+/** Reminders for everyone who hasn't completed — preference-gated per recipient. */
 export async function sendCampaignReminders(teamId: string, campaignId: string): Promise<void> {
   if (!z.uuid().safeParse(teamId).success || !z.uuid().safeParse(campaignId).success) return;
   const { context, campaign } = await loadCampaign(teamId, campaignId);
   if (!campaign || campaign.status !== "active") return;
+
+  const { data: pendingAssignments } = await context.supabase
+    .from("campaign_assignments")
+    .select("id, team_members (email, profile_id, teams (name)), assessment_campaigns (deadline_at)")
+    .eq("campaign_id", campaignId)
+    .neq("status", "completed");
+
+  for (const assignment of pendingAssignments ?? []) {
+    const member = Array.isArray(assignment.team_members)
+      ? assignment.team_members[0]
+      : assignment.team_members;
+    if (!member) continue;
+    const team = Array.isArray(member.teams) ? member.teams[0] : member.teams;
+    const campaignRow = Array.isArray(assignment.assessment_campaigns)
+      ? assignment.assessment_campaigns[0]
+      : assignment.assessment_campaigns;
+    await sendCampaignReminder({
+      to: member.email,
+      profileId: member.profile_id,
+      teamName: team?.name ?? "your team",
+      deadline: formatDeadline(campaignRow?.deadline_at ?? null),
+    });
+  }
 
   await context.supabase
     .from("campaign_assignments")

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/db/browser";
+import { notifyPasswordChanged } from "@/lib/actions/settings";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/auth/fields";
 
@@ -38,6 +39,7 @@ export function ResetPasswordForm() {
       setPending(false);
       return;
     }
+    void notifyPasswordChanged();
     router.push("/app");
     router.refresh();
   };

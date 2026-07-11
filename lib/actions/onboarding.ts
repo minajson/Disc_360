@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
 import { createSupabaseAdminClient } from "@/lib/db/admin";
+import { sendWelcome } from "@/lib/email/notifications";
 
 export interface OnboardingState {
   status: "idle" | "error";
@@ -61,6 +62,8 @@ async function completeProfile(
     .from("notification_preferences")
     .update({ product_updates: parsed.data.product_updates === "on" })
     .eq("profile_id", user.id);
+
+  await sendWelcome(user.email ?? "", user.id, parsed.data.preferred_name);
 
   return { userId: user.id };
 }

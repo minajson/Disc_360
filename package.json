@@ -11,6 +11,7 @@
     "test": "node --test lib/scoring/*.test.ts"
   },
   "dependencies": {
+    "@react-email/components": "^1.0.12",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.2",
     "framer-motion": "^12.42.2",
@@ -19,6 +20,7 @@
     "qrcode.react": "^4.2.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "resend": "^6.17.2",
     "server-only": "^0.0.1",
     "zod": "^4.4.3"
   },

@@ -5,6 +5,10 @@ import { z } from "zod";
 import { requireOnboarded } from "@/lib/auth/guards";
 import { computeResult } from "@/lib/scoring/compute-result";
 import { insightMap } from "@/data/insight-maps";
+import {
+  sendReportReady,
+  sendTeamCampaignCompleted,
+} from "@/lib/email/notifications";
 import type { Question } from "@/lib/types";
 
 /**
@@ -243,11 +247,21 @@ export async function submitAssessment(sessionId: string): Promise<SubmitResult>
     .update({ status: "completed", completed_at: new Date().toISOString() })
     .eq("id", sessionId);
 
-  // Campaign bookkeeping: mark this member's assignment completed.
+  // Report-ready notification (preference-gated).
+  const { profile } = await requireOnboarded();
+  await sendReportReady({
+    to: profile.email,
+    profileId: user.id,
+    archetypeName: insightMap[computed.archetypeCode].name,
+    resultId: resultRow.id,
+  });
+
+  // Campaign bookkeeping: mark this member's assignment completed and,
+  // when the whole campaign finishes, notify team admins.
   if (session.campaign_id) {
     const { data: campaign } = await supabase
       .from("assessment_campaigns")
-      .select("team_id")
+      .select("team_id, name, teams (name)")
       .eq("id", session.campaign_id)
       .maybeSingle();
     if (campaign) {
@@ -263,6 +277,32 @@ export async function submitAssessment(sessionId: string): Promise<SubmitResult>
           .update({ status: "completed" })
           .eq("campaign_id", session.campaign_id)
           .eq("team_member_id", member.id);
+      }
+
+      const { data: assignments } = await supabase
+        .from("campaign_assignments")
+        .select("status")
+        .eq("campaign_id", session.campaign_id);
+      const total = (assignments ?? []).length;
+      const completed = (assignments ?? []).filter((a) => a.status === "completed").length;
+      if (total > 0 && completed === total) {
+        const teamRow = Array.isArray(campaign.teams) ? campaign.teams[0] : campaign.teams;
+        const { data: admins } = await supabase
+          .from("team_members")
+          .select("email, profile_id")
+          .eq("team_id", campaign.team_id)
+          .eq("role", "team_admin");
+        for (const adminMember of admins ?? []) {
+          await sendTeamCampaignCompleted({
+            to: adminMember.email,
+            profileId: adminMember.profile_id,
+            teamId: campaign.team_id,
+            teamName: teamRow?.name ?? "your team",
+            campaignName: campaign.name,
+            completed,
+            total,
+          });
+        }
       }
     }
   }
