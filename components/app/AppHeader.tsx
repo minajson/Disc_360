@@ -4,6 +4,9 @@ import { signOut } from "@/lib/actions/auth";
 
 const navLinks = [
   { href: "/app", label: "Dashboard" },
+  { href: "/app/assessments", label: "Assessments" },
+  { href: "/app/history", label: "History" },
+  { href: "/app/reports", label: "Reports" },
   { href: "/app/teams", label: "Teams" },
   { href: "/app/settings", label: "Settings" },
 ];

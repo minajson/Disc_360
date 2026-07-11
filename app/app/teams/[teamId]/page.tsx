@@ -45,7 +45,7 @@ export default async function TeamOverviewPage({
         <h2 id="roster-heading" className="font-display text-h3 font-semibold">
           Roster · {members?.length ?? 0}
         </h2>
-        <div className="paper-card divide-y divide-[var(--color-hairline)] overflow-hidden p-0">
+        <div className="paper-card divide-y divide-hairline overflow-hidden p-0">
           {(members ?? []).map((member) => (
             <div key={member.id} className="flex items-center justify-between gap-4 px-6 py-4">
               <div className="flex min-w-0 flex-col">
