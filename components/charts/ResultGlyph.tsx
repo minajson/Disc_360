@@ -20,8 +20,7 @@ interface ResultGlyphProps {
 
 /**
  * Tiny DISC kite glyph for history rows and rosters. Server-safe SVG.
- * Motion-ready swap point: scores-in, glyph-out — internals may become a
- * generated 3D mark later.
+ * Swap-point contract: scores in, glyph out.
  */
 export function ResultGlyph({ scores, size = 40, className }: ResultGlyphProps) {
   const points = DIMENSIONS.map((dim) => {
@@ -41,14 +40,14 @@ export function ResultGlyph({ scores, size = 40, className }: ResultGlyphProps) 
       <polygon
         points={`${CENTER},${CENTER - RADIUS} ${CENTER + RADIUS},${CENTER} ${CENTER},${CENTER + RADIUS} ${CENTER - RADIUS},${CENTER}`}
         fill="none"
-        stroke="rgba(255,255,255,0.1)"
+        stroke="var(--color-hairline)"
         strokeWidth="1"
       />
       <polygon
         points={points}
-        fill="var(--color-accent)"
-        fillOpacity="0.2"
-        stroke="var(--color-accent)"
+        fill="var(--color-teal)"
+        fillOpacity="0.22"
+        stroke="var(--color-botanical)"
         strokeWidth="1.5"
         strokeLinejoin="round"
       />

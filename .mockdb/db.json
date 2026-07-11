@@ -1,0 +1,1320 @@
+{
+  "user": [
+    {
+      "id": "usr_demo",
+      "email": "demo@disc360.app",
+      "name": "Demo User",
+      "role": "INDIVIDUAL",
+      "createdAt": "2026-06-01T09:00:00.000Z"
+    }
+  ],
+  "assessmentSession": [
+    {
+      "id": "ses_mrdjn94401fwze2s",
+      "userId": "usr_demo",
+      "status": "IN_PROGRESS",
+      "currentQuestionIndex": 1,
+      "startedAt": "2026-07-09T13:29:51.076Z",
+      "completedAt": null,
+      "resultId": null
+    },
+    {
+      "id": "ses_mrdke4fe03w7mf5w",
+      "userId": "usr_demo",
+      "status": "IN_PROGRESS",
+      "currentQuestionIndex": 0,
+      "startedAt": "2026-07-09T13:50:44.714Z",
+      "completedAt": null,
+      "resultId": null
+    },
+    {
+      "id": "ses_mrdkf76h012ov57d",
+      "userId": "usr_demo",
+      "status": "COMPLETED",
+      "currentQuestionIndex": 23,
+      "startedAt": "2026-07-09T13:51:34.937Z",
+      "completedAt": "2026-07-09T13:51:35.028Z",
+      "resultId": "res_mrdkf7900qn0rlwu"
+    },
+    {
+      "id": "ses_mrdl2y4c014re01d",
+      "userId": "usr_demo",
+      "status": "COMPLETED",
+      "currentQuestionIndex": 23,
+      "startedAt": "2026-07-09T14:10:02.940Z",
+      "completedAt": "2026-07-09T14:10:02.984Z",
+      "resultId": "res_mrdl2y5k0qqyp9c8"
+    },
+    {
+      "id": "ses_mrdl5rb301sa3ur5",
+      "userId": "usr_demo",
+      "status": "COMPLETED",
+      "currentQuestionIndex": 23,
+      "startedAt": "2026-07-09T14:12:14.079Z",
+      "completedAt": "2026-07-09T14:12:14.167Z",
+      "resultId": "res_mrdl5rdj0q4twked"
+    },
+    {
+      "id": "ses_mrdlgpl701hp444m",
+      "userId": "usr_demo",
+      "status": "IN_PROGRESS",
+      "currentQuestionIndex": 0,
+      "startedAt": "2026-07-09T14:20:45.067Z",
+      "completedAt": null,
+      "resultId": null
+    },
+    {
+      "id": "ses_mrfxps2q01i5ie3l",
+      "userId": "usr_demo",
+      "status": "IN_PROGRESS",
+      "currentQuestionIndex": 2,
+      "startedAt": "2026-07-11T05:39:15.938Z",
+      "completedAt": null,
+      "resultId": null
+    },
+    {
+      "id": "ses_mrfz2d3904ijrva4",
+      "userId": "usr_demo",
+      "status": "IN_PROGRESS",
+      "currentQuestionIndex": 0,
+      "startedAt": "2026-07-11T06:17:02.661Z",
+      "completedAt": null,
+      "resultId": null
+    },
+    {
+      "id": "ses_mrfz2vjl05eqf1ox",
+      "userId": "usr_demo",
+      "status": "IN_PROGRESS",
+      "currentQuestionIndex": 0,
+      "startedAt": "2026-07-11T06:17:26.577Z",
+      "completedAt": null,
+      "resultId": null
+    }
+  ],
+  "answer": [
+    {
+      "id": "ans_mrdjn955023lkyl2",
+      "sessionId": "ses_mrdjn94401fwze2s",
+      "questionId": "q01",
+      "mostOptionId": "q01-1",
+      "leastOptionId": "q01-3",
+      "answeredAt": "2026-07-09T13:29:51.113Z"
+    },
+    {
+      "id": "ans_mrdkf78b02ig5j1l",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q01",
+      "mostOptionId": "q01-1",
+      "leastOptionId": "q01-2",
+      "answeredAt": "2026-07-09T13:51:35.003Z"
+    },
+    {
+      "id": "ans_mrdkf78d035d8uex",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q02",
+      "mostOptionId": "q02-1",
+      "leastOptionId": "q02-2",
+      "answeredAt": "2026-07-09T13:51:35.005Z"
+    },
+    {
+      "id": "ans_mrdkf78e04rov27w",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q03",
+      "mostOptionId": "q03-1",
+      "leastOptionId": "q03-2",
+      "answeredAt": "2026-07-09T13:51:35.006Z"
+    },
+    {
+      "id": "ans_mrdkf78g052l5gy8",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q04",
+      "mostOptionId": "q04-1",
+      "leastOptionId": "q04-2",
+      "answeredAt": "2026-07-09T13:51:35.008Z"
+    },
+    {
+      "id": "ans_mrdkf78h063gdfcz",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q05",
+      "mostOptionId": "q05-1",
+      "leastOptionId": "q05-2",
+      "answeredAt": "2026-07-09T13:51:35.009Z"
+    },
+    {
+      "id": "ans_mrdkf78i07lto7jx",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q06",
+      "mostOptionId": "q06-1",
+      "leastOptionId": "q06-2",
+      "answeredAt": "2026-07-09T13:51:35.010Z"
+    },
+    {
+      "id": "ans_mrdkf78j083juvtb",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q07",
+      "mostOptionId": "q07-1",
+      "leastOptionId": "q07-2",
+      "answeredAt": "2026-07-09T13:51:35.011Z"
+    },
+    {
+      "id": "ans_mrdkf78k095wj5sq",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q08",
+      "mostOptionId": "q08-1",
+      "leastOptionId": "q08-2",
+      "answeredAt": "2026-07-09T13:51:35.012Z"
+    },
+    {
+      "id": "ans_mrdkf78m0aehbzwx",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q09",
+      "mostOptionId": "q09-1",
+      "leastOptionId": "q09-2",
+      "answeredAt": "2026-07-09T13:51:35.014Z"
+    },
+    {
+      "id": "ans_mrdkf78n0bzyjmt8",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q10",
+      "mostOptionId": "q10-1",
+      "leastOptionId": "q10-2",
+      "answeredAt": "2026-07-09T13:51:35.015Z"
+    },
+    {
+      "id": "ans_mrdkf78o0cdj43mf",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q11",
+      "mostOptionId": "q11-1",
+      "leastOptionId": "q11-2",
+      "answeredAt": "2026-07-09T13:51:35.016Z"
+    },
+    {
+      "id": "ans_mrdkf78p0d9it1gn",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q12",
+      "mostOptionId": "q12-1",
+      "leastOptionId": "q12-2",
+      "answeredAt": "2026-07-09T13:51:35.017Z"
+    },
+    {
+      "id": "ans_mrdkf78q0e9pwyd0",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q13",
+      "mostOptionId": "q13-1",
+      "leastOptionId": "q13-2",
+      "answeredAt": "2026-07-09T13:51:35.017Z"
+    },
+    {
+      "id": "ans_mrdkf78q0f2ys3p6",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q14",
+      "mostOptionId": "q14-1",
+      "leastOptionId": "q14-2",
+      "answeredAt": "2026-07-09T13:51:35.018Z"
+    },
+    {
+      "id": "ans_mrdkf78r0g7zq8v3",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q15",
+      "mostOptionId": "q15-1",
+      "leastOptionId": "q15-2",
+      "answeredAt": "2026-07-09T13:51:35.019Z"
+    },
+    {
+      "id": "ans_mrdkf78s0hmwus0x",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q16",
+      "mostOptionId": "q16-1",
+      "leastOptionId": "q16-2",
+      "answeredAt": "2026-07-09T13:51:35.020Z"
+    },
+    {
+      "id": "ans_mrdkf78t0is7dzab",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q17",
+      "mostOptionId": "q17-1",
+      "leastOptionId": "q17-2",
+      "answeredAt": "2026-07-09T13:51:35.021Z"
+    },
+    {
+      "id": "ans_mrdkf78u0jigb5mf",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q18",
+      "mostOptionId": "q18-1",
+      "leastOptionId": "q18-2",
+      "answeredAt": "2026-07-09T13:51:35.022Z"
+    },
+    {
+      "id": "ans_mrdkf78v0kry1c9h",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q19",
+      "mostOptionId": "q19-1",
+      "leastOptionId": "q19-2",
+      "answeredAt": "2026-07-09T13:51:35.023Z"
+    },
+    {
+      "id": "ans_mrdkf78w0l1jx9en",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q20",
+      "mostOptionId": "q20-1",
+      "leastOptionId": "q20-2",
+      "answeredAt": "2026-07-09T13:51:35.024Z"
+    },
+    {
+      "id": "ans_mrdkf78x0m4kf0bg",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q21",
+      "mostOptionId": "q21-1",
+      "leastOptionId": "q21-2",
+      "answeredAt": "2026-07-09T13:51:35.025Z"
+    },
+    {
+      "id": "ans_mrdkf78y0ny18i4r",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q22",
+      "mostOptionId": "q22-1",
+      "leastOptionId": "q22-2",
+      "answeredAt": "2026-07-09T13:51:35.026Z"
+    },
+    {
+      "id": "ans_mrdkf78z0o8shz7y",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q23",
+      "mostOptionId": "q23-1",
+      "leastOptionId": "q23-2",
+      "answeredAt": "2026-07-09T13:51:35.027Z"
+    },
+    {
+      "id": "ans_mrdkf78z0pzd8w6m",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "questionId": "q24",
+      "mostOptionId": "q24-1",
+      "leastOptionId": "q24-2",
+      "answeredAt": "2026-07-09T13:51:35.027Z"
+    },
+    {
+      "id": "ans_mrdl2y4q02yldppd",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q01",
+      "mostOptionId": "q01-1",
+      "leastOptionId": "q01-3",
+      "answeredAt": "2026-07-09T14:10:02.954Z"
+    },
+    {
+      "id": "ans_mrdl2y4r03t5k7e4",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q02",
+      "mostOptionId": "q02-3",
+      "leastOptionId": "q02-4",
+      "answeredAt": "2026-07-09T14:10:02.955Z"
+    },
+    {
+      "id": "ans_mrdl2y4t04z4wpwj",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q03",
+      "mostOptionId": "q03-2",
+      "leastOptionId": "q03-1",
+      "answeredAt": "2026-07-09T14:10:02.957Z"
+    },
+    {
+      "id": "ans_mrdl2y4v05fgpm8d",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q04",
+      "mostOptionId": "q04-4",
+      "leastOptionId": "q04-2",
+      "answeredAt": "2026-07-09T14:10:02.959Z"
+    },
+    {
+      "id": "ans_mrdl2y4w069hf5ms",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q05",
+      "mostOptionId": "q05-1",
+      "leastOptionId": "q05-3",
+      "answeredAt": "2026-07-09T14:10:02.960Z"
+    },
+    {
+      "id": "ans_mrdl2y4x070gwsye",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q06",
+      "mostOptionId": "q06-3",
+      "leastOptionId": "q06-4",
+      "answeredAt": "2026-07-09T14:10:02.961Z"
+    },
+    {
+      "id": "ans_mrdl2y4y08ko51ht",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q07",
+      "mostOptionId": "q07-2",
+      "leastOptionId": "q07-1",
+      "answeredAt": "2026-07-09T14:10:02.962Z"
+    },
+    {
+      "id": "ans_mrdl2y4z09def1bp",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q08",
+      "mostOptionId": "q08-4",
+      "leastOptionId": "q08-2",
+      "answeredAt": "2026-07-09T14:10:02.963Z"
+    },
+    {
+      "id": "ans_mrdl2y500ar0cgil",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q09",
+      "mostOptionId": "q09-1",
+      "leastOptionId": "q09-3",
+      "answeredAt": "2026-07-09T14:10:02.964Z"
+    },
+    {
+      "id": "ans_mrdl2y520bswrfdj",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q10",
+      "mostOptionId": "q10-3",
+      "leastOptionId": "q10-4",
+      "answeredAt": "2026-07-09T14:10:02.966Z"
+    },
+    {
+      "id": "ans_mrdl2y530cpdjl3j",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q11",
+      "mostOptionId": "q11-2",
+      "leastOptionId": "q11-1",
+      "answeredAt": "2026-07-09T14:10:02.967Z"
+    },
+    {
+      "id": "ans_mrdl2y540dcd6zse",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q12",
+      "mostOptionId": "q12-4",
+      "leastOptionId": "q12-2",
+      "answeredAt": "2026-07-09T14:10:02.968Z"
+    },
+    {
+      "id": "ans_mrdl2y550e13z27j",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q13",
+      "mostOptionId": "q13-1",
+      "leastOptionId": "q13-3",
+      "answeredAt": "2026-07-09T14:10:02.969Z"
+    },
+    {
+      "id": "ans_mrdl2y560f26u1pj",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q14",
+      "mostOptionId": "q14-3",
+      "leastOptionId": "q14-4",
+      "answeredAt": "2026-07-09T14:10:02.970Z"
+    },
+    {
+      "id": "ans_mrdl2y570gcah8np",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q15",
+      "mostOptionId": "q15-2",
+      "leastOptionId": "q15-1",
+      "answeredAt": "2026-07-09T14:10:02.971Z"
+    },
+    {
+      "id": "ans_mrdl2y580hf2s8fy",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q16",
+      "mostOptionId": "q16-4",
+      "leastOptionId": "q16-2",
+      "answeredAt": "2026-07-09T14:10:02.972Z"
+    },
+    {
+      "id": "ans_mrdl2y580iqe8pi2",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q17",
+      "mostOptionId": "q17-2",
+      "leastOptionId": "q17-4",
+      "answeredAt": "2026-07-09T14:10:02.972Z"
+    },
+    {
+      "id": "ans_mrdl2y5a0jx416ob",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q18",
+      "mostOptionId": "q18-1",
+      "leastOptionId": "q18-2",
+      "answeredAt": "2026-07-09T14:10:02.974Z"
+    },
+    {
+      "id": "ans_mrdl2y5b0k4zm58l",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q19",
+      "mostOptionId": "q19-4",
+      "leastOptionId": "q19-3",
+      "answeredAt": "2026-07-09T14:10:02.975Z"
+    },
+    {
+      "id": "ans_mrdl2y5c0l7wng2j",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q20",
+      "mostOptionId": "q20-3",
+      "leastOptionId": "q20-1",
+      "answeredAt": "2026-07-09T14:10:02.976Z"
+    },
+    {
+      "id": "ans_mrdl2y5d0m96f2ga",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q21",
+      "mostOptionId": "q21-2",
+      "leastOptionId": "q21-4",
+      "answeredAt": "2026-07-09T14:10:02.977Z"
+    },
+    {
+      "id": "ans_mrdl2y5e0nfwcmml",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q22",
+      "mostOptionId": "q22-1",
+      "leastOptionId": "q22-2",
+      "answeredAt": "2026-07-09T14:10:02.978Z"
+    },
+    {
+      "id": "ans_mrdl2y5f0oft414x",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q23",
+      "mostOptionId": "q23-4",
+      "leastOptionId": "q23-3",
+      "answeredAt": "2026-07-09T14:10:02.979Z"
+    },
+    {
+      "id": "ans_mrdl2y5g0pzzu6d1",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "questionId": "q24",
+      "mostOptionId": "q24-3",
+      "leastOptionId": "q24-1",
+      "answeredAt": "2026-07-09T14:10:02.980Z"
+    },
+    {
+      "id": "ans_mrdl5rck02lryqhw",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q01",
+      "mostOptionId": "q01-1",
+      "leastOptionId": "q01-3",
+      "answeredAt": "2026-07-09T14:12:14.132Z"
+    },
+    {
+      "id": "ans_mrdl5rcm03tfgjjl",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q02",
+      "mostOptionId": "q02-3",
+      "leastOptionId": "q02-4",
+      "answeredAt": "2026-07-09T14:12:14.134Z"
+    },
+    {
+      "id": "ans_mrdl5rco04p4kffc",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q03",
+      "mostOptionId": "q03-2",
+      "leastOptionId": "q03-1",
+      "answeredAt": "2026-07-09T14:12:14.136Z"
+    },
+    {
+      "id": "ans_mrdl5rcp0534tpt8",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q04",
+      "mostOptionId": "q04-4",
+      "leastOptionId": "q04-2",
+      "answeredAt": "2026-07-09T14:12:14.137Z"
+    },
+    {
+      "id": "ans_mrdl5rcq06upn5uk",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q05",
+      "mostOptionId": "q05-1",
+      "leastOptionId": "q05-3",
+      "answeredAt": "2026-07-09T14:12:14.138Z"
+    },
+    {
+      "id": "ans_mrdl5rcr073rhasx",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q06",
+      "mostOptionId": "q06-3",
+      "leastOptionId": "q06-4",
+      "answeredAt": "2026-07-09T14:12:14.139Z"
+    },
+    {
+      "id": "ans_mrdl5rct08q2ndqu",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q07",
+      "mostOptionId": "q07-2",
+      "leastOptionId": "q07-1",
+      "answeredAt": "2026-07-09T14:12:14.141Z"
+    },
+    {
+      "id": "ans_mrdl5rcu09z29150",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q08",
+      "mostOptionId": "q08-4",
+      "leastOptionId": "q08-2",
+      "answeredAt": "2026-07-09T14:12:14.142Z"
+    },
+    {
+      "id": "ans_mrdl5rcw0a96raa2",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q09",
+      "mostOptionId": "q09-1",
+      "leastOptionId": "q09-3",
+      "answeredAt": "2026-07-09T14:12:14.144Z"
+    },
+    {
+      "id": "ans_mrdl5rcx0byolzzp",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q10",
+      "mostOptionId": "q10-3",
+      "leastOptionId": "q10-4",
+      "answeredAt": "2026-07-09T14:12:14.145Z"
+    },
+    {
+      "id": "ans_mrdl5rcy0cda0pbf",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q11",
+      "mostOptionId": "q11-2",
+      "leastOptionId": "q11-1",
+      "answeredAt": "2026-07-09T14:12:14.146Z"
+    },
+    {
+      "id": "ans_mrdl5rd00dpvc0dq",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q12",
+      "mostOptionId": "q12-4",
+      "leastOptionId": "q12-2",
+      "answeredAt": "2026-07-09T14:12:14.148Z"
+    },
+    {
+      "id": "ans_mrdl5rd30eemde4g",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q13",
+      "mostOptionId": "q13-1",
+      "leastOptionId": "q13-3",
+      "answeredAt": "2026-07-09T14:12:14.151Z"
+    },
+    {
+      "id": "ans_mrdl5rd70f84op7k",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q14",
+      "mostOptionId": "q14-1",
+      "leastOptionId": "q14-2",
+      "answeredAt": "2026-07-09T14:12:14.155Z"
+    },
+    {
+      "id": "ans_mrdl5rd80g59wyi1",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q15",
+      "mostOptionId": "q15-4",
+      "leastOptionId": "q15-3",
+      "answeredAt": "2026-07-09T14:12:14.156Z"
+    },
+    {
+      "id": "ans_mrdl5rd90hybscrm",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q16",
+      "mostOptionId": "q16-3",
+      "leastOptionId": "q16-1",
+      "answeredAt": "2026-07-09T14:12:14.157Z"
+    },
+    {
+      "id": "ans_mrdl5rda0ix1cac9",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q17",
+      "mostOptionId": "q17-2",
+      "leastOptionId": "q17-4",
+      "answeredAt": "2026-07-09T14:12:14.158Z"
+    },
+    {
+      "id": "ans_mrdl5rdb0jzpu1pv",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q18",
+      "mostOptionId": "q18-1",
+      "leastOptionId": "q18-2",
+      "answeredAt": "2026-07-09T14:12:14.159Z"
+    },
+    {
+      "id": "ans_mrdl5rdc0kr0olke",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q19",
+      "mostOptionId": "q19-4",
+      "leastOptionId": "q19-3",
+      "answeredAt": "2026-07-09T14:12:14.160Z"
+    },
+    {
+      "id": "ans_mrdl5rdd0l09n1ql",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q20",
+      "mostOptionId": "q20-3",
+      "leastOptionId": "q20-1",
+      "answeredAt": "2026-07-09T14:12:14.161Z"
+    },
+    {
+      "id": "ans_mrdl5rde0mqe7xgj",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q21",
+      "mostOptionId": "q21-2",
+      "leastOptionId": "q21-4",
+      "answeredAt": "2026-07-09T14:12:14.162Z"
+    },
+    {
+      "id": "ans_mrdl5rdf0nmlsl60",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q22",
+      "mostOptionId": "q22-1",
+      "leastOptionId": "q22-2",
+      "answeredAt": "2026-07-09T14:12:14.163Z"
+    },
+    {
+      "id": "ans_mrdl5rdg0on6ommq",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q23",
+      "mostOptionId": "q23-4",
+      "leastOptionId": "q23-3",
+      "answeredAt": "2026-07-09T14:12:14.164Z"
+    },
+    {
+      "id": "ans_mrdl5rdh0phflevf",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "questionId": "q24",
+      "mostOptionId": "q24-3",
+      "leastOptionId": "q24-1",
+      "answeredAt": "2026-07-09T14:12:14.165Z"
+    },
+    {
+      "id": "ans_mrfxqjg30204a2c3",
+      "sessionId": "ses_mrfxps2q01i5ie3l",
+      "questionId": "q01",
+      "mostOptionId": "q01-1",
+      "leastOptionId": "q01-2",
+      "answeredAt": "2026-07-11T05:39:51.411Z"
+    },
+    {
+      "id": "ans_mrfxr2pg03jonoaz",
+      "sessionId": "ses_mrfxps2q01i5ie3l",
+      "questionId": "q02",
+      "mostOptionId": "q02-2",
+      "leastOptionId": "q02-3",
+      "answeredAt": "2026-07-11T05:40:16.372Z"
+    }
+  ],
+  "result": [
+    {
+      "id": "res_demo_amara",
+      "sessionId": "ses_demo_amara",
+      "userId": "usr_demo_amara",
+      "rawMost": {
+        "d": 19,
+        "i": 3,
+        "s": 1,
+        "c": 1
+      },
+      "rawLeast": {
+        "d": 2,
+        "i": 1,
+        "s": 13,
+        "c": 2
+      },
+      "net": {
+        "d": 17,
+        "i": 2,
+        "s": -12,
+        "c": -1
+      },
+      "normalized": {
+        "d": 86,
+        "i": 54,
+        "s": 24,
+        "c": 48
+      },
+      "archetypeCode": "D",
+      "primaryDimension": "D",
+      "secondaryDimension": null,
+      "intensity": {
+        "D": "VERY_HIGH",
+        "I": "MODERATE",
+        "S": "LOW",
+        "C": "MODERATE"
+      },
+      "createdAt": "2026-06-01T09:00:00.000Z"
+    },
+    {
+      "id": "res_demo_leo",
+      "sessionId": "ses_demo_leo",
+      "userId": "usr_demo_leo",
+      "rawMost": {
+        "d": 14,
+        "i": 8,
+        "s": 1,
+        "c": 1
+      },
+      "rawLeast": {
+        "d": 2,
+        "i": 1,
+        "s": 11,
+        "c": 8
+      },
+      "net": {
+        "d": 12,
+        "i": 7,
+        "s": -10,
+        "c": -7
+      },
+      "normalized": {
+        "d": 76,
+        "i": 64,
+        "s": 30,
+        "c": 36
+      },
+      "archetypeCode": "DI",
+      "primaryDimension": "D",
+      "secondaryDimension": "I",
+      "intensity": {
+        "D": "VERY_HIGH",
+        "I": "HIGH",
+        "S": "LOW",
+        "C": "MODERATE"
+      },
+      "createdAt": "2026-06-01T09:00:00.000Z"
+    },
+    {
+      "id": "res_demo_priya",
+      "sessionId": "ses_demo_priya",
+      "userId": "usr_demo_priya",
+      "rawMost": {
+        "d": 3,
+        "i": 17,
+        "s": 2,
+        "c": 2
+      },
+      "rawLeast": {
+        "d": 2,
+        "i": 2,
+        "s": 5,
+        "c": 12
+      },
+      "net": {
+        "d": 1,
+        "i": 15,
+        "s": -3,
+        "c": -10
+      },
+      "normalized": {
+        "d": 52,
+        "i": 82,
+        "s": 44,
+        "c": 30
+      },
+      "archetypeCode": "I",
+      "primaryDimension": "I",
+      "secondaryDimension": null,
+      "intensity": {
+        "D": "MODERATE",
+        "I": "VERY_HIGH",
+        "S": "MODERATE",
+        "C": "LOW"
+      },
+      "createdAt": "2026-06-01T09:00:00.000Z"
+    },
+    {
+      "id": "res_demo_daniel",
+      "sessionId": "ses_demo_daniel",
+      "userId": "usr_demo_daniel",
+      "rawMost": {
+        "d": 3,
+        "i": 12,
+        "s": 7,
+        "c": 2
+      },
+      "rawLeast": {
+        "d": 11,
+        "i": 3,
+        "s": 2,
+        "c": 7
+      },
+      "net": {
+        "d": -8,
+        "i": 9,
+        "s": 5,
+        "c": -5
+      },
+      "normalized": {
+        "d": 34,
+        "i": 68,
+        "s": 60,
+        "c": 40
+      },
+      "archetypeCode": "IS",
+      "primaryDimension": "I",
+      "secondaryDimension": "S",
+      "intensity": {
+        "D": "LOW",
+        "I": "HIGH",
+        "S": "HIGH",
+        "C": "MODERATE"
+      },
+      "createdAt": "2026-06-01T09:00:00.000Z"
+    },
+    {
+      "id": "res_demo_sofia",
+      "sessionId": "ses_demo_sofia",
+      "userId": "usr_demo_sofia",
+      "rawMost": {
+        "d": 2,
+        "i": 2,
+        "s": 18,
+        "c": 2
+      },
+      "rawLeast": {
+        "d": 14,
+        "i": 3,
+        "s": 2,
+        "c": 1
+      },
+      "net": {
+        "d": -12,
+        "i": -1,
+        "s": 16,
+        "c": 1
+      },
+      "normalized": {
+        "d": 26,
+        "i": 48,
+        "s": 84,
+        "c": 52
+      },
+      "archetypeCode": "S",
+      "primaryDimension": "S",
+      "secondaryDimension": null,
+      "intensity": {
+        "D": "LOW",
+        "I": "MODERATE",
+        "S": "VERY_HIGH",
+        "C": "MODERATE"
+      },
+      "createdAt": "2026-06-01T09:00:00.000Z"
+    },
+    {
+      "id": "res_demo_marcus",
+      "sessionId": "ses_demo_marcus",
+      "userId": "usr_demo_marcus",
+      "rawMost": {
+        "d": 3,
+        "i": 3,
+        "s": 11,
+        "c": 7
+      },
+      "rawLeast": {
+        "d": 13,
+        "i": 10,
+        "s": 3,
+        "c": 3
+      },
+      "net": {
+        "d": -10,
+        "i": -7,
+        "s": 8,
+        "c": 4
+      },
+      "normalized": {
+        "d": 30,
+        "i": 36,
+        "s": 66,
+        "c": 58
+      },
+      "archetypeCode": "SC",
+      "primaryDimension": "S",
+      "secondaryDimension": "C",
+      "intensity": {
+        "D": "LOW",
+        "I": "MODERATE",
+        "S": "HIGH",
+        "C": "HIGH"
+      },
+      "createdAt": "2026-06-01T09:00:00.000Z"
+    },
+    {
+      "id": "res_demo_elena",
+      "sessionId": "ses_demo_elena",
+      "userId": "usr_demo_elena",
+      "rawMost": {
+        "d": 2,
+        "i": 2,
+        "s": 1,
+        "c": 19
+      },
+      "rawLeast": {
+        "d": 7,
+        "i": 13,
+        "s": 3,
+        "c": 1
+      },
+      "net": {
+        "d": -5,
+        "i": -11,
+        "s": -2,
+        "c": 18
+      },
+      "normalized": {
+        "d": 40,
+        "i": 28,
+        "s": 46,
+        "c": 88
+      },
+      "archetypeCode": "C",
+      "primaryDimension": "C",
+      "secondaryDimension": null,
+      "intensity": {
+        "D": "MODERATE",
+        "I": "LOW",
+        "S": "MODERATE",
+        "C": "VERY_HIGH"
+      },
+      "createdAt": "2026-06-01T09:00:00.000Z"
+    },
+    {
+      "id": "res_demo_tomas",
+      "sessionId": "ses_demo_tomas",
+      "userId": "usr_demo_tomas",
+      "rawMost": {
+        "d": 8,
+        "i": 2,
+        "s": 2,
+        "c": 12
+      },
+      "rawLeast": {
+        "d": 2,
+        "i": 5,
+        "s": 8,
+        "c": 2
+      },
+      "net": {
+        "d": 6,
+        "i": -3,
+        "s": -6,
+        "c": 10
+      },
+      "normalized": {
+        "d": 62,
+        "i": 44,
+        "s": 38,
+        "c": 70
+      },
+      "archetypeCode": "CD",
+      "primaryDimension": "C",
+      "secondaryDimension": "D",
+      "intensity": {
+        "D": "HIGH",
+        "I": "MODERATE",
+        "S": "MODERATE",
+        "C": "HIGH"
+      },
+      "createdAt": "2026-06-01T09:00:00.000Z"
+    },
+    {
+      "id": "res_demo_nia",
+      "sessionId": "ses_demo_nia",
+      "userId": "usr_demo_nia",
+      "rawMost": {
+        "d": 5,
+        "i": 7,
+        "s": 8,
+        "c": 4
+      },
+      "rawLeast": {
+        "d": 4,
+        "i": 4,
+        "s": 4,
+        "c": 4
+      },
+      "net": {
+        "d": 1,
+        "i": 3,
+        "s": 4,
+        "c": 0
+      },
+      "normalized": {
+        "d": 52,
+        "i": 56,
+        "s": 58,
+        "c": 50
+      },
+      "archetypeCode": "BAL",
+      "primaryDimension": "S",
+      "secondaryDimension": null,
+      "intensity": {
+        "D": "MODERATE",
+        "I": "HIGH",
+        "S": "HIGH",
+        "C": "MODERATE"
+      },
+      "createdAt": "2026-06-01T09:00:00.000Z"
+    },
+    {
+      "id": "res_mrdkf7900qn0rlwu",
+      "sessionId": "ses_mrdkf76h012ov57d",
+      "userId": "usr_demo",
+      "rawMost": {
+        "d": 6,
+        "i": 6,
+        "s": 6,
+        "c": 6
+      },
+      "rawLeast": {
+        "d": 6,
+        "i": 6,
+        "s": 6,
+        "c": 6
+      },
+      "net": {
+        "d": 0,
+        "i": 0,
+        "s": 0,
+        "c": 0
+      },
+      "normalized": {
+        "d": 50,
+        "i": 50,
+        "s": 50,
+        "c": 50
+      },
+      "archetypeCode": "BAL",
+      "primaryDimension": "D",
+      "secondaryDimension": null,
+      "intensity": {
+        "D": "MODERATE",
+        "I": "MODERATE",
+        "S": "MODERATE",
+        "C": "MODERATE"
+      },
+      "createdAt": "2026-07-09T13:51:35.028Z"
+    },
+    {
+      "id": "res_mrdl2y5k0qqyp9c8",
+      "sessionId": "ses_mrdl2y4c014re01d",
+      "userId": "usr_demo",
+      "rawMost": {
+        "d": 16,
+        "i": 8,
+        "s": 0,
+        "c": 0
+      },
+      "rawLeast": {
+        "d": 0,
+        "i": 0,
+        "s": 16,
+        "c": 8
+      },
+      "net": {
+        "d": 16,
+        "i": 8,
+        "s": -16,
+        "c": -8
+      },
+      "normalized": {
+        "d": 83,
+        "i": 67,
+        "s": 17,
+        "c": 33
+      },
+      "archetypeCode": "D",
+      "primaryDimension": "D",
+      "secondaryDimension": null,
+      "intensity": {
+        "D": "VERY_HIGH",
+        "I": "HIGH",
+        "S": "LOW",
+        "C": "LOW"
+      },
+      "createdAt": "2026-07-09T14:10:02.984Z"
+    },
+    {
+      "id": "res_mrdl5rdj0q4twked",
+      "sessionId": "ses_mrdl5rb301sa3ur5",
+      "userId": "usr_demo",
+      "rawMost": {
+        "d": 13,
+        "i": 11,
+        "s": 0,
+        "c": 0
+      },
+      "rawLeast": {
+        "d": 0,
+        "i": 0,
+        "s": 13,
+        "c": 11
+      },
+      "net": {
+        "d": 13,
+        "i": 11,
+        "s": -13,
+        "c": -11
+      },
+      "normalized": {
+        "d": 77,
+        "i": 73,
+        "s": 23,
+        "c": 27
+      },
+      "archetypeCode": "DI",
+      "primaryDimension": "D",
+      "secondaryDimension": "I",
+      "intensity": {
+        "D": "VERY_HIGH",
+        "I": "HIGH",
+        "S": "LOW",
+        "C": "LOW"
+      },
+      "createdAt": "2026-07-09T14:12:14.167Z"
+    }
+  ],
+  "team": [
+    {
+      "id": "tem_demo",
+      "name": "Atlas Demo Team",
+      "ownerId": "usr_demo",
+      "createdAt": "2026-06-01T09:00:00.000Z"
+    }
+  ],
+  "teamMember": [
+    {
+      "id": "tmm_demo_amara",
+      "teamId": "tem_demo",
+      "userId": null,
+      "displayName": "Amara Okafor",
+      "roleTitle": "Head of Product",
+      "department": "Product",
+      "resultId": "res_demo_amara",
+      "archetypeCode": "D",
+      "normalized": {
+        "d": 86,
+        "i": 54,
+        "s": 24,
+        "c": 48
+      }
+    },
+    {
+      "id": "tmm_demo_leo",
+      "teamId": "tem_demo",
+      "userId": null,
+      "displayName": "Leo Marchetti",
+      "roleTitle": "Enterprise Sales Lead",
+      "department": "Go-to-Market",
+      "resultId": "res_demo_leo",
+      "archetypeCode": "DI",
+      "normalized": {
+        "d": 76,
+        "i": 64,
+        "s": 30,
+        "c": 36
+      }
+    },
+    {
+      "id": "tmm_demo_priya",
+      "teamId": "tem_demo",
+      "userId": null,
+      "displayName": "Priya Shah",
+      "roleTitle": "Marketing Director",
+      "department": "Go-to-Market",
+      "resultId": "res_demo_priya",
+      "archetypeCode": "I",
+      "normalized": {
+        "d": 52,
+        "i": 82,
+        "s": 44,
+        "c": 30
+      }
+    },
+    {
+      "id": "tmm_demo_daniel",
+      "teamId": "tem_demo",
+      "userId": null,
+      "displayName": "Daniel Kim",
+      "roleTitle": "Customer Success Manager",
+      "department": "Go-to-Market",
+      "resultId": "res_demo_daniel",
+      "archetypeCode": "IS",
+      "normalized": {
+        "d": 34,
+        "i": 68,
+        "s": 60,
+        "c": 40
+      }
+    },
+    {
+      "id": "tmm_demo_sofia",
+      "teamId": "tem_demo",
+      "userId": null,
+      "displayName": "Sofia Reyes",
+      "roleTitle": "People Operations Lead",
+      "department": "Operations & People",
+      "resultId": "res_demo_sofia",
+      "archetypeCode": "S",
+      "normalized": {
+        "d": 26,
+        "i": 48,
+        "s": 84,
+        "c": 52
+      }
+    },
+    {
+      "id": "tmm_demo_marcus",
+      "teamId": "tem_demo",
+      "userId": null,
+      "displayName": "Marcus Bell",
+      "roleTitle": "QA Engineering Lead",
+      "department": "Engineering",
+      "resultId": "res_demo_marcus",
+      "archetypeCode": "SC",
+      "normalized": {
+        "d": 30,
+        "i": 36,
+        "s": 66,
+        "c": 58
+      }
+    },
+    {
+      "id": "tmm_demo_elena",
+      "teamId": "tem_demo",
+      "userId": null,
+      "displayName": "Elena Volkov",
+      "roleTitle": "Data Science Lead",
+      "department": "Engineering",
+      "resultId": "res_demo_elena",
+      "archetypeCode": "C",
+      "normalized": {
+        "d": 40,
+        "i": 28,
+        "s": 46,
+        "c": 88
+      }
+    },
+    {
+      "id": "tmm_demo_tomas",
+      "teamId": "tem_demo",
+      "userId": null,
+      "displayName": "Tomás Ferreira",
+      "roleTitle": "Engineering Manager",
+      "department": "Engineering",
+      "resultId": "res_demo_tomas",
+      "archetypeCode": "CD",
+      "normalized": {
+        "d": 62,
+        "i": 44,
+        "s": 38,
+        "c": 70
+      }
+    },
+    {
+      "id": "tmm_demo_nia",
+      "teamId": "tem_demo",
+      "userId": null,
+      "displayName": "Nia Thompson",
+      "roleTitle": "Program Manager",
+      "department": "Product",
+      "resultId": "res_demo_nia",
+      "archetypeCode": "BAL",
+      "normalized": {
+        "d": 52,
+        "i": 56,
+        "s": 58,
+        "c": 50
+      }
+    }
+  ]
+}

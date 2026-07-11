@@ -1,237 +1,173 @@
 @import "tailwindcss";
 
 @theme {
-  /* ── Cognitive Atlas · surfaces ─────────────────────────── */
-  --color-midnight-950: #07090f;
-  --color-midnight-900: #0d1117;
-  --color-graphite-800: #151a23;
-  --color-graphite-700: #1c2330;
-  --color-line: rgba(255, 255, 255, 0.08);
-  --color-line-strong: rgba(255, 255, 255, 0.14);
+  /* ── Meridian · canvas ──────────────────────────────────── */
+  --color-canvas: #f7f4ee;
+  --color-mineral: #fcfbf8;
+  --color-paper: #ffffff;
 
   /* ── ink ────────────────────────────────────────────────── */
-  --color-ink: #f4f6fb;
-  --color-ink-secondary: #a8b0c0;
-  --color-ink-muted: #6b7485;
+  --color-ink: #17201d;
+  --color-slate: #5f6965;
+  --color-faint: #8b948f;
 
-  /* ── DISC series (chart-safe on midnight-900) ───────────── */
-  --color-disc-d: #e8564a;
-  --color-disc-i: #c98500;
-  --color-disc-s: #199e70;
-  --color-disc-c: #3987e5;
+  /* ── brand ──────────────────────────────────────────────── */
+  --color-botanical: #174c3c;
+  --color-botanical-deep: #0e3529;
+  --color-teal: #4b8275;
+  --color-sage: #bfd2c8;
+  --color-sand: #e8ded0;
+  --color-hairline: rgba(23, 32, 29, 0.1);
+  --color-hairline-strong: rgba(23, 32, 29, 0.18);
 
-  /* glow variants — gradients & luminous edges only, never chart marks */
-  --color-disc-d-glow: #ff7a6b;
-  --color-disc-i-glow: #f5b83d;
-  --color-disc-s-glow: #2fd695;
-  --color-disc-c-glow: #63b3ff;
+  /* ── DISC identifiers (data, badges, chart marks only) ──── */
+  --color-disc-d: #c24a2e;
+  --color-disc-i: #a97614;
+  --color-disc-s: #2f7a57;
+  --color-disc-c: #33648f;
 
-  /* ── signature accent ───────────────────────────────────── */
-  --color-accent: #4fe3c1;
-  --color-accent-alt: #8b7cff;
+  /* soft tints for fills, chips, and chart areas */
+  --color-disc-d-soft: #f4ddd5;
+  --color-disc-i-soft: #f1e6c9;
+  --color-disc-s-soft: #d8e8de;
+  --color-disc-c-soft: #d9e4ef;
 
   /* ── typography ─────────────────────────────────────────── */
-  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", monospace;
 
+  /* fluid editorial scale */
+  --text-display: clamp(2.9rem, 6.5vw + 0.8rem, 6rem);
+  --text-display--line-height: 1.02;
+  --text-display--letter-spacing: -0.02em;
+  --text-h1: clamp(2.3rem, 4vw + 0.7rem, 4rem);
+  --text-h1--line-height: 1.06;
+  --text-h1--letter-spacing: -0.015em;
+  --text-h2: clamp(1.8rem, 2.4vw + 0.7rem, 2.8rem);
+  --text-h2--line-height: 1.12;
+  --text-h2--letter-spacing: -0.01em;
+  --text-h3: clamp(1.3rem, 1.2vw + 0.7rem, 1.7rem);
+  --text-h3--line-height: 1.25;
+  --text-lead: clamp(1.08rem, 0.55vw + 0.92rem, 1.32rem);
+  --text-lead--line-height: 1.6;
+
   /* ── geometry ───────────────────────────────────────────── */
-  --radius-panel: 20px;
+  --radius-editorial: 28px;
+  --radius-arch: 45% 45% 4% 4%;
 
   /* ── motion ─────────────────────────────────────────────── */
-  --ease-atlas: cubic-bezier(0.22, 1, 0.36, 1);
-
-  --animate-orbit-slow: orbit 36s linear infinite;
-  --animate-orbit-slower: orbit 52s linear infinite reverse;
-  --animate-drift: drift 14s var(--ease-atlas) infinite alternate;
-  --animate-pulse-glow: pulse-glow 4.5s ease-in-out infinite;
-
-  @keyframes orbit {
-    from {
-      transform: rotate(0deg);
-    }
-    to {
-      transform: rotate(360deg);
-    }
-  }
-  @keyframes drift {
-    from {
-      transform: translate3d(0, 0, 0) scale(1);
-    }
-    to {
-      transform: translate3d(0, -18px, 0) scale(1.04);
-    }
-  }
-  @keyframes pulse-glow {
-    0%,
-    100% {
-      opacity: 0.55;
-    }
-    50% {
-      opacity: 1;
-    }
-  }
+  --ease-meridian: cubic-bezier(0.32, 0.94, 0.6, 1);
 }
 
 /* ── base ─────────────────────────────────────────────────── */
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  background-color: var(--color-midnight-950);
+  background-color: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01";
 }
 
 ::selection {
-  background: color-mix(in oklch, var(--color-accent) 30%, transparent);
+  background: var(--color-sage);
   color: var(--color-ink);
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+  outline: 2px solid var(--color-botanical);
+  outline-offset: 3px;
   border-radius: 4px;
 }
 
-/* ── Cognitive Atlas utilities ────────────────────────────── */
+/* ── Meridian utilities ───────────────────────────────────── */
 
-/* Dimensional glass panel: hairline border, inner top highlight, deep shadow */
-@utility glass-panel {
+/* Subtle warm paper grain — texture without noise files. */
+@utility paper-grain {
   position: relative;
-  border-radius: var(--radius-panel);
-  border: 1px solid var(--color-line);
-  background: linear-gradient(
-    160deg,
-    rgba(255, 255, 255, 0.06),
-    rgba(255, 255, 255, 0.02)
-  );
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 24px 48px -24px rgba(0, 0, 0, 0.6);
+}
+.paper-grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.09 0 0 0 0 0.13 0 0 0 0 0.11 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* Raised variant for hover / active emphasis */
-@utility glass-panel-raised {
-  border-color: var(--color-line-strong);
-  background: linear-gradient(
-    160deg,
-    rgba(255, 255, 255, 0.09),
-    rgba(255, 255, 255, 0.03)
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.09),
-    0 32px 64px -28px rgba(0, 0, 0, 0.7);
+/* Editorial content card: paper on ivory with a single soft shadow. */
+@utility paper-card {
+  background: var(--color-paper);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-editorial);
+  box-shadow: 0 20px 40px -30px rgba(23, 32, 29, 0.25);
 }
 
-/* Signature duotone gradient — CTAs and key emphasis only */
-@utility accent-gradient {
-  background-image: linear-gradient(
-    135deg,
-    var(--color-accent),
-    var(--color-accent-alt)
-  );
+/* Organic asymmetric image mask */
+@utility mask-organic {
+  border-radius: 42% 58% 52% 48% / 38% 44% 56% 62%;
+  overflow: hidden;
 }
 
-@utility accent-gradient-text {
-  background-image: linear-gradient(
-    135deg,
-    var(--color-accent),
-    var(--color-accent-alt)
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+/* Arched editorial mask (portrait imagery) */
+@utility mask-arch {
+  border-radius: 999px 999px 24px 24px;
+  overflow: hidden;
 }
 
-/* Per-dimension luminous halo (uses glow variants, UI chrome only) */
-@utility glow-d {
-  box-shadow: 0 0 48px -12px
-    color-mix(in oklch, var(--color-disc-d-glow) 35%, transparent);
+/* Hairline rules */
+@utility rule-t {
+  border-top: 1px solid var(--color-hairline);
 }
-@utility glow-i {
-  box-shadow: 0 0 48px -12px
-    color-mix(in oklch, var(--color-disc-i-glow) 35%, transparent);
-}
-@utility glow-s {
-  box-shadow: 0 0 48px -12px
-    color-mix(in oklch, var(--color-disc-s-glow) 35%, transparent);
-}
-@utility glow-c {
-  box-shadow: 0 0 48px -12px
-    color-mix(in oklch, var(--color-disc-c-glow) 35%, transparent);
-}
-@utility glow-accent {
-  box-shadow: 0 0 56px -14px
-    color-mix(in oklch, var(--color-accent) 40%, transparent);
+@utility rule-b {
+  border-bottom: 1px solid var(--color-hairline);
 }
 
-/* Faint blueprint grid for dimensional backdrops */
-@utility atlas-grid {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 30%, transparent 75%);
+/* Ink band — the only permitted dark surface, used as small accents */
+@utility ink-band {
+  background: var(--color-ink);
+  color: var(--color-mineral);
 }
 
-/* Hairline divider */
-@utility hairline-b {
-  border-bottom: 1px solid var(--color-line);
-}
-
-/* ── print / report-ready layout ──────────────────────────── */
-
-@media print {
-  :root {
-    --color-midnight-950: #ffffff;
-    --color-midnight-900: #ffffff;
-    --color-graphite-800: #ffffff;
-    --color-graphite-700: #f4f5f8;
-    --color-line: rgba(0, 0, 0, 0.14);
-    --color-line-strong: rgba(0, 0, 0, 0.24);
-    --color-ink: #12151c;
-    --color-ink-secondary: #3b4252;
-    --color-ink-muted: #667085;
-  }
-
-  body {
-    background: #ffffff !important;
-    color: var(--color-ink) !important;
-  }
-
-  /* Reveal everything the viewport-based motion left hidden. */
-  * {
-    opacity: 1 !important;
-    transform: none !important;
-    animation: none !important;
-    transition: none !important;
-  }
-
-  .glass-panel,
-  .glass-panel-raised {
-    background: #ffffff !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    box-shadow: none !important;
-    border-color: rgba(0, 0, 0, 0.16) !important;
-    break-inside: avoid;
-  }
-
-  .atlas-grid {
-    background-image: none !important;
-  }
+/* Botanical band for conversion moments */
+@utility botanical-band {
+  background: var(--color-botanical);
+  color: var(--color-mineral);
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  }
+}
+
+/* ── print (report & presentation exports) ────────────────── */
+
+@media print {
+  body {
+    background: #ffffff !important;
+  }
+  * {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+  .paper-card {
+    box-shadow: none !important;
+    break-inside: avoid;
   }
 }

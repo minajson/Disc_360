@@ -1,123 +1,156 @@
 @AGENTS.md
 
-# Disc360 — "Cognitive Atlas"
+# DISC360 — Personality Intelligence Platform (v2 "Meridian")
 
-Premium DISC personality intelligence platform for individuals, teams, coaches, HR leaders, and organizations. Fullstack Next.js 16 App Router, strict TypeScript, Tailwind CSS v4, Framer Motion, Zod, custom SVG charts, Prisma-shaped JSON-file mock DB.
+Production full-stack platform: premium **light editorial** interface, Supabase
+auth + Postgres + RLS, organizations/teams/campaigns, two-stage DISC
+assessment, individual reports, team intelligence, and presentation mode.
 
 ## Commands
 
 ```bash
-npm run dev          # dev server (Turbopack)
-npm run build        # production build — must pass before every phase commit
-npm run lint         # eslint
-npm run typecheck    # tsc --noEmit
-npm test             # node --test lib/scoring/*.test.ts  (Node 25 runs TS natively)
+npm run dev            # dev server (Turbopack)
+npm run build          # production build — must pass before every phase commit
+npm run lint           # eslint
+npm run typecheck      # tsc --noEmit
+npm test               # node --test lib/scoring/*.test.ts (Node runs TS natively)
+npx supabase start     # local Postgres + Auth + email capture (requires Docker)
+npx supabase db reset  # re-apply migrations + seed
 ```
 
 ## DISC naming (mandatory)
 
-User-facing labels are **always**:
+| Code | UI label | Displayed letter |
+|------|----------|------------------|
+| D | **Dominant** | D |
+| I | **Influence** | I |
+| S | **Stable** | S |
+| C | **Analytical** | **A** |
 
-| Code | UI label |
-|------|----------|
-| D | **Dominant** |
-| I | **Influence** |
-| S | **Stable** |
-| C | **Analytical** |
+Never display "Dominance", "Steadiness" or "Conscientiousness". Internal
+keys/ids always keep `C`; every user-facing letter or archetype code renders
+via `dimensionMeta[dim].displayCode` / `displayArchetypeCode()`
+(`lib/utils/display.ts`) — DC → DA, CS → AS. Never reveal D/I/S/C mappings
+inside the assessment experience.
 
-Never use "Dominance", "Steadiness", or "Conscientiousness" anywhere in the interface, insight copy, chart labels, or metadata. Internal type code stays `'D' | 'I' | 'S' | 'C'`.
-
-**Display codes:** every user-facing single letter and archetype code renders Analytical as **A** — use `dimensionMeta[dim].displayCode` for letters and `displayArchetypeCode()` (`lib/utils/display.ts`) for archetype codes (DC → DA, CS → AS, C → A). Internal keys, ids, and stored data always keep `C`.
-
-## Directory structure
+## Product architecture
 
 ```
-app/                      # routes only — no business logic in pages
-  page.tsx                # landing
-  assessment/             # intro page + [sessionId] runner
-  results/[resultId]/     # report page
-  dashboard/              # overview + history/
-  team/                   # team intelligence view
-  api/                    # assessment | results | history | team route handlers
-components/
-  landing/ assessment/ results/ dashboard/ team/   # feature components
-  charts/                 # custom SVG charts (no chart library)
-  ui/                     # design-system primitives
-  layout/                 # header, footer, shells
-  motion/                 # Framer Motion wrappers — the 3D swap layer
-lib/
-  assessment/             # Zod schemas, question helpers
-  scoring/                # pure scoring pipeline + *.test.ts
-  insights/               # insight lookup helpers
-  mock-db/                # Prisma-shaped JSON store (swap point for real DB)
-  auth/                   # getCurrentUser() stub, NextAuth-shaped config
-  types/                  # shared domain model
-  utils/                  # cn(), formatters
-data/
-  disc-questions.ts       # 24 groups × 4 adjectives (one per dimension)
-  insight-maps.ts         # 13 archetype insight entries + dimensionMeta
-  team-demo-data.ts       # seeded demo team
+app/(marketing)/   public site: /, how-it-works, individuals, teams, coaches,
+                   organizations, about, pricing, resources, contact, privacy, terms
+app/(auth)/        sign-in, sign-up, forgot-password, reset-password
+app/auth/callback  OAuth/email confirmation handler
+app/onboarding/    post-signup intent flows
+app/join/          invitation link + team code acceptance
+app/app/           authenticated product: dashboard, assessments, results,
+                   history, reports, invitations, settings, teams/*
+components/        marketing/ media/ ui/ charts/ motion/ (+ app/ feature dirs)
+lib/               scoring/ (pure, tested) · assessment/ · actions/ (server actions)
+                   db/ (supabase clients, queries) · auth/ (guards) · email/
+                   motion/ · types/ · utils/
+data/              disc-questions.ts · insight-maps.ts · dimension-meta.ts
+supabase/          config.toml · migrations/ · seed.sql
 ```
 
-## Type conventions
+- Server Components by default; client components only for interaction.
+- **Mutations are Server Actions** in `lib/actions/*` — every one validates
+  input with Zod and authorizes on the server. Route handlers only where the
+  platform requires them (auth callback, exports).
+- Pages compose; `lib/` computes. No business logic in `app/`.
 
-- `strict`, `noUncheckedIndexedAccess`, `noFallthroughCasesInSwitch` are on — no `any`, no non-null assertions to silence the compiler.
-- Domain types live in `lib/types/index.ts` only; never redeclare them locally.
-- IDs are prefixed strings: `usr_`, `ses_`, `ans_`, `res_`, `tem_`, `tmm_` (see `lib/mock-db/ids.ts`).
-- Dates are ISO-8601 strings (Prisma-compatible serialization), never `Date` objects across API boundaries.
-- API payloads are validated with Zod schemas from `lib/assessment/schemas.ts` — shared by client and server. Error envelope everywhere: `{ error: { code, message, issues? } }`.
+## Database rules
 
-## Naming rules
+- Supabase Postgres. Schema lives in `supabase/migrations/*.sql` — never edit
+  applied migrations; add new ones.
+- UUID PKs, `created_at`/`updated_at` (trigger-maintained), FKs, indexes on
+  every FK and lookup path, `archived_at` for soft archival.
+- Normalized DISC scores are **queryable columns** (`score_d/i/s/c`,
+  `archetype_code`, `primary_dimension`) — JSONB only for supplementary
+  report snapshots.
+- Every table has RLS enabled with explicit policies. No table ships without
+  policies. Individual `assessment_responses` are readable only by their owner
+  — never by team admins or members.
+- Generated types via `supabase gen types typescript` → `lib/db/types.ts`.
 
-- Components: PascalCase file + named export (`HeroSection.tsx` exports `HeroSection`).
-- lib/data files: kebab-case (`compute-result.ts`, `disc-questions.ts`).
-- Client Components get `"use client"` only when they need interactivity — Server Components are the default everywhere.
-- Route params in Next 16 are async: `const { sessionId } = await params`.
-- Pages that read the mock DB declare `export const dynamic = "force-dynamic"` (mock DB is request-time data; never let the build prerender stale reads).
+## Security rules
 
-## DISC scoring rules (do not change without updating tests)
+- Never trust client-sent role/org/team ids — resolve membership server-side
+  via guards in `lib/auth/guards.ts` (`requireUser`, `requireTeamAdmin`, …).
+- Secrets only in env; `SUPABASE_SERVICE_ROLE_KEY` is server-only and used
+  exclusively where RLS bypass is explicitly justified in a comment.
+- Invitations: random tokens (crypto), expiry, single-acceptance; rate-limit
+  invitation/email sends.
+- Sensitive admin actions write `audit_logs` rows.
+- No diagnostic/medical/employment-selection claims anywhere in product copy.
 
-- 24 forced-choice groups; each group has exactly 4 adjectives, one per dimension. Per question the user picks one MOST and one LEAST; they can never be the same option.
-- Raw: +1 `most[dim]`, +1 `least[dim]` per answer. Net = most − least (−24…+24). Normalized = `round(((net + 24) / 48) * 100)`, clamped 0–100.
-- Archetype derivation (deterministic; dimension sort tie-break is **D → I → S → C**):
-  1. **Balanced** if `max − min ≤ 12` → `BAL`.
-  2. **Pure** if `top1 − top2 ≥ 15` → `D | I | S | C`.
-  3. **Pair** otherwise: primary+secondary code. Valid pairs are adjacent combos only: `DI ID IS SI SC CS CD DC`.
-  4. **Diagonal rule**: D↔S and I↔C are opposites, never a pair. If secondary is the primary's opposite, substitute the third-ranked dimension when `top2 − top3 ≤ 8`; otherwise fall back to the pure primary.
-- 13 archetypes total: `D DI ID I IS SI S SC CS C CD DC BAL`.
-- Intensity bands: 0–35 LOW, 36–55 MODERATE, 56–75 HIGH, 76–100 VERY_HIGH.
-- Scoring functions in `lib/scoring/` are pure — no I/O, no Date.now(), no randomness. `computeResult()` is the only entry point the API layer calls.
+## Roles
 
-## State management rules
+`individual` · `team_member` · `team_admin` · `coach` · `organization_admin` ·
+`super_admin`. Roles are membership-scoped (org/team member rows), not global
+flags — except `super_admin` on the profile. Team reports respect
+`results_named` + member visibility; anonymized mode strips names in queries,
+not in the client.
 
-- Server state lives in `lib/mock-db` — a `globalThis` singleton with Prisma-mimicking API (`db.result.create({ data })`, `.findUnique({ where })`, …) writing through to git-ignored `.mockdb/db.json`. Swapping to real Prisma later must only touch `lib/mock-db`.
-- Assessment flow state lives in `AssessmentController`'s `useReducer` — optimistic UI, PATCH autosave per answer, resume from server session on mount.
-- No global client store (no Redux/Zustand/Context-as-store). Server Components fetch via `lib/` directly — pages never `fetch()` their own API routes.
-- API routes exist for the client-side assessment flow and future backend parity only.
+## Assessment state rules
 
-## Design system — "Cognitive Atlas"
+- Sessions: `in_progress → completed | abandoned`; one active session per
+  user per campaign context; `current_index` tracks resume position.
+- Responses: unique per (session, question); MOST ≠ LEAST enforced in schema
+  and Zod; autosaved per answer.
+- Scoring: `lib/scoring/computeResult()` is the only entry point — pure,
+  deterministic, tested. Thresholds: balanced spread ≤ 12, pure gap ≥ 15,
+  diagonal window ≤ 8, tie-break D→I→S→C. Do not change without updating tests.
+- Campaigns: `draft → scheduled → active → closed → archived` (reopen:
+  closed → active).
 
-All tokens live in `app/globals.css` under Tailwind v4 `@theme` — no `tailwind.config.ts`. Dark-only in v1.
+## Design rules — "Meridian" light editorial
 
-- Surfaces: midnight `#07090F` (page) / `#0D1117` (canvas) → graphite `#151A23` (panel) / `#1C2330` (raised). Hairline borders `rgba(255,255,255,0.08)`. Ink `#F4F6FB` / `#A8B0C0` / `#6B7485`.
-- DISC series colors (CVD-validated on `#0D1117`, used for chart marks): D `#E8564A`, I `#C98500`, S `#199E70`, C `#3987E5`. Bright glow variants exist for gradients/luminous edges only — **never** as chart marks.
-- Signature accent: ion teal `#4FE3C1` → ultraviolet `#8B7CFF`, 135° gradient, CTAs and focus rings only. Not the clichéd blue→purple.
-- Fonts (`next/font/google`): Space Grotesk (display/headlines/stats), Inter (body/UI), IBM Plex Mono (scores, codes, axis labels).
-- Glass panels via the `glass-panel` utility: white 6%→2% gradient, `backdrop-blur(20px) saturate(140%)`, hairline border, inset top highlight, layered depth shadow.
-- Motion: 200ms micro-interactions, 450ms section reveals, easing `cubic-bezier(0.22, 1, 0.36, 1)`. Every `components/motion/` wrapper must respect `prefers-reduced-motion`.
-- Chart text always wears ink tokens, never series colors. Direct labels over legends when ≤4 series.
+- Canvas ivory `#F7F4EE` / mineral `#FCFBF8` / paper `#FFFFFF`; ink `#17201D`;
+  slate `#5F6965`; brand botanical `#174C3C`, teal `#4B8275`, sage `#BFD2C8`,
+  sand `#E8DED0`. Tokens live in `app/globals.css` `@theme` only.
+- DISC colors (D `#C24A2E`, I `#A97614`, S `#2F7A57`, C `#33648F` + `-soft`
+  tints) are for **data, charts, badges and small identifiers only** — never
+  brand chrome.
+- Type: Fraunces (display serif) + Inter (UI) + IBM Plex Mono (data), fluid
+  scale via `clamp()` tokens (`text-display`, `text-h1/h2/h3`, `text-lead`).
+- Editorial idiom: generous whitespace, hairlines, numbered sections,
+  `paper-card`, organic masks (`mask-organic`, `mask-arch`), single soft
+  shadows. Dark surfaces only as small accents (`ink-band`, `botanical-band`).
+- Forbidden: dark page backgrounds, neon, glassmorphism, gradient blobs,
+  purple-blue AI styling, dense KPI grids, emoji UI.
 
-## Future 3D / motion enhancement rules
+## Motion-performance rules
 
-Components marked motion-ready (`CognitiveOrbit`, `TraitConstellation`, `DimensionalHero`, `DimensionalLayer`, `MotionShell`, `ResultGlyph`, `DiscRadarChart`, `ResultPreviewPanel`, `QuestionTransition`, `CompletionInterstitial`, `TeamQuadrantMap`) are **swap points**: their prop contracts are stable and their internals may later be replaced with Fable-generated 3D/WebGL scenes. Never leak their internals to call sites; never add props that assume a specific rendering technology. New cinematic surfaces go in `components/motion/` behind the same pattern.
+- Framer Motion for component/route transitions; GSAP + ScrollTrigger only
+  inside client components that dynamically `import("gsap")` (never in the
+  assessment flow). CSS transforms for cheap depth.
+- Every enhanced scene consults `lib/motion/preferences.ts`
+  (`useMotionTier`): `reduced` renders static; `lite` (touch/small screens)
+  gets cheap motion; `full` gets cursor/scroll enhancement.
+- Base layouts must be complete and accessible without JS motion. No scroll
+  hijacking; micro-interactions ≤ 250 ms; section reveals ≤ 700 ms; assessment
+  interactions are immediate.
+- Media: `components/media/` placeholders become real assets via `src`/`poster`
+  props (specs in MEDIA_GUIDE.md). Scenes (`DiscSpectrumScene`,
+  `AssessmentTransitionScene`, `TeamCultureMapScene`, `ResultsRevealScene`)
+  are swap points for future rendered 3D — stable props, replaceable internals.
+
+## Testing requirements
+
+- Pure logic (scoring, normalization, blends, ties, validation, permissions,
+  anonymization, campaign transitions) → `node --test` colocated `*.test.ts`
+  with relative `.ts`-extension imports (the Node runner doesn't resolve `@/*`).
+- Journeys (homepage, sign-up, assessment, team creation, invitation, team
+  dashboard, presentation) → Playwright smoke tests against the local stack.
+- Gate for every phase: `lint` · `typecheck` · `test` · `build` all green.
 
 ## What NOT to do
 
-- No placeholder shortcuts: no lorem ipsum, no `TODO: add copy`, no stub pages, no fake buttons that go nowhere. Every shipped surface is finished.
-- No generic SaaS/AI-template UI: no flat white cards on gray, no basic blue-purple gradients, no emoji-driven UI, no childish quiz styling.
-- No chart libraries — charts are hand-built SVG in `components/charts/`.
-- No `console.log` left in committed code; no `any`; no suppressed lint rules without a comment explaining why.
-- No new client-side state libraries or CSS frameworks.
-- Don't put business logic in `app/` routes — pages compose, `lib/` computes.
-- Don't hardcode DISC copy in components — all archetype/dimension content comes from `data/insight-maps.ts` (per archetype: summary, strengths, blind spots, communication style + guide, leadership, conflict response, stress response, motivators/drainers, ideal environment, coaching, complementary types). Team-level narratives (culture summary, communication gaps, risk zones, actions) are rule-generated in `lib/insights/team.ts`.
-- The results page must stay print-ready: `@media print` overrides live in `globals.css`; chrome that shouldn't print gets `print:hidden`.
+- No placeholder shortcuts: no lorem ipsum, TODO markers, stub pages or dead
+  buttons. Media placeholders must look deliberate (use `components/media/`).
+- No `any`, no unexplained lint suppressions, no `console.log` in committed
+  code, no new client-state libraries, no chart libraries (charts are custom SVG).
+- Don't hardcode DISC copy in components — archetype/dimension content comes
+  from `data/insight-maps.ts` and `data/dimension-meta.ts`; team narratives are
+  rule-generated in `lib/`.
+- Don't fabricate credentials; keep `.env.example` authoritative.

@@ -24,8 +24,8 @@
 .DS_Store
 *.pem
 
-# local mock database
-/.mockdb/
+# local development artifacts
+/.contact-inbox.jsonl
 
 # debug
 npm-debug.log*

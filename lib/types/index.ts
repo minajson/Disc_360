@@ -1,6 +1,6 @@
 /**
  * Shared domain model — Prisma-compatible naming and serialization.
- * Dates are ISO-8601 strings; IDs are prefixed strings (see lib/mock-db/ids.ts).
+ * Dates are ISO-8601 strings across API boundaries.
  */
 
 export type Dimension = "D" | "I" | "S" | "C";

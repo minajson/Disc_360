@@ -21,10 +21,10 @@ export function DimensionBarChart({ scores, className }: DimensionBarChartProps)
         const value = scores[DIMENSION_KEY[dim]];
         return (
           <div key={dim} className="flex items-center gap-3">
-            <span className="w-20 shrink-0 text-xs text-ink-secondary sm:w-24 sm:text-sm">
+            <span className="w-20 shrink-0 text-xs text-slate sm:w-24 sm:text-sm">
               {meta.label}
             </span>
-            <div className="h-2 flex-1 overflow-hidden rounded-[4px] bg-white/8">
+            <div className="h-2 flex-1 overflow-hidden rounded-[4px] bg-ink/8">
               <motion.div
                 className="h-full rounded-[4px]"
                 style={{ background: `var(--color-${meta.colorVar})` }}
@@ -34,7 +34,7 @@ export function DimensionBarChart({ scores, className }: DimensionBarChartProps)
                 transition={{
                   duration: 0.7,
                   delay: index * 0.08,
-                  ease: [0.22, 1, 0.36, 1],
+                  ease: [0.32, 0.94, 0.6, 1],
                 }}
               />
             </div>

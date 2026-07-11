@@ -38,8 +38,8 @@ interface DiscRadarChartProps {
 }
 
 /**
- * Four-axis DISC kite. Motion-ready swap point: prop contract (scores in
- * 0–100 per dimension) stays stable if internals become a 3D scene.
+ * Four-axis DISC kite on the light canvas. Swap-point contract: scores in
+ * (0–100 per dimension), self-sizing SVG out.
  */
 export function DiscRadarChart({
   scores,
@@ -55,20 +55,13 @@ export function DiscRadarChart({
       aria-label={`DISC profile — Dominant ${scores.d}, Influence ${scores.i}, Stable ${scores.s}, Analytical ${scores.c}`}
       className={cn("w-full", className)}
     >
-      <defs>
-        <linearGradient id="disc-kite-fill" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="var(--color-accent)" />
-          <stop offset="100%" stopColor="var(--color-accent-alt)" />
-        </linearGradient>
-      </defs>
-
       {/* grid kites */}
       {GRID_LEVELS.map((level) => (
         <polygon
           key={level}
           points={DIMENSIONS.map((d) => pointFor(d, level).join(",")).join(" ")}
           fill="none"
-          stroke="rgba(255,255,255,0.08)"
+          stroke="var(--color-hairline)"
           strokeWidth={level === 1 ? 1.25 : 1}
           strokeDasharray={level === 1 ? undefined : "3 4"}
         />
@@ -84,7 +77,7 @@ export function DiscRadarChart({
             y1={CENTER}
             x2={x}
             y2={y}
-            stroke="rgba(255,255,255,0.08)"
+            stroke="var(--color-hairline)"
             strokeWidth={1}
           />
         );
@@ -93,15 +86,15 @@ export function DiscRadarChart({
       {/* data kite */}
       <motion.polygon
         points={polygonPoints(scores)}
-        fill="url(#disc-kite-fill)"
-        fillOpacity={0.22}
-        stroke="url(#disc-kite-fill)"
+        fill="var(--color-teal)"
+        fillOpacity={0.16}
+        stroke="var(--color-botanical)"
         strokeWidth={1.75}
         strokeLinejoin="round"
         initial={reduceMotion ? false : { opacity: 0, scale: 0.82 }}
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.6, ease: [0.32, 0.94, 0.6, 1] }}
         style={{ transformOrigin: `${CENTER}px ${CENTER}px` }}
       />
 
@@ -114,9 +107,9 @@ export function DiscRadarChart({
             key={dim}
             cx={x}
             cy={y}
-            r={4}
+            r={4.5}
             fill={`var(--color-disc-${dim.toLowerCase()})`}
-            stroke="var(--color-midnight-900)"
+            stroke="var(--color-paper)"
             strokeWidth={2}
           />
         );
@@ -135,12 +128,10 @@ export function DiscRadarChart({
             dominantBaseline="middle"
             className="font-mono"
             fontSize={11}
-            fill="var(--color-ink-secondary)"
+            fill="var(--color-slate)"
           >
             {dimensionMeta[dim].displayCode}
-            {showScores ? (
-              <tspan fill="var(--color-ink-muted)"> {score}</tspan>
-            ) : null}
+            {showScores ? <tspan fill="var(--color-faint)"> {score}</tspan> : null}
           </text>
         );
       })}

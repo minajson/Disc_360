@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Inter, Space_Grotesk } from "next/font/google";
+import { Fraunces, IBM_Plex_Mono, Inter } from "next/font/google";
 import "./globals.css";
 
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  axes: ["opsz", "SOFT"],
 });
 
 const inter = Inter({
@@ -16,29 +16,25 @@ const inter = Inter({
 const plexMono = IBM_Plex_Mono({
   variable: "--font-plex-mono",
   subsets: ["latin"],
-  weight: ["500"],
+  weight: ["400", "500"],
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("http://localhost:3000"),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  ),
   title: {
-    default: "Disc360 — Personality Intelligence Platform",
-    template: "%s · Disc360",
+    default: "DISC360 — Personality intelligence for people and teams",
+    template: "%s · DISC360",
   },
   description:
-    "Decode how people lead, communicate, decide, and respond under pressure. DISC assessment and team intelligence for individuals, coaches, and organizations.",
+    "Understand how people lead, communicate and respond when it matters. DISC360 turns behavioral patterns into practical guidance for individuals, teams and organizations.",
   openGraph: {
-    title: "Disc360 — Personality Intelligence Platform",
+    title: "DISC360 — Personality intelligence for people and teams",
     description:
-      "Decode how people lead, communicate, decide, and respond under pressure. Profiles across four dimensions: Dominant, Influence, Stable, Analytical.",
-    siteName: "Disc360",
+      "Understand how people lead, communicate and respond when it matters.",
+    siteName: "DISC360",
     type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Disc360 — Personality Intelligence Platform",
-    description:
-      "Decode how people lead, communicate, decide, and respond under pressure.",
   },
 };
 
@@ -50,9 +46,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} ${inter.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${inter.variable} ${plexMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-midnight-950 text-ink">
+      <body className="flex min-h-full flex-col bg-canvas text-ink">
         {children}
       </body>
     </html>
