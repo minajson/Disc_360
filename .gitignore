@@ -27,6 +27,10 @@
 # local development artifacts
 /.contact-inbox.jsonl
 
+# playwright
+/test-results/
+/playwright-report/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

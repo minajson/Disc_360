@@ -1,56 +1,95 @@
-# Disc360 — Personality Intelligence Platform
+# DISC360 — Personality Intelligence Platform
 
-> Decode how people lead, communicate, decide, and respond under pressure.
+> Understand how people lead, communicate and respond when it matters.
 
-Disc360 is a premium fullstack DISC assessment platform built with Next.js App Router. Individuals take a 24-question forced-choice assessment (~7 minutes) and receive an executive-grade behavioral profile; coaches, HR leaders, and teams get a quadrant map of their whole roster with composition and coverage insights.
+A production-grade, full-stack DISC platform: a premium light editorial
+public site, Supabase auth + Postgres with row-level security, a calm
+two-stage assessment, individual reports, organizations/teams/campaigns,
+a team intelligence dashboard, and a conference-room presentation mode.
 
-The four dimensions, as they appear everywhere in the product:
-
-| Code | Label |
-|------|-------------|
-| D | **Dominant** |
-| I | **Influence** |
-| S | **Stable** |
-| C | **Analytical** |
-
-## Features
-
-- **Cinematic landing page** — "Cognitive Atlas" design system: midnight surfaces, glassmorphism panels, luminous accents, animated DISC orbit
-- **Forced-choice assessment** — pick MOST and LEAST like you per scenario, with autosave, resume-on-refresh, and smooth question transitions
-- **Deterministic scoring engine** — raw tallies → net → normalized 0–100 → one of 13 archetypes, fully unit-tested
-- **Full archetype report** — radar and intensity charts, strengths, blind spots, communication style and do/don'ts, leadership style, conflict response, motivators and drainers, stress response, ideal environment, coaching recommendation, complementary types, and a print-ready download layout
-- **Dashboard** — latest profile, per-dimension trend sparklines, assessment history
-- **Team intelligence** — members plotted across DISC quadrants with a working department filter, culture summary, primary-style distribution, communication-gap analysis, risk zones, and recommended actions for the team and its coach
+DISC labels used throughout: **Dominant · Influence · Stable · Analytical**
+(the Analytical letter displays as **A**; internal keys keep `C`).
 
 ## Stack
 
-Next.js 16 (App Router, Turbopack) · TypeScript strict · Tailwind CSS v4 (CSS-first tokens) · Framer Motion · Zod · custom SVG charts (no chart library) · Prisma-shaped JSON-file mock DB (swap point for a real database) · Node native test runner
+Next.js 16 (App Router) · TypeScript strict · Tailwind CSS v4 · Supabase
+(Postgres, Auth, RLS) · Framer Motion + GSAP ScrollTrigger · Zod · Resend +
+react-email · custom SVG charts · Node test runner + Playwright.
 
-## Getting started
+## Local development
+
+Prereqs: Node ≥ 20, Docker running.
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
+npx supabase start        # local Postgres + Auth (first run downloads images)
+npx supabase db reset     # apply migrations + seed
+cp .env.example .env.local  # fill values printed by `supabase start`
+npm run dev               # http://localhost:3000
 ```
 
-Other commands:
+Seeded logins (password `disc360-demo`):
+
+| Account | Role |
+|---|---|
+| `demo@disc360.dev` | Org + team admin — 3 teams, campaigns, invitations |
+| `solo@disc360.dev` | Individual — result history + in-progress session |
+
+Local email: Supabase's mailbox UI at http://127.0.0.1:54324 captures auth
+emails; product emails are logged to `notification_logs` unless
+`RESEND_API_KEY` is set (and in non-production they only ever deliver to dev
+domains).
+
+## Commands
 
 ```bash
-npm test           # scoring unit tests (Node runs TypeScript natively)
-npm run typecheck  # tsc --noEmit
-npm run lint       # eslint
-npm run build      # production build
+npm run dev / build / start
+npm run lint / typecheck
+npm test              # unit tests: scoring, campaign state, CSV import
+npm run test:e2e      # Playwright smoke (needs supabase start + npm run build)
+npx supabase db reset # rebuild the local database
 ```
-
-Local data persists to the git-ignored `.mockdb/db.json`, so sessions and results survive dev-server restarts. Delete the folder to reset.
 
 ## Architecture
 
 ```
-app/          routes + API handlers (assessment, results, history, team)
-components/   landing, assessment, results, dashboard, team, charts, ui, layout, motion
-lib/          scoring pipeline, insights, mock DB, auth stub, types, schemas
-data/         question bank, archetype insight maps, demo team
+app/(marketing)   12 public pages (Meridian editorial design)
+app/(auth) + auth/callback + onboarding + join/[token]
+app/app/(shell)   dashboard · assessments · results · history · reports ·
+                  invitations · settings · teams/[teamId]/(overview|results|
+                  members|campaigns|settings)
+app/app/(present) teams/[teamId]/presentation (full-screen deck)
+lib/              scoring (pure, tested) · actions (server actions, Zod) ·
+                  db (supabase clients + generated types) · auth/guards ·
+                  insights (team intelligence + anonymization) · email ·
+                  campaigns (state machine) · motion
+supabase/         config, 6 migrations (schema, RLS, question bank, grants,
+                  invitation policies), seed
+emails/           react-email templates    e2e/  Playwright smoke suite
 ```
 
-Design and engineering conventions live in [CLAUDE.md](./CLAUDE.md) — including the scoring contract, design tokens, and the motion-ready component swap points reserved for future 3D enhancements.
+Security model: RLS on every table; assessment responses and results are
+own-row only — cross-member team reporting happens exclusively in
+`lib/insights/team.ts` behind explicit authorization with anonymization
+applied server-side. Server actions never trust client-sent ids.
+
+## Production deployment
+
+1. **Supabase**: create a project → `npx supabase link --project-ref <ref>`
+   → `npx supabase db push` (applies migrations; do *not* run the dev seed).
+   Enable Google/Azure providers in Auth settings with your OAuth credentials.
+   Set the Site URL to your domain and add `/auth/callback` to redirect URLs.
+2. **Vercel (or any Node host)**: set env vars from `.env.example` —
+   `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (server-only),
+   `RESEND_API_KEY`, `EMAIL_FROM`. Build command `npm run build`.
+3. **Resend**: verify your sending domain; production sends are gated by
+   per-user notification preferences automatically.
+4. Smoke-check `/`, sign-up → onboarding → assessment → report, and a team
+   presentation at 1920×1080 before inviting real users.
+
+## Responsible use
+
+DISC360 supports self-awareness and team development. It is not a medical,
+clinical or employment-selection instrument — the terms of service bind
+customers to the same boundary.
