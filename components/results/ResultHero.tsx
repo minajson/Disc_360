@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/Badge";
 import { DimensionPill } from "@/components/ui/DimensionPill";
 import { ArchetypeBadge } from "@/components/results/ArchetypeBadge";
+import { TraitConstellation } from "@/components/motion/TraitConstellation";
 import type { ArchetypeInsight } from "@/data/insight-maps";
 import type { Result } from "@/lib/types";
 
@@ -18,7 +19,11 @@ const formatDate = (iso: string) =>
 
 export function ResultHero({ result, insight }: ResultHeroProps) {
   return (
-    <div className="flex flex-col items-center gap-6 text-center">
+    <div className="relative flex flex-col items-center gap-6 text-center">
+      <TraitConstellation
+        scores={result.normalized}
+        className="absolute -top-24 left-1/2 w-[420px] max-w-none -translate-x-1/2 opacity-60 print:hidden"
+      />
       <Badge tone="accent">Your Disc360 profile</Badge>
       <ArchetypeBadge code={result.archetypeCode} />
       <div className="flex flex-col gap-2">

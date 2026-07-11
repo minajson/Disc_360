@@ -41,7 +41,7 @@ export function DimensionPill({
         aria-hidden
         className={cn("size-1.5 rounded-full", dotStyles[dimension])}
       />
-      {compact ? meta.code : meta.label}
+      {compact ? meta.displayCode : meta.label}
     </span>
   );
 }

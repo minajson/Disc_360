@@ -23,7 +23,7 @@ export function HistoryTable({ items }: { items: HistoryItem[] }) {
               {DIMENSIONS.map((dim) => (
                 <th key={dim} scope="col" className="px-3 py-3 text-right font-medium">
                   <abbr title={dimensionMeta[dim].label} className="no-underline">
-                    {dim}
+                    {dimensionMeta[dim].displayCode}
                   </abbr>
                 </th>
               ))}

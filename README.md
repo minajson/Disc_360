@@ -18,9 +18,9 @@ The four dimensions, as they appear everywhere in the product:
 - **Cinematic landing page** — "Cognitive Atlas" design system: midnight surfaces, glassmorphism panels, luminous accents, animated DISC orbit
 - **Forced-choice assessment** — pick MOST and LEAST like you per scenario, with autosave, resume-on-refresh, and smooth question transitions
 - **Deterministic scoring engine** — raw tallies → net → normalized 0–100 → one of 13 archetypes, fully unit-tested
-- **Full archetype report** — radar and intensity charts, strengths, blind spots, communication do/don'ts, leadership style, stress response, ideal environment, complementary types
+- **Full archetype report** — radar and intensity charts, strengths, blind spots, communication style and do/don'ts, leadership style, conflict response, motivators and drainers, stress response, ideal environment, coaching recommendation, complementary types, and a print-ready download layout
 - **Dashboard** — latest profile, per-dimension trend sparklines, assessment history
-- **Team intelligence** — members plotted across DISC quadrants, primary-style distribution, rule-based coverage insights
+- **Team intelligence** — members plotted across DISC quadrants with a working department filter, culture summary, primary-style distribution, communication-gap analysis, risk zones, and recommended actions for the team and its coach
 
 ## Stack
 

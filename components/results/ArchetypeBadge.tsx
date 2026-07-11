@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils/cn";
+import { displayArchetypeCode } from "@/lib/utils/display";
 import type { ArchetypeCode } from "@/lib/types";
 
 interface ArchetypeBadgeProps {
@@ -17,7 +18,7 @@ export function ArchetypeBadge({ code, className }: ArchetypeBadgeProps) {
     >
       <span aria-hidden className="absolute inset-0 rounded-2xl accent-gradient opacity-10" />
       <span className="accent-gradient-text font-mono text-xl font-medium tracking-tight">
-        {code}
+        {displayArchetypeCode(code)}
       </span>
     </span>
   );

@@ -2,6 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
+import { dimensionMeta } from "@/data/dimension-meta";
 import { DIMENSION_KEY, DIMENSIONS, type Dimension, type DiscScores } from "@/lib/types";
 
 const SIZE = 260;
@@ -136,7 +137,7 @@ export function DiscRadarChart({
             fontSize={11}
             fill="var(--color-ink-secondary)"
           >
-            {dim}
+            {dimensionMeta[dim].displayCode}
             {showScores ? (
               <tspan fill="var(--color-ink-muted)"> {score}</tspan>
             ) : null}

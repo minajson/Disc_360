@@ -6,7 +6,7 @@ import { motion, useReducedMotion } from "framer-motion";
  * Route-level entrance transition (used by app/template.tsx).
  * Motion-ready swap point for future dimensional page transitions.
  */
-export function PageTransition({ children }: { children: React.ReactNode }) {
+export function MotionShell({ children }: { children: React.ReactNode }) {
   const reduceMotion = useReducedMotion();
 
   return (

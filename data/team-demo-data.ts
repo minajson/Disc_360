@@ -23,6 +23,7 @@ interface DemoMemberSpec {
   slug: string;
   displayName: string;
   roleTitle: string;
+  department: string;
   normalized: DiscScores;
   archetypeCode: ArchetypeCode;
 }
@@ -33,6 +34,7 @@ const memberSpecs: DemoMemberSpec[] = [
     slug: "amara",
     displayName: "Amara Okafor",
     roleTitle: "Head of Product",
+    department: "Product",
     normalized: { d: 86, i: 54, s: 24, c: 48 },
     archetypeCode: "D",
   },
@@ -40,6 +42,7 @@ const memberSpecs: DemoMemberSpec[] = [
     slug: "leo",
     displayName: "Leo Marchetti",
     roleTitle: "Enterprise Sales Lead",
+    department: "Go-to-Market",
     normalized: { d: 76, i: 64, s: 30, c: 36 },
     archetypeCode: "DI",
   },
@@ -47,6 +50,7 @@ const memberSpecs: DemoMemberSpec[] = [
     slug: "priya",
     displayName: "Priya Shah",
     roleTitle: "Marketing Director",
+    department: "Go-to-Market",
     normalized: { d: 52, i: 82, s: 44, c: 30 },
     archetypeCode: "I",
   },
@@ -54,6 +58,7 @@ const memberSpecs: DemoMemberSpec[] = [
     slug: "daniel",
     displayName: "Daniel Kim",
     roleTitle: "Customer Success Manager",
+    department: "Go-to-Market",
     normalized: { d: 34, i: 68, s: 60, c: 40 },
     archetypeCode: "IS",
   },
@@ -61,6 +66,7 @@ const memberSpecs: DemoMemberSpec[] = [
     slug: "sofia",
     displayName: "Sofia Reyes",
     roleTitle: "People Operations Lead",
+    department: "Operations & People",
     normalized: { d: 26, i: 48, s: 84, c: 52 },
     archetypeCode: "S",
   },
@@ -68,6 +74,7 @@ const memberSpecs: DemoMemberSpec[] = [
     slug: "marcus",
     displayName: "Marcus Bell",
     roleTitle: "QA Engineering Lead",
+    department: "Engineering",
     normalized: { d: 30, i: 36, s: 66, c: 58 },
     archetypeCode: "SC",
   },
@@ -75,6 +82,7 @@ const memberSpecs: DemoMemberSpec[] = [
     slug: "elena",
     displayName: "Elena Volkov",
     roleTitle: "Data Science Lead",
+    department: "Engineering",
     normalized: { d: 40, i: 28, s: 46, c: 88 },
     archetypeCode: "C",
   },
@@ -82,6 +90,7 @@ const memberSpecs: DemoMemberSpec[] = [
     slug: "tomas",
     displayName: "Tomás Ferreira",
     roleTitle: "Engineering Manager",
+    department: "Engineering",
     normalized: { d: 62, i: 44, s: 38, c: 70 },
     archetypeCode: "CD",
   },
@@ -89,6 +98,7 @@ const memberSpecs: DemoMemberSpec[] = [
     slug: "nia",
     displayName: "Nia Thompson",
     roleTitle: "Program Manager",
+    department: "Product",
     normalized: { d: 52, i: 56, s: 58, c: 50 },
     archetypeCode: "BAL",
   },
@@ -191,6 +201,7 @@ export const demoTeamMembers: TeamMember[] = memberSpecs.map((spec) => ({
   userId: null,
   displayName: spec.displayName,
   roleTitle: spec.roleTitle,
+  department: spec.department,
   resultId: `res_demo_${spec.slug}`,
   archetypeCode: spec.archetypeCode,
   normalized: spec.normalized,

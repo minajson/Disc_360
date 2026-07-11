@@ -10,7 +10,7 @@ const productLinks = [
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-line bg-midnight-900">
+    <footer className="border-t border-line bg-midnight-900 print:hidden">
       <PageContainer className="py-14">
         <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
           <div className="flex flex-col gap-4">

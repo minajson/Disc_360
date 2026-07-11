@@ -11,15 +11,19 @@ const AXIS: Record<Dimension, { x: number; y: number }> = {
   C: { x: -1, y: 0 },
 };
 
-interface MiniDiscShapeProps {
+interface ResultGlyphProps {
   scores: DiscScores;
   /** Rendered size in px. */
   size?: number;
   className?: string;
 }
 
-/** Tiny DISC kite glyph for history rows and rosters. Server-safe SVG. */
-export function MiniDiscShape({ scores, size = 40, className }: MiniDiscShapeProps) {
+/**
+ * Tiny DISC kite glyph for history rows and rosters. Server-safe SVG.
+ * Motion-ready swap point: scores-in, glyph-out — internals may become a
+ * generated 3D mark later.
+ */
+export function ResultGlyph({ scores, size = 40, className }: ResultGlyphProps) {
   const points = DIMENSIONS.map((dim) => {
     const value = Math.max(0.08, scores[DIMENSION_KEY[dim]] / 100);
     const unit = AXIS[dim];

@@ -1,5 +1,5 @@
-import { PageTransition } from "@/components/motion/PageTransition";
+import { MotionShell } from "@/components/motion/MotionShell";
 
 export default function Template({ children }: { children: React.ReactNode }) {
-  return <PageTransition>{children}</PageTransition>;
+  return <MotionShell>{children}</MotionShell>;
 }

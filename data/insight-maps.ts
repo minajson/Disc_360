@@ -14,9 +14,16 @@ export interface ArchetypeInsight {
   strengths: { title: string; detail: string }[];
   blindSpots: { title: string; detail: string }[];
   communication: { do: string[]; dont: string[] };
+  /** How this archetype communicates (their own style). */
+  communicationStyle: string[];
   leadershipStyle: { headline: string; description: string; bullets: string[] };
+  conflictResponse: { headline: string; description: string; tips: string[] };
   stressResponse: { triggers: string[]; behaviors: string[]; recovery: string[] };
+  motivators: string[];
+  drainers: string[];
   idealEnvironment: string[];
+  /** Growth and coaching recommendation. */
+  coaching: string;
   complementaryTypes: { code: ArchetypeCode; reason: string }[];
 }
 
@@ -126,6 +133,36 @@ export const insightMap: Record<ArchetypeCode, ArchetypeInsight> = {
       "Freedom to act without approval theater",
       "Peers strong enough to push back without flinching",
     ],
+    communicationStyle: [
+      "Leads with the conclusion and works backward only if asked",
+      "Short, declarative sentences — questions are often decisions in disguise",
+      "Comfortable interrupting to keep the room on point",
+      "Signals respect by being blunt; small talk is rationed",
+    ],
+    conflictResponse: {
+      headline: "Meets conflict head-on",
+      description:
+        "You treat conflict as information: something is blocked, and pressure will unblock it. You escalate quickly, argue to win, and recover fast — often faster than the person you argued with.",
+      tips: [
+        "Name the shared goal before pressing your case",
+        "Let the other side finish; you decide better with full data",
+        "Close hard conversations with an explicit repair — you've moved on, they may not have",
+      ],
+    },
+    motivators: [
+      "Authority matched to accountability",
+      "Ambitious, measurable targets",
+      "Visible wins and ground gained",
+      "Direct competition",
+    ],
+    drainers: [
+      "Approval chains and committee consensus",
+      "Vague goals with no scoreboard",
+      "Being managed in the details",
+      "Meetings that end without decisions",
+    ],
+    coaching:
+      "Your growth multiplier is timing, not softening. Practice the deliberate pause: before overriding someone, ask one real question and use the answer. Keep people around who are safe to contradict you and reward them publicly when they do — your results are already strong; your ceiling is set by the quality of dissent you retain.",
     complementaryTypes: [
       {
         code: "SC",
@@ -245,6 +282,36 @@ export const insightMap: Record<ArchetypeCode, ArchetypeInsight> = {
       "Direct access to decision-makers",
       "Wins that are celebrated out loud",
     ],
+    communicationStyle: [
+      "Announces direction with energy — communication doubles as recruitment",
+      "Persuades in headlines and delegates the fine print",
+      "Adjusts the pitch in real time to the room's energy",
+      "Prefers conversation over documents, momentum over minutes",
+    ],
+    conflictResponse: {
+      headline: "Wins the room, then the argument",
+      description:
+        "You confront quickly but stylishly — challenging the idea while charming the person. The risk is that unresolved substance hides under restored rapport.",
+      tips: [
+        "Confirm the disagreement is actually resolved, not just defused",
+        "Put the settlement in writing while goodwill is high",
+        "Don't recruit allies mid-conflict; it reads as campaigning",
+      ],
+    },
+    motivators: [
+      "Launches, turnarounds, and new ground",
+      "An audience for the wins",
+      "Freedom to improvise the route",
+      "Ambitious goals with public stakes",
+    ],
+    drainers: [
+      "Maintenance mode and steady-state operations",
+      "Long documents and longer approval loops",
+      "Skeptics with no counter-proposal",
+      "Working alone for extended stretches",
+    ],
+    coaching:
+      "Pair every launch with a named finisher and hold yourself to their sequence. Your persuasion creates commitments faster than the team can absorb them — cap the number of open initiatives, and audit last quarter's promises before making this quarter's.",
     complementaryTypes: [
       {
         code: "CS",
@@ -364,6 +431,36 @@ export const insightMap: Record<ArchetypeCode, ArchetypeInsight> = {
       "A detail-strong partner who closes what you open",
       "Freedom to build relationships across boundaries",
     ],
+    communicationStyle: [
+      "Opens with connection, lands the ask once the room is warm",
+      "Stories and examples over frameworks and data",
+      "Thinks out loud — the first version is a draft, not a decision",
+      "Generous with praise, sparing with paperwork",
+    ],
+    conflictResponse: {
+      headline: "Defuses first, resolves if pressed",
+      description:
+        "Your instinct is to lower the temperature — humor, warmth, reframing. It keeps teams intact, but conflicts you charm to sleep tend to wake up bigger.",
+      tips: [
+        "Name the actual disagreement in one sentence before smoothing it",
+        "Tolerate ten seconds of discomfort; it buys real resolution",
+        "Follow up in writing so warmth doesn't erase the terms",
+      ],
+    },
+    motivators: [
+      "Rooms full of people to win over",
+      "Public recognition, given and received",
+      "Variety and motion in the work",
+      "Being trusted as the face of the mission",
+    ],
+    drainers: [
+      "Solo deep work with no audience",
+      "Reconciliation, documentation, and fine print",
+      "Cold, purely transactional cultures",
+      "Delivering criticism without a relationship to cushion it",
+    ],
+    coaching:
+      "Your leverage is trust; your liability is follow-through. Institute a personal close-the-loop ritual — three open commitments finished before any new yes — and practice one plainly delivered hard message per week. Warmth plus truth is your executive form.",
     complementaryTypes: [
       {
         code: "C",
@@ -483,6 +580,36 @@ export const insightMap: Record<ArchetypeCode, ArchetypeInsight> = {
       "A partner or system that owns the follow-through",
       "Freedom to communicate across the whole organization",
     ],
+    communicationStyle: [
+      "Warm, expressive, and fast — energy is part of the message",
+      "Persuades through stories and belief, not spreadsheets",
+      "Thinks by talking; ideas improve in company",
+      "Remembers the personal details and uses them kindly",
+    ],
+    conflictResponse: {
+      headline: "Smooths before it solves",
+      description:
+        "Conflict feels like relationship failure, so you move fast to restore the mood. The mood usually recovers; the underlying issue often doesn't.",
+      tips: [
+        "Treat the issue and the relationship as separate tracks",
+        "Say the uncomfortable sentence early — it's smaller now than later",
+        "Recruit a fact-anchor when disputes turn technical",
+      ],
+    },
+    motivators: [
+      "People-dense, collaborative work",
+      "Appreciation said out loud",
+      "New faces, new rooms, new stories",
+      "A mission worth evangelizing",
+    ],
+    drainers: [
+      "Extended solitude and silence",
+      "Detail marathons and reconciliation work",
+      "Cultures where enthusiasm is read as naivety",
+      "Being disliked — even by people whose opinion shouldn't count",
+    ],
+    coaching:
+      "Become selective, not serious. Choose the three relationships and two projects where your energy compounds, and protect them from the twenty that merely consume it. Pair with a finisher, put commitments in writing, and let optimism be a decision you make rather than a reflex you obey.",
     complementaryTypes: [
       {
         code: "C",
@@ -602,6 +729,36 @@ export const insightMap: Record<ArchetypeCode, ArchetypeInsight> = {
       "Leadership that shields the team from whiplash",
       "Room to develop people, not just process them",
     ],
+    communicationStyle: [
+      "Leads with empathy — the relationship is the channel",
+      "Listens more than speaks, then speaks for the room's quiet half",
+      "Softens hard messages, sometimes past the point of hearing",
+      "Consistent tone: what you get today is what you get in a crisis",
+    ],
+    conflictResponse: {
+      headline: "Absorbs before it addresses",
+      description:
+        "You give people the benefit of the doubt, then more of it. You'll carry friction privately for weeks to spare the group — and call it patience.",
+      tips: [
+        "Set a 48-hour rule: concerns get voiced within two days",
+        "Small honest no's beat one large resentful yes",
+        "Let the other party own their share of the discomfort",
+      ],
+    },
+    motivators: [
+      "Long-horizon relationships that compound",
+      "Being genuinely useful to specific people",
+      "Teams that feel like teams",
+      "Quiet, sincere recognition",
+    ],
+    drainers: [
+      "Open interpersonal warfare",
+      "Churn that resets relationships every quarter",
+      "Being taken for granted",
+      "Zero-sum, elbows-out cultures",
+    ],
+    coaching:
+      "Practice graduated candor: start with low-stakes disagreements and work up. Your warmth gives you more permission to be direct than you currently use — people can take hard truth from you precisely because they trust you. Spend that credit.",
     complementaryTypes: [
       {
         code: "D",
@@ -721,6 +878,36 @@ export const insightMap: Record<ArchetypeCode, ArchetypeInsight> = {
       "A culture where care counts as contribution",
       "Conflict handled early, privately, and like adults",
     ],
+    communicationStyle: [
+      "Quiet, warm, and deliberate — speaks when there's something to say",
+      "Asks the questions that let others feel heard",
+      "Prefers one-on-one to the open floor",
+      "Understatement by default; strong feelings arrive in soft packaging",
+    ],
+    conflictResponse: {
+      headline: "De-escalates by presence",
+      description:
+        "You cool rooms down without being asked. But your own grievances get filed, not voiced — and quiet withdrawal is your loudest signal.",
+      tips: [
+        "Say the thing at sixty percent intensity rather than not at all",
+        "Don't mediate conflicts you're actually a party to",
+        "Count your own needs as one of the interests at stake",
+      ],
+    },
+    motivators: [
+      "Stable teams with real bonds",
+      "Predictable rhythms and honored commitments",
+      "Care recognized as contribution",
+      "Leaders who ask — and then actually wait",
+    ],
+    drainers: [
+      "Sustained conflict in the inner circle",
+      "Whiplash pivots without consultation",
+      "Being planned around rather than consulted",
+      "Loud, self-promoting cultures",
+    ],
+    coaching:
+      "Your read on the room is data the team needs — publish it. Commit to speaking first once per week and converting one private concern into an agenda item per sprint. You don't need more empathy; you need more airtime.",
     complementaryTypes: [
       {
         code: "D",
@@ -840,6 +1027,36 @@ export const insightMap: Record<ArchetypeCode, ArchetypeInsight> = {
       "Low-politics culture where words match actions",
       "Recognition tied to reliability, not volume",
     ],
+    communicationStyle: [
+      "Measured and consistent — says less, means all of it",
+      "Asks the practical questions others skip",
+      "Prefers advance notice to on-the-spot reactions",
+      "A yes is a schedule, not a sentiment",
+    ],
+    conflictResponse: {
+      headline: "Endures, then addresses",
+      description:
+        "You outlast most conflict rather than engage it, absorbing strain to protect the team's rhythm. The cost accrues silently — and surfaces late.",
+      tips: [
+        "Flag friction while it's still small enough to be boring",
+        "Ask for time deliberately: 'I'll respond tomorrow' beats silence",
+        "Don't confuse keeping the peace with keeping quiet",
+      ],
+    },
+    motivators: [
+      "Clear expectations and stable priorities",
+      "Finishing what was started",
+      "Loyalty repaid in kind",
+      "Change introduced with runway",
+    ],
+    drainers: [
+      "Chaotic pivots and moving goalposts",
+      "Conflict-heavy environments",
+      "Reliability rewarded with more load",
+      "Flash prioritized over follow-through",
+    ],
+    coaching:
+      "Make your capacity visible before it's exceeded — report the true number of what you're carrying. And sponsor one change per quarter yourself: advocating for a pivot, once, will do more for how the organization reads you than a year of silent excellence.",
     complementaryTypes: [
       {
         code: "D",
@@ -959,6 +1176,36 @@ export const insightMap: Record<ArchetypeCode, ArchetypeInsight> = {
       "Ownership of a domain end to end",
       "Colleagues who do what they say they'll do",
     ],
+    communicationStyle: [
+      "Precise and economical — writes better than meetings allow",
+      "Reports when finished; silence usually means progress",
+      "Asks specification questions others find pedantic and later needed",
+      "Understates achievements — the work is the statement",
+    ],
+    conflictResponse: {
+      headline: "Withdraws into the work",
+      description:
+        "You'd rather quietly fix the problem than confront its author. Disputes about quality feel personal because your standards are personal.",
+      tips: [
+        "Critique the artifact and invite critique of yours — trade in specifics",
+        "Escalate slippage when it's a fact, not once it's a crisis",
+        "Someone else's sloppiness is their bill; stop paying it silently",
+      ],
+    },
+    motivators: [
+      "Protected deep-focus time",
+      "Mastery visible in the artifact",
+      "Specific briefs and stable priorities",
+      "Respect from people who know the craft",
+    ],
+    drainers: [
+      "Interrupt-driven days and priority churn",
+      "Being compared to faster, rougher output",
+      "Vague direction from uncommitted stakeholders",
+      "Quality debt imposed from above",
+    ],
+    coaching:
+      "Narrate the invisible work: publish progress at fixed intervals, even mid-imperfection, and define 'good enough for this purpose' with stakeholders up front. Your standards should be a spec others can meet — not a private bar only you can see.",
     complementaryTypes: [
       {
         code: "DI",
@@ -1078,6 +1325,36 @@ export const insightMap: Record<ArchetypeCode, ArchetypeInsight> = {
       "Colleagues who respect procedure enough to follow or formally amend it",
       "Quality and compliance treated as strategy, not overhead",
     ],
+    communicationStyle: [
+      "Structured and sequenced — context, evidence, recommendation",
+      "Documents decisions; conversation is input, writing is record",
+      "Precise language, precisely meant",
+      "Flags risk early, takes credit late, brings drama never",
+    ],
+    conflictResponse: {
+      headline: "Proceduralizes the dispute",
+      description:
+        "You take conflict to process: criteria, precedents, documentation. It keeps things fair — and can feel bloodless to people who needed to be heard first.",
+      tips: [
+        "Hear the feeling before citing the framework",
+        "Not every exception is an attack on the system",
+        "Time-box process disputes; some fights cost more than the rule protects",
+      ],
+    },
+    motivators: [
+      "Authority over the systems they're accountable for",
+      "Order visibly emerging from chaos",
+      "Prevention valued like firefighting",
+      "Leadership that plans beyond the quarter",
+    ],
+    drainers: [
+      "Improvisation overriding agreed process",
+      "Chronic ambiguity from above",
+      "Heroics celebrated over reliability",
+      "Accountability without authority",
+    ],
+    coaching:
+      "Treat adaptability as a system requirement: sunset one process per quarter as deliberately as you create them, and budget explicit slack for exceptions. Pair with a change-agent and give their experiments a protected lane — the mission is the point; the system is the means.",
     complementaryTypes: [
       {
         code: "DI",
@@ -1197,6 +1474,36 @@ export const insightMap: Record<ArchetypeCode, ArchetypeInsight> = {
       "A few sharp colleagues over many loud ones",
       "Standards enforced consistently, including upward",
     ],
+    communicationStyle: [
+      "Precise, prepared, and economical with claims",
+      "Prefers written arguments with time to verify",
+      "Questions are quality control, not hostility",
+      "Reserved until sure — then quietly immovable",
+    ],
+    conflictResponse: {
+      headline: "Litigates on the evidence",
+      description:
+        "You depersonalize conflict into a question of facts — which works until the other party needed acknowledgment more than accuracy. You rarely lose the argument; check what the win cost.",
+      tips: [
+        "Concede valid fragments early; it makes your case credible",
+        "State your confidence level instead of projecting certainty",
+        "When it turns emotional, pause the data and hear the person",
+      ],
+    },
+    motivators: [
+      "Hard problems that reward depth",
+      "Decisions genuinely made on merit",
+      "Time to do it right",
+      "A few rigorous colleagues",
+    ],
+    drainers: [
+      "Deadlines that force endorsing sloppy work",
+      "Decisions made on politics against evidence",
+      "Meeting sprawl and status theater",
+      "Hype outranking analysis",
+    ],
+    coaching:
+      "Ship judgment at decision speed: set explicit deadlines and deliver at eighty percent certainty with confidence levels attached. And pair every critique with one genuine, specific acknowledgment — accuracy people can't hear is accuracy the organization doesn't get.",
     complementaryTypes: [
       {
         code: "I",
@@ -1316,6 +1623,36 @@ export const insightMap: Record<ArchetypeCode, ArchetypeInsight> = {
       "Sharp colleagues who bring evidence to arguments",
       "Long horizons — time to build things properly",
     ],
+    communicationStyle: [
+      "Compressed and technical — status, risk, decision needed",
+      "Argues from evidence and expects the same in return",
+      "Terse by efficiency, not hostility",
+      "Praise is rare, specific, and therefore currency",
+    ],
+    conflictResponse: {
+      headline: "Engineers the outcome",
+      description:
+        "You treat conflict as a design problem: find the actual constraint, apply force there. Efficient — but people are not load paths, and some need the slow route to yes.",
+      tips: [
+        "Give opponents a face-saving path; you want the outcome, not the surrender",
+        "Signal which battles are preferences, not requirements",
+        "Check whether being right is landing as being contemptuous",
+      ],
+    },
+    motivators: [
+      "End-to-end ownership of consequential systems",
+      "Arguments decided on merit",
+      "Sharp colleagues who push back with evidence",
+      "Long horizons to build properly",
+    ],
+    drainers: [
+      "Incompetence protected above them",
+      "Politics overriding evidence",
+      "Approval theater and ceremony",
+      "Delegation without authority",
+    ],
+    coaching:
+      "Delegate outcomes, not methods: define the quality bar, then stay out of the how — your team's growth compounds faster than your corrections do. And say the respect your standards imply; the people meeting your bar can't hear the approval you think is obvious.",
     complementaryTypes: [
       {
         code: "IS",
@@ -1435,6 +1772,36 @@ export const insightMap: Record<ArchetypeCode, ArchetypeInsight> = {
       "Compensation and standing tied to results",
       "Few meetings, fewer pep talks, no theater",
     ],
+    communicationStyle: [
+      "Direct challenge as a handshake — questions arrive sharp",
+      "States positions with evidence attached and expects rebuttal",
+      "Zero padding; hears padding as spin",
+      "Keeps score on commitments — theirs and yours",
+    ],
+    conflictResponse: {
+      headline: "Runs toward the fight",
+      description:
+        "Conflict is your native competence: you pressure-test people the way you pressure-test claims. You win arguments at a rate that quietly empties the room of honest input.",
+      tips: [
+        "Calibrate force to the stakes — not every disagreement is a siege",
+        "Protect messengers visibly, especially bearers of bad news",
+        "After winning, repair: the argument ended; their memory didn't",
+      ],
+    },
+    motivators: [
+      "Entrenched problems that fight back",
+      "License to question anything",
+      "Standing and stakes tied to results",
+      "Truth valued over comfort",
+    ],
+    drainers: [
+      "Being managed by the less competent",
+      "Feelings overriding documented facts",
+      "Pep talks, ceremony, and theater",
+      "Rules that shield incumbents from scrutiny",
+    ],
+    coaching:
+      "Aim the challenge at problems and protect the people. Recruit one trusted translator who softens your transmission without diluting substance, and track a new metric: how much bad news reaches you first. Fear is expensive; make honesty cheap.",
     complementaryTypes: [
       {
         code: "SI",
@@ -1554,6 +1921,36 @@ export const insightMap: Record<ArchetypeCode, ArchetypeInsight> = {
       "Leaders who value glue work out loud",
       "Room to go deep in one chosen domain",
     ],
+    communicationStyle: [
+      "Matches register to the listener — data for the skeptic, story for the room",
+      "Translates between styles that talk past each other",
+      "Strong opinions delivered with genuine openness",
+      "Sometimes so adaptive the personal position goes unstated",
+    ],
+    conflictResponse: {
+      headline: "Mediates by instinct",
+      description:
+        "You see every side early and move to broker. It resolves most conflicts well — and hides the fact that sometimes you were a party, not the mediator.",
+      tips: [
+        "Declare when you're a stakeholder, then advocate as one",
+        "Don't split differences that deserve a winner",
+        "Your synthesis is a position — defend it like one",
+      ],
+    },
+    motivators: [
+      "Cross-functional problems that need range",
+      "A seat at the decision, not just the translation",
+      "Diverse teams that need a bridge",
+      "Space to go deep in one chosen domain",
+    ],
+    drainers: [
+      "Being pulled in four directions by competing stakeholders",
+      "Glue work rendered invisible",
+      "Pressure to become someone's caricature",
+      "Chronic role ambiguity",
+    ],
+    coaching:
+      "Choose a signature: one domain where you compound depth, and one meeting per week where you state your position first. Your range is already rare — anchored to a visible edge and a declared point of view, it becomes leadership.",
     complementaryTypes: [
       {
         code: "D",

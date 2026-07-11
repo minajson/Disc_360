@@ -27,6 +27,8 @@ User-facing labels are **always**:
 
 Never use "Dominance", "Steadiness", or "Conscientiousness" anywhere in the interface, insight copy, chart labels, or metadata. Internal type code stays `'D' | 'I' | 'S' | 'C'`.
 
+**Display codes:** every user-facing single letter and archetype code renders Analytical as **A** — use `dimensionMeta[dim].displayCode` for letters and `displayArchetypeCode()` (`lib/utils/display.ts`) for archetype codes (DC → DA, CS → AS, C → A). Internal keys, ids, and stored data always keep `C`.
+
 ## Directory structure
 
 ```
@@ -107,7 +109,7 @@ All tokens live in `app/globals.css` under Tailwind v4 `@theme` — no `tailwind
 
 ## Future 3D / motion enhancement rules
 
-Components marked motion-ready (`OrbitField`, `DimensionalLayer`, `DiscRadarChart`, `QuadrantMap`, `ResultPreviewPanel`, `QuestionTransition`, `CompletionInterstitial`, `TeamQuadrantMap`) are **swap points**: their prop contracts are stable and their internals may later be replaced with 3D/WebGL scenes. Never leak their internals to call sites; never add props that assume a specific rendering technology. New cinematic surfaces go in `components/motion/` behind the same pattern.
+Components marked motion-ready (`CognitiveOrbit`, `TraitConstellation`, `DimensionalHero`, `DimensionalLayer`, `MotionShell`, `ResultGlyph`, `DiscRadarChart`, `ResultPreviewPanel`, `QuestionTransition`, `CompletionInterstitial`, `TeamQuadrantMap`) are **swap points**: their prop contracts are stable and their internals may later be replaced with Fable-generated 3D/WebGL scenes. Never leak their internals to call sites; never add props that assume a specific rendering technology. New cinematic surfaces go in `components/motion/` behind the same pattern.
 
 ## What NOT to do
 
@@ -117,4 +119,5 @@ Components marked motion-ready (`OrbitField`, `DimensionalLayer`, `DiscRadarChar
 - No `console.log` left in committed code; no `any`; no suppressed lint rules without a comment explaining why.
 - No new client-side state libraries or CSS frameworks.
 - Don't put business logic in `app/` routes — pages compose, `lib/` computes.
-- Don't hardcode DISC copy in components — all archetype/dimension content comes from `data/insight-maps.ts`.
+- Don't hardcode DISC copy in components — all archetype/dimension content comes from `data/insight-maps.ts` (per archetype: summary, strengths, blind spots, communication style + guide, leadership, conflict response, stress response, motivators/drainers, ideal environment, coaching, complementary types). Team-level narratives (culture summary, communication gaps, risk zones, actions) are rule-generated in `lib/insights/team.ts`.
+- The results page must stay print-ready: `@media print` overrides live in `globals.css`; chrome that shouldn't print gets `print:hidden`.

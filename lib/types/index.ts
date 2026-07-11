@@ -88,6 +88,7 @@ export interface TeamMember {
   userId: string | null;
   displayName: string;
   roleTitle: string;
+  department: string;
   resultId: string;
   archetypeCode: ArchetypeCode;
   normalized: DiscScores;

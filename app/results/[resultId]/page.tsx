@@ -11,6 +11,10 @@ import { InsightSection } from "@/components/results/InsightSection";
 import { StrengthsList } from "@/components/results/StrengthsList";
 import { BlindSpotsList } from "@/components/results/BlindSpotsList";
 import { CommunicationGuide } from "@/components/results/CommunicationGuide";
+import { CommunicationStylePanel } from "@/components/results/CommunicationStylePanel";
+import { ConflictResponsePanel } from "@/components/results/ConflictResponsePanel";
+import { MotivationPanel } from "@/components/results/MotivationPanel";
+import { GrowthPanel } from "@/components/results/GrowthPanel";
 import { LeadershipStylePanel } from "@/components/results/LeadershipStylePanel";
 import { StressResponsePanel } from "@/components/results/StressResponsePanel";
 import { IdealEnvironmentPanel } from "@/components/results/IdealEnvironmentPanel";
@@ -74,8 +78,19 @@ export default async function ResultPage({
 
           <MotionSection>
             <InsightSection
+              eyebrow="Your voice"
+              title="How you communicate"
+            >
+              <CommunicationStylePanel
+                communicationStyle={insight.communicationStyle}
+              />
+            </InsightSection>
+          </MotionSection>
+
+          <MotionSection>
+            <InsightSection
               eyebrow="Working with you"
-              title="Communication guide"
+              title="How to communicate with you"
               description="Share this with colleagues — it's the fastest way to make your style an asset instead of a surprise."
             >
               <CommunicationGuide communication={insight.communication} />
@@ -85,6 +100,27 @@ export default async function ResultPage({
           <MotionSection>
             <InsightSection eyebrow="Leadership" title="How you lead">
               <LeadershipStylePanel leadershipStyle={insight.leadershipStyle} />
+            </InsightSection>
+          </MotionSection>
+
+          <MotionSection>
+            <InsightSection
+              eyebrow="Conflict"
+              title="How you respond to conflict"
+            >
+              <ConflictResponsePanel conflictResponse={insight.conflictResponse} />
+            </InsightSection>
+          </MotionSection>
+
+          <MotionSection>
+            <InsightSection
+              eyebrow="Motivation"
+              title="What fuels you — and what depletes you"
+            >
+              <MotivationPanel
+                motivators={insight.motivators}
+                drainers={insight.drainers}
+              />
             </InsightSection>
           </MotionSection>
 
@@ -104,6 +140,12 @@ export default async function ResultPage({
               title="Where you do your best work"
             >
               <IdealEnvironmentPanel idealEnvironment={insight.idealEnvironment} />
+            </InsightSection>
+          </MotionSection>
+
+          <MotionSection>
+            <InsightSection eyebrow="Growth" title="Where to grow next">
+              <GrowthPanel coaching={insight.coaching} />
             </InsightSection>
           </MotionSection>
 

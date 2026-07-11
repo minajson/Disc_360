@@ -7,6 +7,11 @@ import type { Dimension } from "@/lib/types";
  */
 export interface DimensionMeta {
   code: Dimension;
+  /**
+   * Single-letter code as shown in the UI. Internal key for Analytical
+   * stays "C", but every user-facing letter renders as "A".
+   */
+  displayCode: string;
   /** Mandatory user-facing label. */
   label: string;
   /** One-line essence of the dimension. */
@@ -26,6 +31,7 @@ export interface DimensionMeta {
 export const dimensionMeta: Record<Dimension, DimensionMeta> = {
   D: {
     code: "D",
+    displayCode: "D",
     label: "Dominant",
     essence: "Drive, decisiveness, and appetite for challenge.",
     question: "How do they approach problems and exercise power?",
@@ -36,6 +42,7 @@ export const dimensionMeta: Record<Dimension, DimensionMeta> = {
   },
   I: {
     code: "I",
+    displayCode: "I",
     label: "Influence",
     essence: "Energy, persuasion, and social momentum.",
     question: "How do they move people and shape the room?",
@@ -46,6 +53,7 @@ export const dimensionMeta: Record<Dimension, DimensionMeta> = {
   },
   S: {
     code: "S",
+    displayCode: "S",
     label: "Stable",
     essence: "Consistency, patience, and steady support.",
     question: "How do they handle pace, change, and loyalty?",
@@ -56,6 +64,7 @@ export const dimensionMeta: Record<Dimension, DimensionMeta> = {
   },
   C: {
     code: "C",
+    displayCode: "A",
     label: "Analytical",
     essence: "Precision, standards, and systematic thinking.",
     question: "How do they engage rules, quality, and evidence?",

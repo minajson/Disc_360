@@ -1,6 +1,7 @@
 import { GlassPanel } from "@/components/ui/GlassPanel";
-import { MiniDiscShape } from "@/components/charts/MiniDiscShape";
+import { ResultGlyph } from "@/components/charts/ResultGlyph";
 import { insightMap } from "@/data/insight-maps";
+import { displayArchetypeCode } from "@/lib/utils/display";
 import {
   DIMENSION_KEY,
   DIMENSIONS,
@@ -48,14 +49,14 @@ export function MemberCard({ member }: { member: TeamMember }) {
           {member.displayName}
         </span>
         <span className="truncate text-xs text-ink-muted">
-          {member.roleTitle}
+          {member.roleTitle} · {member.department}
         </span>
         <span className="truncate font-mono text-[11px] text-accent">
-          {insight.name} · {member.archetypeCode}
+          {insight.name} · {displayArchetypeCode(member.archetypeCode)}
         </span>
       </div>
 
-      <MiniDiscShape scores={member.normalized} size={40} className="shrink-0" />
+      <ResultGlyph scores={member.normalized} size={40} className="shrink-0" />
     </GlassPanel>
   );
 }

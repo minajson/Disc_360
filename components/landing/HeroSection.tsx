@@ -1,22 +1,13 @@
 import { PageContainer } from "@/components/layout/PageContainer";
-import { OrbitField } from "@/components/motion/OrbitField";
-import { GlowPulse } from "@/components/motion/GlowPulse";
+import { DimensionalHero } from "@/components/motion/DimensionalHero";
+import { CognitiveOrbit } from "@/components/motion/CognitiveOrbit";
 import { Badge } from "@/components/ui/Badge";
 import { GradientText } from "@/components/ui/GradientText";
 import { LinkButton } from "@/components/ui/LinkButton";
 
 export function HeroSection() {
   return (
-    <section className="relative overflow-hidden">
-      {/* dimensional backdrop */}
-      <div aria-hidden className="atlas-grid absolute inset-0" />
-      <GlowPulse className="-top-40 left-1/2 -translate-x-1/2" size={720} />
-      <GlowPulse
-        className="top-1/3 -right-48"
-        color="var(--color-accent-alt)"
-        size={520}
-      />
-
+    <DimensionalHero glow="hero">
       <PageContainer className="relative grid items-center gap-14 py-20 sm:py-28 lg:grid-cols-[1.1fr_0.9fr] lg:py-32">
         <div className="flex flex-col items-start gap-7">
           <Badge tone="accent">Personality intelligence platform</Badge>
@@ -48,9 +39,9 @@ export function HeroSection() {
         </div>
 
         <div className="relative mx-auto w-full max-w-[440px] lg:max-w-none">
-          <OrbitField className="mx-auto max-w-[460px]" />
+          <CognitiveOrbit className="mx-auto max-w-[460px]" />
         </div>
       </PageContainer>
-    </section>
+    </DimensionalHero>
   );
 }

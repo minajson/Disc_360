@@ -23,6 +23,15 @@ export function TeamHeader({ overview }: { overview: TeamOverview }) {
           what that means for how it decides.
         </p>
       </div>
+
+      <div className="max-w-3xl rounded-2xl border border-line bg-white/[0.03] p-5">
+        <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-accent">
+          Culture summary
+        </span>
+        <p className="mt-2 text-sm leading-relaxed text-ink-secondary">
+          {overview.cultureSummary}
+        </p>
+      </div>
       <dl className="flex flex-wrap gap-x-6 gap-y-2">
         {DIMENSIONS.map((dim: Dimension) => (
           <div key={dim} className="flex items-center gap-2.5">

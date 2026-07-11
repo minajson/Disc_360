@@ -30,7 +30,7 @@ const nodeColor: Record<Dimension, { text: string; border: string; glow: string 
  * Motion-ready swap point: replace internals with a WebGL scene later —
  * the outer contract (a self-sizing decorative field) stays stable.
  */
-export function OrbitField({ className }: { className?: string }) {
+export function CognitiveOrbit({ className }: { className?: string }) {
   return (
     <div
       aria-hidden
@@ -124,7 +124,7 @@ function OrbitNodeChip({
                   color.text,
                 )}
               >
-                {node.dimension}
+                {dimensionMeta[node.dimension].displayCode}
               </span>
               <span className="text-xs leading-none text-ink-secondary">
                 {label}

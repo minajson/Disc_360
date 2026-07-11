@@ -182,6 +182,49 @@ body {
   border-bottom: 1px solid var(--color-line);
 }
 
+/* ── print / report-ready layout ──────────────────────────── */
+
+@media print {
+  :root {
+    --color-midnight-950: #ffffff;
+    --color-midnight-900: #ffffff;
+    --color-graphite-800: #ffffff;
+    --color-graphite-700: #f4f5f8;
+    --color-line: rgba(0, 0, 0, 0.14);
+    --color-line-strong: rgba(0, 0, 0, 0.24);
+    --color-ink: #12151c;
+    --color-ink-secondary: #3b4252;
+    --color-ink-muted: #667085;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: var(--color-ink) !important;
+  }
+
+  /* Reveal everything the viewport-based motion left hidden. */
+  * {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .glass-panel,
+  .glass-panel-raised {
+    background: #ffffff !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    border-color: rgba(0, 0, 0, 0.16) !important;
+    break-inside: avoid;
+  }
+
+  .atlas-grid {
+    background-image: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

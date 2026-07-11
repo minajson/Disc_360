@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { MiniDiscShape } from "@/components/charts/MiniDiscShape";
+import { ResultGlyph } from "@/components/charts/ResultGlyph";
+import { displayArchetypeCode } from "@/lib/utils/display";
 import type { HistoryItem } from "@/lib/insights/history";
 import { DIMENSION_KEY, DIMENSIONS } from "@/lib/types";
 
@@ -14,7 +15,7 @@ export function HistoryRow({ item }: { item: HistoryItem }) {
   return (
     <tr className="group border-t border-line transition-colors hover:bg-white/3">
       <td className="py-3.5 pl-5 pr-3">
-        <MiniDiscShape scores={item.normalized} size={36} />
+        <ResultGlyph scores={item.normalized} size={36} />
       </td>
       <td className="px-3 py-3.5">
         <div className="flex flex-col">
@@ -22,7 +23,7 @@ export function HistoryRow({ item }: { item: HistoryItem }) {
             {item.archetypeName}
           </span>
           <span className="font-mono text-[11px] text-ink-muted">
-            {item.archetypeCode}
+            {displayArchetypeCode(item.archetypeCode)}
           </span>
         </div>
       </td>

@@ -74,15 +74,12 @@ class MockDb {
         for (const row of rows) table.set(row.id, row);
       }
     } catch {
-      // First run (or corrupted snapshot): start from seed data.
-      this.applySeed();
-      this.scheduleFlush();
+      // First run or corrupted snapshot: start from an empty store.
     }
-    // Seed rows must always exist, even against an older snapshot.
-    if (!this.tables.user.has(seedData.user.id)) {
-      this.applySeed();
-      this.scheduleFlush();
-    }
+    // Seed rows are re-applied on every load: idempotent for current data,
+    // and it upgrades demo rows persisted by an older seed shape.
+    this.applySeed();
+    this.scheduleFlush();
   }
 
   private applySeed(): void {

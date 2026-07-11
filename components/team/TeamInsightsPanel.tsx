@@ -9,7 +9,7 @@ const kindStyles: Record<TeamInsight["kind"], { label: string; className: string
 
 export function TeamInsightsPanel({ insights }: { insights: TeamInsight[] }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="grid gap-4">
       {insights.map((insight) => {
         const kind = kindStyles[insight.kind];
         return (
