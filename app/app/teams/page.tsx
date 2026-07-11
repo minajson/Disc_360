@@ -31,9 +31,25 @@ export default async function TeamsIndexPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-5 py-12 sm:px-8">
-      <div className="flex flex-col gap-2">
-        <Eyebrow>Teams</Eyebrow>
-        <h1 className="font-display text-h2 font-semibold">Your teams</h1>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <Eyebrow>Teams</Eyebrow>
+          <h1 className="font-display text-h2 font-semibold">Your teams</h1>
+        </div>
+        <div className="flex gap-3">
+          <Link
+            href="/app/invitations"
+            className="inline-flex min-h-11 items-center rounded-full border border-hairline-strong px-6 text-sm font-medium text-ink transition-colors hover:border-botanical hover:text-botanical"
+          >
+            Invitations
+          </Link>
+          <Link
+            href="/app/teams/new"
+            className="inline-flex min-h-11 items-center rounded-full bg-botanical px-6 text-sm font-medium text-mineral transition-colors hover:bg-botanical-deep"
+          >
+            Create a team
+          </Link>
+        </div>
       </div>
 
       {teams.length > 0 ? (
@@ -62,9 +78,8 @@ export default async function TeamsIndexPage() {
       ) : (
         <div className="paper-card flex flex-col items-start gap-3 p-8">
           <p className="max-w-md text-sm leading-relaxed text-slate">
-            No teams yet. If you have a team code, you can join during
-            onboarding of a colleague&rsquo;s invitation — or ask your
-            administrator for an invitation link.
+            No teams yet. Create one, accept an invitation, or join with a
+            team code from the invitations page.
           </p>
         </div>
       )}
