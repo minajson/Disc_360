@@ -15,10 +15,12 @@ export function TeamTabs({ teamId, isAdmin }: TeamTabsProps) {
 
   const tabs = [
     { href: base, label: "Overview", exact: true },
+    { href: `${base}/results`, label: "Results", exact: false },
     ...(isAdmin
       ? [
           { href: `${base}/members`, label: "Members", exact: false },
           { href: `${base}/campaigns`, label: "Campaigns", exact: false },
+          { href: `${base}/presentation`, label: "Presentation", exact: false },
           { href: `${base}/settings`, label: "Settings", exact: false },
         ]
       : []),
