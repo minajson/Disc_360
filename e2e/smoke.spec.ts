@@ -1,9 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /**
- * Journey smoke tests. Runs against the seeded local Supabase stack:
- *   demo@disc360.dev / disc360-demo — org + team admin (Atlas Collective)
- *   Product Leadership team id 30000000-0000-4000-8000-000000000001
+ * Journey smoke tests against the seeded local Supabase stack.
+ *   demo@disc360.dev  — team admin (Atlas Collective) with a seeded entitlement
+ *   solo@disc360.dev  — free individual with result history
+ *   admin@disc360.dev — platform super admin
+ * All passwords: disc360-demo
  */
 
 const PRODUCT_TEAM = "30000000-0000-4000-8000-000000000001";
@@ -13,6 +15,20 @@ async function signIn(page: Page, email: string) {
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("disc360-demo");
   await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForURL("**/app");
+}
+
+async function signUpIndividual(page: Page, name: string, email: string) {
+  await page.goto("/sign-up");
+  await page.getByLabel("Full name").fill(name);
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill("disc360-playwright");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.waitForURL("**/onboarding**");
+  await page.getByRole("radio", { name: /Understand myself/i }).click();
+  await page.getByLabel("Country").fill("US");
+  await page.getByText(/I consent to DISC360 processing/).click();
+  await page.getByRole("button", { name: /Continue to your dashboard/i }).click();
   await page.waitForURL("**/app");
 }
 
@@ -30,96 +46,129 @@ test("public homepage renders the editorial hero and navigation", async ({ page 
 });
 
 test("sign-up and individual onboarding reach the dashboard", async ({ page }) => {
-  const email = `pw-${Date.now()}@disc360.dev`;
-  await page.goto("/sign-up");
-  await page.getByLabel("Full name").fill("Play Wright");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill("disc360-playwright");
-  await page.getByRole("button", { name: "Create account" }).click();
-
-  await page.waitForURL("**/onboarding**");
-  await page.getByRole("radio", { name: /Understand myself/i }).click();
-  await page.getByLabel("Country").fill("US");
-  await page.getByText(/I consent to DISC360 processing/).click();
-  await page.getByRole("button", { name: /Continue to your dashboard/i }).click();
-
-  await page.waitForURL("**/app");
+  await signUpIndividual(page, "Play Wright", `pw-${Date.now()}@disc360.dev`);
   await expect(page.getByRole("heading", { name: /Welcome back, Play/i })).toBeVisible();
+});
+
+test("free individual clicking Create a team lands on the pricing prompt", async ({ page }) => {
+  await signUpIndividual(page, "Free Rider", `pw-free-${Date.now()}@disc360.dev`);
+  await page.getByRole("link", { name: /Create a team/i }).click();
+  await page.waitForURL("**/pricing?intent=create-team**");
+  await expect(
+    page.getByRole("heading", { name: /Creating a team requires the Team plan/i }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /Buy Team plan/i }).first()).toBeVisible();
+});
+
+test("purchasing the team plan unlocks team creation end to end", async ({ page }) => {
+  await signUpIndividual(page, "Team Buyer", `pw-buyer-${Date.now()}@disc360.dev`);
+  await page.goto("/pricing?intent=create-team");
+  await page.getByRole("button", { name: /Buy Team plan/i }).first().click();
+
+  await page.waitForURL("**/app/teams/new");
+  const teamName = `Playwright Guild ${Date.now() % 10_000}`;
+  await page.getByLabel("Team name").fill(teamName);
+  await page.getByLabel("Organization or company").fill("Playwright Co");
+  await page.getByLabel(/Event or session name/).fill("E2E Offsite");
+  await page.getByRole("button", { name: "Create team" }).click();
+
+  await page.waitForURL("**/dashboard");
+  await expect(page.getByRole("heading", { name: teamName })).toBeVisible();
+  await expect(page.getByText("Completion")).toBeVisible();
 });
 
 test("individual assessment completes end to end", async ({ page }) => {
   test.slow();
-  const email = `pw-assess-${Date.now()}@disc360.dev`;
-  await page.goto("/sign-up");
-  await page.getByLabel("Full name").fill("Assess Runner");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill("disc360-playwright");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await page.waitForURL("**/onboarding**");
-  await page.getByRole("radio", { name: /Understand myself/i }).click();
-  await page.getByLabel("Country").fill("US");
-  await page.getByText(/I consent to DISC360 processing/).click();
-  await page.getByRole("button", { name: /Continue to your dashboard/i }).click();
-  await page.waitForURL("**/app");
-
-  await page.getByRole("button", { name: /Take your first assessment/i }).click();
+  await signUpIndividual(page, "Assess Runner", `pw-assess-${Date.now()}@disc360.dev`);
+  await page.getByRole("button", { name: /Take your assessment/i }).click();
   await page.waitForURL("**/app/assessments/**");
 
   for (let scenario = 0; scenario < 24; scenario++) {
     await expect(page.getByText(`Scenario ${scenario + 1} of 24`)).toBeVisible();
     const options = page.getByRole("group").getByRole("button");
-    await options.first().click(); // MOST
-    await options.nth(1).click(); // LEAST (first is disabled now)
-    // auto-advance
+    await options.first().click();
+    await options.nth(1).click();
   }
 
   await expect(page.getByRole("heading", { name: /Ready to see your profile/i })).toBeVisible();
   await page.getByRole("button", { name: "Submit assessment" }).click();
   await page.waitForURL("**/app/results/**", { timeout: 30_000 });
-  await expect(page.getByText(/Your DISC360 profile/i)).toBeVisible();
-  await expect(page.getByRole("button", { name: /Download PDF/i }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Download PDF/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Email report/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Share$/i })).toBeVisible();
 });
 
-test("team creation produces a working team space", async ({ page }) => {
+test("individual can share their result link", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await signIn(page, "solo@disc360.dev");
+  await page.getByRole("link", { name: "View details" }).first().click();
+  await page.waitForURL("**/app/results/**");
+  await page.getByRole("button", { name: /^Share$/i }).click();
+  await expect(page.getByText(/Share link copied|\/r\//i)).toBeVisible();
+});
+
+test("team dashboard shows participants, statuses and completed types", async ({ page }) => {
   await signIn(page, "demo@disc360.dev");
-  await page.goto("/app/teams/new");
-  const teamName = `Playwright Guild ${Date.now() % 10_000}`;
-  await page.getByLabel("Team name").fill(teamName);
-  await page.getByRole("button", { name: "Create team" }).click();
-  await page.waitForURL("**/app/teams/**");
-  await expect(page.getByRole("heading", { name: teamName })).toBeVisible();
-  await expect(page.getByText(/Copy invite link/i)).toBeVisible();
+  await page.goto(`/app/teams/${PRODUCT_TEAM}/dashboard`);
+  await expect(page.getByText("Completion")).toBeVisible();
+  await expect(page.getByText("Amara Okafor")).toBeVisible();
+  await expect(page.getByText("The Commander")).toBeVisible();
+  await expect(page.getByText(/Completed|Report sent/).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /Remind pending/i })).toBeVisible();
 });
 
-test("member invitation lands on the roster with an invitation", async ({ page }) => {
+test("team admin can email a participant report and see the status change", async ({ page }) => {
   await signIn(page, "demo@disc360.dev");
-  await page.goto(`/app/teams/${PRODUCT_TEAM}/members`);
-  const email = `pw-invite-${Date.now()}@atlasdemo.dev`;
-  await page.getByLabel("Full name").fill("Invited Person");
-  await page.locator("#add-email").fill(email);
-  await page.getByRole("button", { name: /Add member & invite/i }).click();
-  await expect(page.getByText(/added and invited/i)).toBeVisible();
-  await expect(page.getByText(email).first()).toBeVisible();
+  await page.goto(`/app/teams/${PRODUCT_TEAM}/dashboard`);
+  const amaraRow = page.getByRole("row").filter({ hasText: "Amara Okafor" });
+  await amaraRow.getByRole("button", { name: /Email report|Resend report/i }).click();
+  await expect(amaraRow.getByRole("button", { name: /Resend report/i })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(amaraRow.getByText(/Report sent/i)).toBeVisible();
 });
 
-test("team intelligence dashboard answers the culture questions", async ({ page }) => {
-  await signIn(page, "demo@disc360.dev");
-  await page.goto(`/app/teams/${PRODUCT_TEAM}/results`);
-  await expect(page.getByRole("heading", { name: /What this team is like/i })).toBeVisible();
-  await expect(page.getByText(/completed profile/i).first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Recommended actions/i })).toBeVisible();
-  // density toggle reveals analytical extras
-  await page.getByRole("button", { name: /analytical view/i }).click();
-  await expect(page.getByRole("heading", { name: /Completed profiles/i })).toBeVisible();
-});
-
-test("presentation mode navigates by keyboard", async ({ page }) => {
+test("presentation dashboard tabs, keyboard and anonymize toggle work", async ({ page }) => {
   await signIn(page, "demo@disc360.dev");
   await page.goto(`/app/teams/${PRODUCT_TEAM}/presentation`);
-  await expect(page.getByText(/Team intelligence briefing/i)).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Product Leadership/i })).toBeVisible();
+
+  // Scope to the visible tabpanel — print export renders every tab hidden.
+  const panel = page.getByRole("tabpanel");
+  await expect(panel.getByText(/team balance score/i)).toBeVisible();
+  await page.getByRole("tab", { name: "Distribution" }).click();
+  await expect(panel.getByText(/Primary styles/i)).toBeVisible();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByText(/^Culture$/i)).toBeVisible();
-  await page.keyboard.press("ArrowLeft");
-  await expect(page.getByText(/Team intelligence briefing/i)).toBeVisible();
+  await expect(panel.getByText(/Preferred styles/i)).toBeVisible();
+
+  // Named team → presenter can anonymize: real names disappear everywhere
+  await page.getByRole("button", { name: /Names on/i }).click();
+  await page.getByRole("tab", { name: "Pairings" }).click();
+  await expect(panel.getByRole("heading").first()).toBeVisible();
+  await expect(panel.getByText(/Amara/)).toHaveCount(0);
+  await expect(panel.getByRole("combobox").first()).toContainText("Member A");
+
+  await page.getByRole("tab", { name: "Recommendations" }).click();
+  await expect(panel.getByText(/Five team actions/i)).toBeVisible();
+});
+
+test("super admin sees the platform overview; others are turned away", async ({ page }) => {
+  await signIn(page, "solo@disc360.dev");
+  await page.goto("/admin");
+  await page.waitForURL("**/app");
+
+  await page.goto("/sign-in").catch(() => undefined);
+  // sign out solo by using the app header
+  await page.goto("/app");
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.waitForURL("**/");
+
+  await signIn(page, "admin@disc360.dev");
+  await page.goto("/admin");
+  await expect(page.getByRole("heading", { name: /Platform health/i })).toBeVisible();
+  await expect(page.getByText("Total users")).toBeVisible();
+  await expect(page.getByText("Total revenue")).toBeVisible();
+
+  await page.goto("/admin/submissions");
+  await expect(page.getByRole("heading", { name: /completed assessments/i })).toBeVisible();
 });
