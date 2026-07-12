@@ -19,7 +19,10 @@ export function classifyBaseUrl(raw: string | undefined): PublicBaseUrl {
 }
 
 export function getPublicBaseUrl(): PublicBaseUrl {
-  return classifyBaseUrl(process.env.NEXT_PUBLIC_SITE_URL);
+  // NEXT_PUBLIC_* is frozen into the bundles at build time; the unprefixed
+  // SITE_URL is read at runtime on the server so a deployed (or test) process
+  // can point shared links at the host it actually serves.
+  return classifyBaseUrl(process.env.SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL);
 }
 
 /** The participant-facing join URL for a team's invite token. */

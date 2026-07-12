@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireSuperAdmin } from "@/lib/auth/guards";
 import { createSupabaseAdminClient } from "@/lib/db/admin";
+import { getPublicBaseUrl } from "@/lib/utils/site-url";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 
 export const metadata: Metadata = { title: "Settings · Admin" };
@@ -15,7 +16,7 @@ export default async function AdminSettingsPage() {
   ]);
 
   const rows: { label: string; value: string }[] = [
-    { label: "Site URL", value: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000" },
+    { label: "Site URL", value: getPublicBaseUrl().url },
     { label: "Supabase URL", value: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "—" },
     {
       label: "Email delivery",

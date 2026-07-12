@@ -10,8 +10,9 @@ import {
   TeamInvitationEmail,
   WelcomeEmail,
 } from "@/emails/templates";
+import { getPublicBaseUrl } from "@/lib/utils/site-url";
 
-const siteUrl = () => process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const siteUrl = () => getPublicBaseUrl().url;
 
 export async function sendWelcome(to: string, profileId: string, name: string) {
   await sendEmail({
