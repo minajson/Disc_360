@@ -16,7 +16,7 @@ export function AssessmentPreviewSection() {
           index="02"
           eyebrow="The assessment"
           title="Two calm decisions per scenario. Nothing else on screen."
-          description="Each of the 24 scenarios asks for one MOST-like-you choice, then one LEAST. Autosave keeps your place; finish on any device, in about seven minutes."
+          description="Pick MOST, then LEAST. Autosaved, resumable, ~7 minutes."
         />
 
         <div aria-hidden className="relative mx-auto w-full max-w-lg">

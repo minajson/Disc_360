@@ -16,22 +16,22 @@ const steps = [
   {
     title: "Answer 24 honest scenarios",
     detail:
-      "Each scenario offers four workplace behaviors. You choose the one MOST like you, then the one LEAST like you. Forced choice keeps the profile honest — there are no right answers to perform.",
+      "Four behaviors per scenario: pick MOST like you, then LEAST. Forced choice keeps it honest.",
   },
   {
     title: "Scores become a profile",
     detail:
-      "Your choices are tallied per dimension, normalized to a 0–100 scale, and matched to one of 13 behavioral archetypes — pure styles, hybrid blends, or the balanced Integrator.",
+      "Choices are tallied, normalized 0–100, and matched to one of 13 archetypes.",
   },
   {
     title: "The profile becomes guidance",
     detail:
-      "Every archetype carries a full working document: communication style, adaptation guidance, conflict response, motivators, stressors, blind spots and growth recommendations.",
+      "Your report covers communication, conflict, pressure, motivators and growth.",
   },
   {
     title: "Profiles become a team map",
     detail:
-      "When a team completes the assessment, DISC360 maps the composition — where styles cluster, where friction is likely, which pairings complement — and turns it into an action plan.",
+      "Completed profiles become a team map: clusters, friction, pairings, action plan.",
   },
 ];
 
@@ -39,22 +39,22 @@ const faqs = [
   {
     question: "What does DISC360 actually measure?",
     answer:
-      "Observable behavioral preferences across four dimensions — Dominant, Influence, Stable and Analytical. It describes how you tend to communicate, decide and respond to pressure. It does not measure intelligence, ability, values or mental health.",
+      "Behavioral preferences across the four dimensions — not intelligence, ability, values or mental health.",
   },
   {
     question: "Is this a scientifically validated clinical instrument?",
     answer:
-      "DISC360 is a self-awareness and team-development tool built on the widely used DISC behavioral model. It is deliberately not a medical, clinical or employment-selection instrument, and we ask organizations not to use it as one.",
+      "It is a development tool built on the DISC model — deliberately not a medical, clinical or hiring instrument.",
   },
   {
     question: "Can my answers change over time?",
     answer:
-      "Yes. Behavior shifts with roles, seasons and context. Profiles are dated, history is kept, and we recommend re-assessing every six to twelve months or after a significant role change.",
+      "Yes — behavior shifts with roles and seasons. Re-assess every 6–12 months.",
   },
   {
     question: "Who can see my individual results?",
     answer:
-      "You. Team summaries only include your named profile when the team's visibility setting allows it — and administrators can run fully anonymized team reports. Your raw answers are never shown to anyone.",
+      "You. Team summaries can be fully anonymized, and raw answers are never shown to anyone.",
   },
 ];
 
@@ -64,7 +64,7 @@ export default function HowItWorksPage() {
       <PageIntro
         eyebrow="How it works"
         title="Seven minutes of choices. A working document for years."
-        lead="DISC360 turns a short forced-choice assessment into practical behavioral guidance — grounded in the DISC model, written like a good coach."
+        lead="A short forced-choice assessment, scored deterministically, written like a good coach."
       />
 
       <section className="mx-auto w-full max-w-7xl px-5 sm:px-8">
@@ -90,7 +90,7 @@ export default function HowItWorksPage() {
           <SectionHeading
             eyebrow="The model"
             title="One spectrum, four energies"
-            description="Dominant and Stable answer how you handle pace and power. Influence and Analytical answer how you handle people and proof. Your profile is where you sit on the whole spectrum — not a box."
+            description="Pace and power, people and proof — your profile is a position on the spectrum, not a box."
           />
           <DiscSpectrumScene className="mx-auto max-h-[440px] w-full max-w-2xl" />
         </div>

@@ -21,7 +21,7 @@ export function CaseStudiesSection() {
         index="06"
         eyebrow="In practice"
         title="What teams do with it"
-        description="Illustrative scenarios drawn from how DISC-based debriefs typically play out — your case studies will live here."
+        description="Illustrative scenarios — your case studies will live here."
       />
 
       <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">

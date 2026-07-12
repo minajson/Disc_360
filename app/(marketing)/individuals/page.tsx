@@ -18,22 +18,22 @@ const outcomes = [
   {
     title: "Name your operating style",
     detail:
-      "Your archetype gives precise language for instincts you've been using blind — the way you push, persuade, steady or scrutinize.",
+      "Precise language for the instincts you've been using blind.",
   },
   {
     title: "See your pressure behavior coming",
     detail:
-      "Stress doesn't change who you are; it concentrates it. Know your triggers, your under-pressure defaults, and what actually restores you.",
+      "Know your triggers, your defaults, and what restores you.",
   },
   {
     title: "Be heard by people wired differently",
     detail:
-      "A do-and-don't guide for your style — and adaptation guidance for reaching each of the other three energies without losing yourself.",
+      "A do-and-don't guide for your style, plus adaptation tips for every other style.",
   },
   {
     title: "Choose environments deliberately",
     detail:
-      "Your ideal working conditions, spelled out — so role changes, team choices and job offers get evaluated against something real.",
+      "Your ideal working conditions, spelled out.",
   },
 ];
 
@@ -43,7 +43,7 @@ export default function IndividualsPage() {
       <PageIntro
         eyebrow="For individuals"
         title="Self-awareness you can actually use on Tuesday."
-        lead="Not a label. A working profile of how you decide, communicate, lead and respond under pressure — with guidance specific enough to apply in your next hard conversation."
+        lead="A working profile of how you decide, communicate, lead and respond under pressure. Free."
       >
         <LinkButton href="/sign-up" size="lg">
           Take the assessment
@@ -72,7 +72,7 @@ export default function IndividualsPage() {
           <SectionHeading
             eyebrow="A sample profile"
             title="What a finished profile looks like"
-            description="A Dominant-Influence blend — 'The Catalyst'. Direct under pressure, persuasive in the room, impatient with slow consensus. The full report runs to twelve sections of guidance."
+            description="A Dominant-Influence blend — 'The Catalyst'. The full report runs to seven concise sections."
           />
           <div className="paper-card mx-auto grid w-full max-w-lg gap-8 p-8 sm:grid-cols-[0.9fr_1.1fr] sm:items-center">
             <DiscRadarChart scores={{ d: 77, i: 73, s: 23, c: 27 }} />

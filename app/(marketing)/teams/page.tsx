@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 const adminFeatures = [
   "Invite by link, team code, email or CSV upload",
-  "Campaigns with start dates, deadlines and automatic reminders",
+  "Deadlines with automatic reminders",
   "Live tracking: invited, started, completed",
   "Named or anonymized results — decided by you, per team",
   "Department grouping and filters",
@@ -25,19 +25,19 @@ const adminFeatures = [
 const setupSteps = [
   {
     title: "Create the team",
-    detail: "Name it, describe it, set the department and how results may be viewed.",
+    detail: "Name it and choose named or anonymized results.",
   },
   {
     title: "Invite members",
-    detail: "Share one link, send email invitations, or upload a CSV. Track every status.",
+    detail: "One link, email invitations, or CSV. Every status tracked.",
   },
   {
-    title: "Run the campaign",
-    detail: "Set a deadline; DISC360 nudges the stragglers so you don't have to.",
+    title: "Track completion",
+    detail: "Deadlines and reminders run themselves.",
   },
   {
     title: "Read the map together",
-    detail: "The culture map, friction points and action plan — on screen, in one meeting.",
+    detail: "Culture map, friction, action plan — on screen, in one meeting.",
   },
 ];
 
@@ -47,7 +47,7 @@ export default function TeamsPage() {
       <PageIntro
         eyebrow="For teams"
         title="Your team's culture, mapped in one afternoon."
-        lead="Most team friction is a style mismatch nobody has language for. DISC360 gives the whole team the same vocabulary — and gives you the map."
+        lead="Most friction is a style mismatch nobody has language for. Get the vocabulary — and the map. $8."
       >
         <LinkButton href="/sign-up?intent=team" size="lg">
           Create a team
@@ -103,8 +103,8 @@ export default function TeamsPage() {
       </section>
 
       <CtaBand
-        title="The map is free to start."
-        lead="Create the team, invite three colleagues, and see the first composition read today."
+        title="The map costs $8."
+        lead="One payment, one team, everything included."
         primary={{ href: "/sign-up?intent=team", label: "Create a team" }}
         secondary={{ href: "/pricing", label: "Team pricing" }}
       />

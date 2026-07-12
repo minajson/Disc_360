@@ -6,7 +6,7 @@ const pathways = [
     eyebrow: "For yourself",
     title: "Language for how you actually operate",
     description:
-      "Seven minutes of honest choices becomes a working profile — your strengths, your pressure behavior, and how to be heard by people wired differently.",
+      "Your strengths, your pressure behavior, and how to be heard — free.",
     href: "/individuals",
     cta: "Explore the individual path",
   },
@@ -14,7 +14,7 @@ const pathways = [
     eyebrow: "For your team",
     title: "See the whole team on one map",
     description:
-      "Invite your team, watch completion roll in, and get a culture read — where styles cluster, where friction hides, and what to do about it.",
+      "Invite your team, watch submissions arrive, present the culture map. $8.",
     href: "/teams",
     cta: "Explore the team path",
   },

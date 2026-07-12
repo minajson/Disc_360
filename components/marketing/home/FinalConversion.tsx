@@ -10,8 +10,7 @@ export function FinalConversion() {
           <span className="italic text-botanical">Walk in prepared.</span>
         </h2>
         <p className="max-w-xl text-lead text-slate">
-          Seven minutes for a personal profile. One afternoon for a team map.
-          No credit card to begin.
+          Free personal profile. Team map for $8.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-4">
           <LinkButton href="/sign-up" size="lg">

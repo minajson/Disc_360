@@ -2,10 +2,9 @@ import { LinkButton } from "@/components/ui/LinkButton";
 import { LeadershipPortraitPlaceholder } from "@/components/media/LeadershipPortraitPlaceholder";
 
 const capabilities = [
-  "Client and team workspaces with role-based access",
-  "Campaigns with deadlines, reminders and completion tracking",
-  "Anonymized or named reporting, decided per team",
-  "A presentation mode built for the conference-room screen",
+  "Client workspaces with role-based access",
+  "Invitations, reminders and live completion tracking",
+  "A presentation dashboard built for the conference room",
 ];
 
 export function AudienceBand() {

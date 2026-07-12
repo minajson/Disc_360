@@ -16,22 +16,22 @@ const workflow = [
   {
     title: "One workspace per client",
     detail:
-      "Keep organizations, teams and campaigns separated per engagement — with access that ends when the engagement does.",
+      "Organizations and teams separated per engagement.",
   },
   {
     title: "Campaigns that run themselves",
     detail:
-      "Deadlines, invitations and reminders are automatic. You arrive at the debrief with completion already at ninety percent.",
+      "Invitations and reminders are automatic — you arrive with completion done.",
   },
   {
     title: "Debriefs on the big screen",
     detail:
-      "Presentation mode walks the room through culture, gaps and pairings — large type, keyboard navigation, QR for participants.",
+      "Large type, tabbed views, QR for participants.",
   },
   {
     title: "Reports that survive the session",
     detail:
-      "Every participant keeps a personal report; every leader keeps the team map and action plan. Your session compounds.",
+      "Participants keep reports; leaders keep the map and plan.",
   },
 ];
 
@@ -41,7 +41,7 @@ export default function CoachesPage() {
       <PageIntro
         eyebrow="For coaches and consultants"
         title="Run DISC debriefs clients remember — and renew."
-        lead="DISC360 handles the logistics of assessment campaigns so your time goes where it's valuable: the conversation in the room."
+        lead="DISC360 handles the logistics; your time goes to the conversation in the room."
       >
         <LinkButton href="/sign-up?intent=coach" size="lg">
           Set up a coaching workspace
@@ -68,7 +68,7 @@ export default function CoachesPage() {
           <SectionHeading
             eyebrow="Professional boundaries"
             title="Built to be used responsibly"
-            description="DISC360 supports development conversations. It is explicitly not a hiring filter, a clinical measure or a performance verdict — and the product language keeps it that way, protecting you and your clients."
+            description="Not a hiring filter, clinical measure or performance verdict — the product language keeps it that way."
           />
         </div>
       </section>

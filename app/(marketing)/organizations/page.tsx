@@ -16,22 +16,22 @@ const pillars = [
   {
     title: "Structure that matches yours",
     detail:
-      "Organizations hold teams; teams hold departments and campaigns. Organization admins manage users and teams across the whole account.",
+      "Organizations hold teams and departments; admins manage the whole account.",
   },
   {
     title: "Privacy by design",
     detail:
-      "Individual answers are never exposed. Team reports can be fully anonymized. Access is enforced at the database layer with row-level security, not just hidden in the interface.",
+      "Answers are never exposed; reports can be anonymized; access is enforced at the database layer.",
   },
   {
     title: "Roles with real boundaries",
     detail:
-      "Individuals, team members, team admins, coaches and organization admins each see exactly what their role permits — and administration actions are audit-logged.",
+      "Every role sees exactly what it permits, and admin actions are audit-logged.",
   },
   {
     title: "Adoption you can track",
     detail:
-      "Campaign dashboards show invited, started and completed per team and department — with reminders that go out automatically before deadlines.",
+      "Invited, started and completed per team — with automatic reminders.",
   },
 ];
 
@@ -41,7 +41,7 @@ export default function OrganizationsPage() {
       <PageIntro
         eyebrow="For organizations"
         title="Behavioral development, run like a program — not a workshop."
-        lead="For HR and L&D teams who need DISC across departments: structure, privacy controls, completion tracking and reporting that stands up to scrutiny."
+        lead="Structure, privacy controls and tracking that stands up to scrutiny."
       >
         <LinkButton href="/contact" size="lg">
           Talk to us about your organization
@@ -68,7 +68,7 @@ export default function OrganizationsPage() {
           <SectionHeading
             eyebrow="A responsible instrument"
             title="Clear about what it is — and is not"
-            description="DISC360 is a development tool. We ask every customer to keep it out of hiring decisions and clinical contexts, and the product's language, exports and legal terms are written to support that boundary."
+            description="A development tool — kept out of hiring and clinical contexts by design and by our terms."
           />
           <MediaPlaceholder
             label="Leadership workshop in a bright conference room"
@@ -83,7 +83,7 @@ export default function OrganizationsPage() {
 
       <CtaBand
         title="Start with one department."
-        lead="Most organizations pilot DISC360 with a single team's debrief. The map does the rest of the selling."
+        lead="Pilot with one team's debrief — the map does the rest."
         primary={{ href: "/contact", label: "Contact us" }}
         secondary={{ href: "/teams", label: "See the team experience" }}
       />

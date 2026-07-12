@@ -88,8 +88,7 @@ export function AdaptationStory() {
           <span className="italic text-botanical">Four deliveries.</span>
         </h2>
         <p className="max-w-lg text-lead text-slate">
-          “We need to change direction.” Watch the same feedback land well four
-          different ways — this is what DISC360 teaches your team to do.
+          The same feedback, landing well four different ways.
         </p>
       </div>
 

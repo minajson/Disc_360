@@ -18,8 +18,7 @@ export function HomeHero() {
             className="text-display"
           />
           <p className="max-w-xl text-lead text-slate text-pretty">
-            DISC360 turns behavioral patterns into practical guidance for
-            individuals, teams and organizations — in the language of
+            Seven honest minutes. Practical guidance in the language of
             Dominant, Influence, Stable and Analytical.
           </p>
           <div className="flex flex-wrap items-center gap-4">

@@ -17,7 +17,7 @@ export function TeamPreviewSection() {
             index="04"
             eyebrow="Team intelligence"
             title="Your team, on one honest map"
-            description="Invite the team, and DISC360 turns completed profiles into a culture read a manager can act on — named or anonymized, your call."
+            description="Completed profiles become a culture read — named or anonymized, your call."
           />
           <ul className="flex flex-col gap-3">
             {teamAnswers.map((answer) => (

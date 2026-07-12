@@ -7,12 +7,10 @@ import type { DiscScores } from "@/lib/types";
 const sampleScores: DiscScores = { d: 74, i: 62, s: 34, c: 48 };
 
 const reportSections = [
-  "Behavioral overview and hybrid blend",
-  "Natural communication style — and how to adapt it",
-  "Decision-making, leadership and teamwork",
-  "Conflict response and behavior under pressure",
-  "Motivators, stressors and possible blind spots",
-  "Growth recommendations and ideal working conditions",
+  "Communication style — and how to adapt it",
+  "Leadership, conflict and pressure behavior",
+  "Motivators, stressors and blind spots",
+  "Growth recommendations",
 ];
 
 export function ReportPreviewSection() {
@@ -37,7 +35,7 @@ export function ReportPreviewSection() {
           index="03"
           eyebrow="The report"
           title="A working document, not a certificate"
-          description="Every profile reads like guidance from a good coach — specific, humane, and immediately usable in your next difficult conversation."
+          description="Specific, humane guidance — usable in your next difficult conversation."
         />
         <ul className="flex flex-col gap-3">
           {reportSections.map((section) => (

@@ -25,7 +25,7 @@ export default function HomePage() {
             index="01"
             eyebrow="The four dimensions"
             title="Four ways people move through work"
-            description="Every profile blends Dominant, Influence, Stable and Analytical energy. Open each dimension to see what it governs — and what it looks like under pressure."
+            description="Open each dimension to see what it governs — and what it looks like under pressure."
           />
           <DimensionsInteractive />
         </div>
