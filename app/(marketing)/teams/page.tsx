@@ -92,6 +92,7 @@ export default function TeamsPage() {
             </ul>
           </div>
           <MediaPlaceholder
+            mediaId="MEDIA-TEAMS-COLLAB-01"
             label="Team working together around a table, warm natural light"
             ratio="3/2"
             kind="photo"

@@ -21,6 +21,7 @@ export function HeroFilmPlaceholder({
 }: HeroFilmProps) {
   return (
     <MediaPlaceholder
+      mediaId="MEDIA-HOME-HERO-01"
       label="Leadership team collaborating in warm natural light"
       ratio={variant === "desktop" ? "3/2" : "4/5"}
       kind="film"

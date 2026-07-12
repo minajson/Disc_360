@@ -18,6 +18,7 @@ export function LeadershipPortraitPlaceholder({
 }: PortraitProps) {
   return (
     <MediaPlaceholder
+      mediaId="MEDIA-COACH-PORTRAIT-01"
       label={label}
       ratio="4/5"
       kind="photo"

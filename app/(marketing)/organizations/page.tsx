@@ -71,6 +71,7 @@ export default function OrganizationsPage() {
             description="A development tool — kept out of hiring and clinical contexts by design and by our terms."
           />
           <MediaPlaceholder
+            mediaId="MEDIA-ORGS-WORKSHOP-01"
             label="Leadership workshop in a bright conference room"
             ratio="3/2"
             kind="photo"

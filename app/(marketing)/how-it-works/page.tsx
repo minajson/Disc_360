@@ -4,6 +4,7 @@ import { CtaBand } from "@/components/marketing/CtaBand";
 import { FaqList } from "@/components/marketing/FaqList";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DiscSpectrumScene } from "@/components/media/DiscSpectrumScene";
+import { MediaPlaceholder } from "@/components/media/MediaPlaceholder";
 import { MotionSection } from "@/components/motion/MotionSection";
 
 export const metadata: Metadata = {
@@ -96,7 +97,23 @@ export default function HowItWorksPage() {
         </div>
       </section>
 
-      <section className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-5 py-20 sm:px-8">
+      <section className="mx-auto grid w-full max-w-7xl items-center gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[0.8fr_1.2fr]">
+        <SectionHeading
+          eyebrow="See it"
+          title="Twenty seconds of the real thing"
+          description="The two-stage flow, exactly as participants experience it."
+        />
+        <MediaPlaceholder
+          mediaId="MEDIA-HOW-IT-WORKS-VIDEO-01"
+          label="Assessment walkthrough demo"
+          ratio="16/9"
+          kind="film"
+          dimensions="1920×1080"
+          className="mx-auto w-full max-w-2xl"
+        />
+      </section>
+
+      <section className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-5 pb-20 sm:px-8">
         <SectionHeading eyebrow="Honest answers" title="Questions we get asked" />
         <FaqList items={faqs} />
       </section>

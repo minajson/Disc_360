@@ -21,6 +21,7 @@ export function CaseStudyFilmPlaceholder({
 }: CaseStudyProps) {
   return (
     <MediaPlaceholder
+      mediaId="MEDIA-CASESTUDY-FILM-01"
       label={label}
       ratio="16/9"
       kind="film"

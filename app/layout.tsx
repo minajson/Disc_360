@@ -29,12 +29,17 @@ export const metadata: Metadata = {
   },
   description:
     "Understand how people lead, communicate and respond when it matters. DISC360 turns behavioral patterns into practical guidance for individuals, teams and organizations.",
+  icons: {
+    icon: "/brand/favicon.svg",
+    apple: "/brand/app-icon.png",
+  },
   openGraph: {
     title: "DISC360 — Personality intelligence for people and teams",
     description:
       "Understand how people lead, communicate and respond when it matters.",
     siteName: "DISC360",
     type: "website",
+    images: [{ url: "/brand/og-image.png", width: 1200, height: 630 }],
   },
 };
 
