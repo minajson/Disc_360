@@ -34,15 +34,26 @@ const TABS = [
 interface PresentationDeckProps {
   data: TeamIntelligence;
   resultsUrl: string;
+  joinUrl: string;
+  joinDisplayUrl: string;
+  teamCode: string;
+  isLocalBase: boolean;
 }
 
-export function PresentationDeck({ data, resultsUrl }: PresentationDeckProps) {
+export function PresentationDeck({
+  data,
+  resultsUrl,
+  joinUrl,
+  joinDisplayUrl,
+  teamCode,
+  isLocalBase,
+}: PresentationDeckProps) {
   const reduced = useReducedMotion();
   const [tabIndex, setTabIndex] = useState(0);
   const [showNames, setShowNames] = useState(data.named);
   const [department, setDepartment] = useState<string | null>(null);
   const [autoAdvance, setAutoAdvance] = useState(false);
-  const [showQr, setShowQr] = useState(false);
+  const [overlay, setOverlay] = useState<null | "join" | "report">(null);
 
   const profiles = useMemo(
     () =>
@@ -140,8 +151,21 @@ export function PresentationDeck({ data, resultsUrl }: PresentationDeckProps) {
           <button type="button" onClick={() => setAutoAdvance((v) => !v)} aria-pressed={autoAdvance} className={controlChip(autoAdvance)}>
             Auto {autoAdvance ? "on" : "off"}
           </button>
-          <button type="button" onClick={() => setShowQr((v) => !v)} aria-pressed={showQr} className={controlChip(showQr)}>
-            QR
+          <button
+            type="button"
+            onClick={() => setOverlay(overlay === "join" ? null : "join")}
+            aria-pressed={overlay === "join"}
+            className={controlChip(overlay === "join")}
+          >
+            Join QR
+          </button>
+          <button
+            type="button"
+            onClick={() => setOverlay(overlay === "report" ? null : "report")}
+            aria-pressed={overlay === "report"}
+            className={controlChip(overlay === "report")}
+          >
+            Report QR
           </button>
           <button type="button" onClick={() => window.print()} className={controlChip()}>
             Download
@@ -220,18 +244,35 @@ export function PresentationDeck({ data, resultsUrl }: PresentationDeckProps) {
         ))}
       </div>
 
-      {/* QR overlay */}
-      {showQr ? (
+      {/* Join QR — participants scan to join THIS team's assessment */}
+      {overlay === "join" ? (
+        <JoinQrOverlay
+          teamId={data.teamId}
+          teamName={data.teamName}
+          joinUrl={joinUrl}
+          joinDisplayUrl={joinDisplayUrl}
+          teamCode={teamCode}
+          isLocalBase={isLocalBase}
+          onClose={() => setOverlay(null)}
+        />
+      ) : null}
+
+      {/* Report QR — separate purpose: members open the shared summary */}
+      {overlay === "report" ? (
         <div
           role="dialog"
-          aria-label="Scan to open the team summary"
+          aria-label="Scan to open the team summary report"
           className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-6 print:hidden"
-          onClick={() => setShowQr(false)}
+          onClick={() => setOverlay(null)}
         >
           <div className="paper-card flex flex-col items-center gap-4 p-10">
-            <QRCodeSVG value={resultsUrl} size={260} fgColor="#17201D" bgColor="#FFFFFF" marginSize={1} />
+            <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-teal">
+              Team summary report
+            </span>
+            <QRCodeSVG value={resultsUrl} size={240} fgColor="#17201D" bgColor="#FFFFFF" marginSize={1} />
             <p className="max-w-xs text-center text-sm text-slate">
-              Members: scan to open the team summary and your personal report.
+              Members: scan to open the team summary and your personal report
+              (sign-in required; visibility follows team settings).
             </p>
           </div>
         </div>
@@ -259,6 +300,81 @@ export function PresentationDeck({ data, resultsUrl }: PresentationDeckProps) {
           →
         </button>
       </footer>
+    </div>
+  );
+}
+
+interface JoinQrOverlayProps {
+  teamId: string;
+  teamName: string;
+  joinUrl: string;
+  joinDisplayUrl: string;
+  teamCode: string;
+  isLocalBase: boolean;
+  onClose: () => void;
+}
+
+function JoinQrOverlay({
+  teamId,
+  teamName,
+  joinUrl,
+  joinDisplayUrl,
+  teamCode,
+  isLocalBase,
+  onClose,
+}: JoinQrOverlayProps) {
+  const [counts, setCounts] = useState<{ joined: number; completed: number } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const response = await fetch(`/app/teams/${teamId}/presentation/stats`);
+        if (!response.ok) return;
+        const body = (await response.json()) as { joined: number; completed: number };
+        if (!cancelled) setCounts(body);
+      } catch {
+        // transient — next poll retries
+      }
+    };
+    void load();
+    const timer = setInterval(load, 10_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [teamId]);
+
+  return (
+    <div
+      role="dialog"
+      aria-label={`Scan to join ${teamName}`}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-6 print:hidden"
+      onClick={onClose}
+    >
+      <div className="paper-card flex flex-col items-center gap-5 p-10 sm:p-12">
+        <span className="font-mono text-sm uppercase tracking-[0.28em] text-teal">
+          Scan to join {teamName}
+        </span>
+        <QRCodeSVG value={joinUrl} size={320} fgColor="#17201D" bgColor="#FFFFFF" marginSize={1} />
+        <div className="flex flex-col items-center gap-1 text-center">
+          <span className="text-lg text-slate">
+            or visit <span className="font-medium text-ink">{joinDisplayUrl}</span>
+          </span>
+          <span className="font-mono text-base text-slate">
+            Team code <span className="font-semibold text-ink">{teamCode}</span>
+          </span>
+        </div>
+        <span aria-live="polite" className="font-display text-2xl font-semibold text-ink">
+          {counts ? `${counts.joined} joined · ${counts.completed} completed` : "…"}
+        </span>
+        {isLocalBase ? (
+          <p role="alert" className="max-w-sm rounded-xl bg-disc-i-soft px-4 py-2.5 text-center text-xs leading-relaxed text-disc-i">
+            Local development only — this QR cannot be opened from another
+            device until a public URL is configured.
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

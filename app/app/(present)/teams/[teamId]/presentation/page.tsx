@@ -1,5 +1,11 @@
 import type { Metadata } from "next";
 import { getTeamIntelligence } from "@/lib/insights/team";
+import { createSupabaseAdminClient } from "@/lib/db/admin";
+import {
+  buildJoinUrl,
+  displayJoinUrl,
+  getPublicBaseUrl,
+} from "@/lib/utils/site-url";
 import { PresentationDeck } from "@/components/teams/PresentationDeck";
 
 export const metadata: Metadata = { title: "Presentation" };
@@ -23,11 +29,23 @@ export default async function TeamPresentationPage({
     );
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  // Join link details (admin-guarded above; token read via service role).
+  const admin = createSupabaseAdminClient();
+  const { data: team } = await admin
+    .from("teams")
+    .select("invite_token, team_code")
+    .eq("id", teamId)
+    .single();
+
+  const base = getPublicBaseUrl();
   return (
     <PresentationDeck
       data={data}
-      resultsUrl={`${siteUrl}/app/teams/${teamId}/results`}
+      resultsUrl={`${base.url}/app/teams/${teamId}/results`}
+      joinUrl={buildJoinUrl(base, team?.invite_token ?? "")}
+      joinDisplayUrl={displayJoinUrl(base, team?.invite_token ?? "")}
+      teamCode={team?.team_code ?? ""}
+      isLocalBase={base.isLocal}
     />
   );
 }

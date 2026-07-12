@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
+import { getMediaEntry } from "@/data/media-registry";
 
 export type MediaRatio = "16/9" | "3/2" | "4/5" | "9/16" | "1/1";
 
@@ -12,6 +13,8 @@ const ratioClass: Record<MediaRatio, string> = {
 };
 
 export interface MediaPlaceholderProps {
+  /** Registry id (data/media-registry.ts) — enables the dev spec overlay. */
+  mediaId?: string;
   /** What this media depicts — also the accessible label. */
   label: string;
   ratio: MediaRatio;
@@ -36,7 +39,16 @@ export interface MediaPlaceholderProps {
  * accepts real photo/film sources without restructuring. Full replacement
  * specs live in MEDIA_GUIDE.md.
  */
+const typeLabel: Record<string, string> = {
+  image: "IMAGE PLACEHOLDER",
+  video: "VIDEO PLACEHOLDER",
+  logo: "BRAND ASSET",
+  icon: "BRAND ASSET",
+  avatar: "PORTRAIT PLACEHOLDER",
+};
+
 export function MediaPlaceholder({
+  mediaId,
   label,
   ratio,
   kind,
@@ -47,6 +59,8 @@ export function MediaPlaceholder({
   className,
   children,
 }: MediaPlaceholderProps) {
+  const entry = mediaId ? getMediaEntry(mediaId) : undefined;
+  const showSpecs = process.env.NODE_ENV === "development" && entry;
   return (
     <figure
       className={cn(
@@ -104,13 +118,33 @@ export function MediaPlaceholder({
             </span>
           ) : null}
 
-          {/* spec chip */}
-          <span
-            aria-hidden
-            className="absolute bottom-4 left-4 rounded-full border border-ink/10 bg-paper/80 px-3 py-1 font-mono text-[10px] tracking-wide text-slate backdrop-blur-sm"
-          >
-            {kind} · {ratio} · {dimensions}
-          </span>
+          {/* spec overlay: full registry card in development, quiet chip otherwise */}
+          {showSpecs ? (
+            <div
+              aria-hidden
+              className="absolute bottom-3 left-3 right-3 rounded-xl border border-ink/10 bg-paper/90 px-4 py-3 font-mono text-[10px] leading-relaxed text-slate backdrop-blur-sm"
+            >
+              <span className="block font-semibold tracking-wide text-ink">
+                {entry.id} · {typeLabel[entry.type]}
+              </span>
+              <span className="block">{entry.purpose}</span>
+              <span className="block text-faint">
+                {entry.dimensions} · {entry.ratio}
+                {entry.transparent ? " · transparent bg" : ""}
+                {entry.video
+                  ? ` · ${entry.video.duration} · autoplay ${entry.video.autoplay ? "yes" : "no"} · audio ${entry.video.audio ? "yes" : "no"}`
+                  : ""}
+              </span>
+              <span className="block text-faint">→ {entry.suggestedContent}</span>
+            </div>
+          ) : (
+            <span
+              aria-hidden
+              className="absolute bottom-4 left-4 rounded-full border border-ink/10 bg-paper/80 px-3 py-1 font-mono text-[10px] tracking-wide text-slate backdrop-blur-sm"
+            >
+              {kind} · {ratio} · {dimensions}
+            </span>
+          )}
         </div>
       )}
       {children ? <div className="absolute inset-0">{children}</div> : null}

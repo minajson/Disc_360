@@ -403,6 +403,77 @@ export type Database = {
           },
         ]
       }
+      coach_profiles: {
+        Row: {
+          banner_path: string | null
+          bio: string
+          created_at: string
+          credentials: string[]
+          expertise: string[]
+          linkedin: string | null
+          location: string | null
+          logo_path: string | null
+          organization: string | null
+          phone: string | null
+          photo_path: string | null
+          profile_id: string
+          show_in_presentation: boolean
+          specialties: string[]
+          title: string | null
+          updated_at: string
+          website: string | null
+          years_experience: number | null
+        }
+        Insert: {
+          banner_path?: string | null
+          bio?: string
+          created_at?: string
+          credentials?: string[]
+          expertise?: string[]
+          linkedin?: string | null
+          location?: string | null
+          logo_path?: string | null
+          organization?: string | null
+          phone?: string | null
+          photo_path?: string | null
+          profile_id: string
+          show_in_presentation?: boolean
+          specialties?: string[]
+          title?: string | null
+          updated_at?: string
+          website?: string | null
+          years_experience?: number | null
+        }
+        Update: {
+          banner_path?: string | null
+          bio?: string
+          created_at?: string
+          credentials?: string[]
+          expertise?: string[]
+          linkedin?: string | null
+          location?: string | null
+          logo_path?: string | null
+          organization?: string | null
+          phone?: string | null
+          photo_path?: string | null
+          profile_id?: string
+          show_in_presentation?: boolean
+          specialties?: string[]
+          title?: string | null
+          updated_at?: string
+          website?: string | null
+          years_experience?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coach_profiles_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       entitlements: {
         Row: {
           amount_cents: number
@@ -670,28 +741,37 @@ export type Database = {
       organizations: {
         Row: {
           archived_at: string | null
+          cover_path: string | null
           created_at: string
           created_by: string
+          description: string
           id: string
           industry: string | null
+          logo_path: string | null
           name: string
           updated_at: string
         }
         Insert: {
           archived_at?: string | null
+          cover_path?: string | null
           created_at?: string
           created_by: string
+          description?: string
           id?: string
           industry?: string | null
+          logo_path?: string | null
           name: string
           updated_at?: string
         }
         Update: {
           archived_at?: string | null
+          cover_path?: string | null
           created_at?: string
           created_by?: string
+          description?: string
           id?: string
           industry?: string | null
+          logo_path?: string | null
           name?: string
           updated_at?: string
         }
@@ -918,6 +998,7 @@ export type Database = {
           email: string
           id: string
           profile_id: string | null
+          reference_id: string | null
           role: Database["public"]["Enums"]["team_member_role"]
           team_id: string
           updated_at: string
@@ -929,6 +1010,7 @@ export type Database = {
           email: string
           id?: string
           profile_id?: string | null
+          reference_id?: string | null
           role?: Database["public"]["Enums"]["team_member_role"]
           team_id: string
           updated_at?: string
@@ -940,6 +1022,7 @@ export type Database = {
           email?: string
           id?: string
           profile_id?: string | null
+          reference_id?: string | null
           role?: Database["public"]["Enums"]["team_member_role"]
           team_id?: string
           updated_at?: string
@@ -965,13 +1048,17 @@ export type Database = {
         Row: {
           approx_size: number | null
           archived_at: string | null
+          client_organization: string | null
+          cover_path: string | null
           created_at: string
           created_by: string
           deadline_at: string | null
           department: string | null
           description: string
+          engagement_starts_at: string | null
           id: string
           invite_token: string
+          join_enabled: boolean
           logo_url: string | null
           members_can_view_summary: boolean
           name: string
@@ -985,13 +1072,17 @@ export type Database = {
         Insert: {
           approx_size?: number | null
           archived_at?: string | null
+          client_organization?: string | null
+          cover_path?: string | null
           created_at?: string
           created_by: string
           deadline_at?: string | null
           department?: string | null
           description?: string
+          engagement_starts_at?: string | null
           id?: string
           invite_token?: string
+          join_enabled?: boolean
           logo_url?: string | null
           members_can_view_summary?: boolean
           name: string
@@ -1005,13 +1096,17 @@ export type Database = {
         Update: {
           approx_size?: number | null
           archived_at?: string | null
+          client_organization?: string | null
+          cover_path?: string | null
           created_at?: string
           created_by?: string
           deadline_at?: string | null
           department?: string | null
           description?: string
+          engagement_starts_at?: string | null
           id?: string
           invite_token?: string
+          join_enabled?: boolean
           logo_url?: string | null
           members_can_view_summary?: boolean
           name?: string

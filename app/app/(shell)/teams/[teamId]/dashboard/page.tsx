@@ -3,7 +3,8 @@ import Link from "next/link";
 import { requireTeamAdmin } from "@/lib/auth/guards";
 import { getTeamRoster } from "@/lib/teams/roster";
 import { sendReminderToPending } from "@/lib/actions/teams";
-import { CopyButton } from "@/components/ui/CopyButton";
+import { InviteParticipantsPanel } from "@/components/teams/InviteParticipantsPanel";
+import { buildJoinUrl, getPublicBaseUrl } from "@/lib/utils/site-url";
 import { AutoRefresh } from "@/components/teams/AutoRefresh";
 import { ParticipantTable } from "@/components/teams/ParticipantTable";
 import { AddMemberForm, ImportCsvForm } from "@/components/teams/MemberForms";
@@ -21,14 +22,14 @@ export default async function TeamDashboardPage({
   const [{ data: team }, roster] = await Promise.all([
     supabase
       .from("teams")
-      .select("team_code, invite_token, session_name, deadline_at")
+      .select("name, team_code, invite_token, session_name, deadline_at")
       .eq("id", teamId)
       .single(),
     getTeamRoster(teamId),
   ]);
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const inviteLink = `${siteUrl}/join/${team?.invite_token}`;
+  const base = getPublicBaseUrl();
+  const inviteLink = buildJoinUrl(base, team?.invite_token ?? "");
   const { metrics } = roster;
 
   const metricCards = [
@@ -62,10 +63,16 @@ export default async function TeamDashboardPage({
         ))}
       </div>
 
+      {/* invite participants */}
+      <InviteParticipantsPanel
+        teamName={team?.name ?? "Team"}
+        teamCode={team?.team_code ?? ""}
+        joinUrl={inviteLink}
+        isLocal={base.isLocal}
+      />
+
       {/* controls */}
       <div className="flex flex-wrap items-center gap-2">
-        <CopyButton value={inviteLink} label="Copy invite link" />
-        <CopyButton value={team?.team_code ?? ""} label={`Code ${team?.team_code}`} />
         <form action={sendReminderToPending.bind(null, teamId)}>
           <button
             type="submit"
