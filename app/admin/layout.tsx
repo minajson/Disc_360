@@ -23,7 +23,7 @@ export default async function AdminLayout({
           </div>
           <div className="flex items-center gap-3">
             <Link href="/app" className="text-sm text-slate hover:text-ink">
-              Back to app
+              Return to DISC360
             </Link>
             <span className="hidden font-mono text-xs text-faint sm:inline">
               {profile.email}

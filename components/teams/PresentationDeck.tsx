@@ -31,6 +31,14 @@ const TABS = [
   { id: "recommendations", label: "Recommendations", Component: RecommendationsTab },
 ] as const;
 
+export interface FacilitatorInfo {
+  name: string;
+  title: string | null;
+  organization: string | null;
+  photoUrl: string | null;
+  logoUrl: string | null;
+}
+
 interface PresentationDeckProps {
   data: TeamIntelligence;
   resultsUrl: string;
@@ -38,6 +46,7 @@ interface PresentationDeckProps {
   joinDisplayUrl: string;
   teamCode: string;
   isLocalBase: boolean;
+  facilitator: FacilitatorInfo | null;
 }
 
 export function PresentationDeck({
@@ -47,6 +56,7 @@ export function PresentationDeck({
   joinDisplayUrl,
   teamCode,
   isLocalBase,
+  facilitator,
 }: PresentationDeckProps) {
   const reduced = useReducedMotion();
   const [tabIndex, setTabIndex] = useState(0);
@@ -54,6 +64,7 @@ export function PresentationDeck({
   const [department, setDepartment] = useState<string | null>(null);
   const [autoAdvance, setAutoAdvance] = useState(false);
   const [overlay, setOverlay] = useState<null | "join" | "report">(null);
+  const [showFacilitator, setShowFacilitator] = useState(Boolean(facilitator));
 
   const profiles = useMemo(
     () =>
@@ -148,6 +159,16 @@ export function PresentationDeck({
               Anonymized
             </span>
           )}
+          {facilitator ? (
+            <button
+              type="button"
+              onClick={() => setShowFacilitator((v) => !v)}
+              aria-pressed={showFacilitator}
+              className={controlChip(showFacilitator)}
+            >
+              Facilitator {showFacilitator ? "on" : "off"}
+            </button>
+          ) : null}
           <button type="button" onClick={() => setAutoAdvance((v) => !v)} aria-pressed={autoAdvance} className={controlChip(autoAdvance)}>
             Auto {autoAdvance ? "on" : "off"}
           </button>
@@ -182,6 +203,29 @@ export function PresentationDeck({
           </Link>
         </div>
       </header>
+
+      {/* facilitator credit */}
+      {facilitator && showFacilitator ? (
+        <div className="flex items-center gap-3 border-t border-hairline px-6 py-2.5 print:border-none">
+          {facilitator.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- storage-hosted, unoptimized by design
+            <img
+              src={facilitator.photoUrl}
+              alt=""
+              className="size-9 rounded-full object-cover"
+            />
+          ) : null}
+          <span className="text-sm text-slate">
+            Facilitated by <span className="font-medium text-ink">{facilitator.name}</span>
+            {facilitator.title ? ` · ${facilitator.title}` : ""}
+            {facilitator.organization ? ` · ${facilitator.organization}` : ""}
+          </span>
+          {facilitator.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- storage-hosted, unoptimized by design
+            <img src={facilitator.logoUrl} alt="" className="ml-auto max-h-7 w-auto object-contain" />
+          ) : null}
+        </div>
+      ) : null}
 
       {/* tabs */}
       <nav

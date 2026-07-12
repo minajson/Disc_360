@@ -44,7 +44,7 @@ export default async function AppLayout({
         ]
       : [{ href: "/app/invitations", label: "Invitations" }]),
     { href: "/app/settings", label: "Settings" },
-    ...(profile.is_super_admin ? [{ href: "/admin", label: "Admin" }] : []),
+    ...(profile.is_super_admin ? [{ href: "/admin", label: "Platform Admin" }] : []),
   ];
 
   return (

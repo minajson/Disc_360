@@ -35,11 +35,49 @@ export async function toggleSuperAdmin(userId: string): Promise<void> {
     .eq("id", userId)
     .maybeSingle();
   if (!target) return;
+
+  // Last-super-admin protection: the platform must always keep one.
+  if (target.is_super_admin) {
+    const { count } = await admin
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("is_super_admin", true);
+    if ((count ?? 0) <= 1) return;
+  }
+
   await admin
     .from("profiles")
     .update({ is_super_admin: !target.is_super_admin })
     .eq("id", userId);
   await audit(user.id, target.is_super_admin ? "admin.role_revoked" : "admin.role_granted", "profile", userId);
+  revalidatePath("/admin/users");
+}
+
+const ORG_ROLES = ["member", "coach", "organization_admin"] as const;
+
+/** Change a user's role inside one of their organizations. */
+export async function setOrgMemberRole(
+  membershipId: string,
+  role: string,
+): Promise<void> {
+  if (!z.uuid().safeParse(membershipId).success) return;
+  if (!ORG_ROLES.includes(role as (typeof ORG_ROLES)[number])) return;
+  const { user } = await requireSuperAdmin();
+  const admin = createSupabaseAdminClient();
+  await admin
+    .from("organization_members")
+    .update({ role: role as (typeof ORG_ROLES)[number] })
+    .eq("id", membershipId);
+  await audit(user.id, `admin.org_role_set_${role}`, "organization_member", membershipId);
+  revalidatePath("/admin/users");
+}
+
+export async function removeOrgMembership(membershipId: string): Promise<void> {
+  if (!z.uuid().safeParse(membershipId).success) return;
+  const { user } = await requireSuperAdmin();
+  const admin = createSupabaseAdminClient();
+  await admin.from("organization_members").delete().eq("id", membershipId);
+  await audit(user.id, "admin.org_membership_removed", "organization_member", membershipId);
   revalidatePath("/admin/users");
 }
 

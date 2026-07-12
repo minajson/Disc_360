@@ -46,6 +46,11 @@ export default async function SettingsPage() {
         <p className="text-sm text-slate">
           Signed in as <span className="font-medium text-ink">{profile.email}</span>
         </p>
+        {process.env.NODE_ENV === "development" && !profile.is_super_admin ? (
+          <p className="font-mono text-xs text-faint">
+            Current account does not have platform administrator access.
+          </p>
+        ) : null}
       </div>
 
       <ProfileSettingsForm profile={profile} />

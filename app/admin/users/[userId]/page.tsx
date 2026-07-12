@@ -3,7 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSuperAdmin } from "@/lib/auth/guards";
 import { createSupabaseAdminClient } from "@/lib/db/admin";
-import { revokeEntitlement, resendReportEmail } from "@/lib/actions/admin";
+import {
+  removeOrgMembership,
+  resendReportEmail,
+  revokeEntitlement,
+  setOrgMemberRole,
+} from "@/lib/actions/admin";
 import { CreateTeamForUserForm } from "@/components/admin/CreateTeamForUserForm";
 import { StatusBadge } from "@/components/admin/table";
 import { Eyebrow } from "@/components/ui/Eyebrow";
@@ -13,8 +18,22 @@ import type { ArchetypeCode } from "@/lib/types";
 
 export const metadata: Metadata = { title: "User · Admin" };
 
+const ORG_ROLE_OPTIONS = [
+  { value: "member", label: "Member" },
+  { value: "coach", label: "Coach" },
+  { value: "organization_admin", label: "Organization admin" },
+] as const;
+
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+
+async function changeOrgRole(formData: FormData): Promise<void> {
+  "use server";
+  await setOrgMemberRole(
+    String(formData.get("membership_id") ?? ""),
+    String(formData.get("role") ?? ""),
+  );
+}
 
 export default async function AdminUserDetailPage({
   params,
@@ -32,7 +51,7 @@ export default async function AdminUserDetailPage({
     .maybeSingle();
   if (!profile) notFound();
 
-  const [{ data: memberships }, { data: results }, { data: entitlements }] =
+  const [{ data: memberships }, { data: results }, { data: entitlements }, { data: orgMemberships }] =
     await Promise.all([
       admin
         .from("team_members")
@@ -48,6 +67,10 @@ export default async function AdminUserDetailPage({
         .select("id, status, amount_cents, purchased_at, team_id")
         .eq("purchaser_id", userId)
         .order("purchased_at", { ascending: false }),
+      admin
+        .from("organization_members")
+        .select("id, role, organizations (name)")
+        .eq("profile_id", userId),
     ]);
 
   return (
@@ -139,6 +162,51 @@ export default async function AdminUserDetailPage({
             <p className="p-5 text-sm text-slate">No team memberships.</p>
           ) : null}
         </div>
+      </section>
+
+      <section className="flex flex-col gap-3" aria-label="Organization roles">
+        <h2 className="font-display text-h3 font-semibold">Organization roles</h2>
+        <div className="paper-card divide-y divide-hairline p-0">
+          {(orgMemberships ?? []).map((row) => {
+            const org = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations;
+            return (
+              <div key={row.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
+                <span className="text-sm text-ink">{org?.name ?? "Organization"}</span>
+                <div className="ml-auto flex items-center gap-3">
+                  <form action={changeOrgRole} className="flex items-center gap-2">
+                    <input type="hidden" name="membership_id" value={row.id} />
+                    <select
+                      name="role"
+                      defaultValue={row.role}
+                      aria-label={`Role in ${org?.name ?? "organization"}`}
+                      className="rounded-md border border-hairline bg-canvas px-2 py-1.5 text-xs text-ink"
+                    >
+                      {ORG_ROLE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="submit" className="text-xs text-botanical hover:underline">
+                      Update role
+                    </button>
+                  </form>
+                  <form action={removeOrgMembership.bind(null, row.id)}>
+                    <button type="submit" className="text-xs text-disc-d hover:underline">
+                      Remove
+                    </button>
+                  </form>
+                </div>
+              </div>
+            );
+          })}
+          {(orgMemberships ?? []).length === 0 ? (
+            <p className="p-5 text-sm text-slate">No organization memberships.</p>
+          ) : null}
+        </div>
+        <p className="text-xs text-faint">
+          Coaches see the coaching workspace; organization admins manage teams across their organization.
+        </p>
       </section>
 
       <section className="paper-card flex flex-col gap-4 p-6" aria-label="Create team on behalf">
