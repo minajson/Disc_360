@@ -5,7 +5,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireOnboarded, requireTeamAdmin } from "@/lib/auth/guards";
 import { parseMemberCsv } from "@/lib/teams/csv";
-import { sendTeamInvitation } from "@/lib/email/notifications";
+import {
+  sendCampaignReminder,
+  sendTeamInvitation,
+} from "@/lib/email/notifications";
 
 async function inviteAndNotify(options: {
   supabase: Awaited<ReturnType<typeof requireTeamAdmin>>["supabase"];
@@ -253,7 +256,7 @@ export async function rotateInviteLink(teamId: string): Promise<void> {
     entity_type: "team",
     entity_id: teamId,
   });
-  revalidatePath(`/app/teams/${teamId}/members`);
+  revalidatePath(`/app/teams/${teamId}/dashboard`);
 }
 
 /* ── members ─────────────────────────────────────────────────────────── */
@@ -307,7 +310,7 @@ export async function addMember(
     inviterName: profile.full_name,
   });
 
-  revalidatePath(`/app/teams/${parsed.data.team_id}/members`);
+  revalidatePath(`/app/teams/${parsed.data.team_id}/dashboard`);
   return ok(`${parsed.data.display_name} added and invited.`);
 }
 
@@ -351,7 +354,7 @@ export async function importMembers(
     });
   }
 
-  revalidatePath(`/app/teams/${parsed.data.team_id}/members`);
+  revalidatePath(`/app/teams/${parsed.data.team_id}/dashboard`);
   return ok(
     `Imported ${added} member${added === 1 ? "" : "s"}${skipped ? `, skipped ${skipped} duplicate${skipped === 1 ? "" : "s"}` : ""}${errors.length ? `, ${errors.length} invalid line${errors.length === 1 ? "" : "s"}` : ""}.`,
   );
@@ -390,7 +393,7 @@ export async function updateMember(
     .eq("team_id", parsed.data.team_id);
   if (error) return fail("Could not update the member.");
 
-  revalidatePath(`/app/teams/${parsed.data.team_id}/members`);
+  revalidatePath(`/app/teams/${parsed.data.team_id}/dashboard`);
   return ok("Member updated.");
 }
 
@@ -423,7 +426,7 @@ export async function removeMember(teamId: string, memberId: string): Promise<vo
     entity_id: memberId,
     metadata: { team_id: teamId },
   });
-  revalidatePath(`/app/teams/${teamId}/members`);
+  revalidatePath(`/app/teams/${teamId}/dashboard`);
 }
 
 /* ── invitations ─────────────────────────────────────────────────────── */
@@ -465,7 +468,100 @@ export async function resendInvitation(teamId: string, invitationId: string): Pr
     message: invitation.message ?? undefined,
   });
 
-  revalidatePath(`/app/teams/${teamId}/members`);
+  revalidatePath(`/app/teams/${teamId}/dashboard`);
+}
+
+/**
+ * One-click nudge for everyone who hasn't completed: unclaimed roster
+ * entries get their invitation resent; claimed-but-incomplete members get
+ * a reminder email (preference-gated).
+ */
+export async function sendReminderToPending(teamId: string): Promise<void> {
+  if (!z.uuid().safeParse(teamId).success) return;
+  const { supabase, user, profile } = await requireTeamAdmin(teamId);
+
+  const { data: team } = await supabase
+    .from("teams")
+    .select("name, deadline_at")
+    .eq("id", teamId)
+    .single();
+  if (!team) return;
+
+  const deadline = team.deadline_at
+    ? new Date(team.deadline_at).toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+      })
+    : undefined;
+
+  // Roster with result state — service role via the roster module's caller
+  // is unnecessary here: admins can read members; results state comes from
+  // notification of completion instead. Use members + own-team invitations.
+  const { data: members } = await supabase
+    .from("team_members")
+    .select("id, email, profile_id, display_name")
+    .eq("team_id", teamId);
+
+  // Which members already completed (service role: cross-member result
+  // existence check only — no scores are read).
+  const { createSupabaseAdminClient } = await import("@/lib/db/admin");
+  const admin = createSupabaseAdminClient();
+  const profileIds = (members ?? [])
+    .map((m) => m.profile_id)
+    .filter((id): id is string => Boolean(id));
+  const { data: completedRows } = profileIds.length
+    ? await admin
+        .from("assessment_results")
+        .select("profile_id")
+        .in("profile_id", profileIds)
+    : { data: [] as { profile_id: string }[] };
+  const completedProfiles = new Set((completedRows ?? []).map((r) => r.profile_id));
+
+  for (const member of members ?? []) {
+    if (member.profile_id && completedProfiles.has(member.profile_id)) continue;
+
+    if (member.profile_id) {
+      await sendCampaignReminder({
+        to: member.email,
+        profileId: member.profile_id,
+        teamName: team.name,
+        deadline,
+      });
+    } else {
+      // Unclaimed: refresh + resend their pending invitation.
+      const { data: invitation } = await supabase
+        .from("invitations")
+        .select("id, token, send_count, status")
+        .eq("team_id", teamId)
+        .eq("email", member.email)
+        .eq("status", "pending")
+        .maybeSingle();
+      if (invitation && invitation.send_count < RESEND_MAX_SENDS) {
+        await supabase
+          .from("invitations")
+          .update({
+            last_sent_at: new Date().toISOString(),
+            send_count: invitation.send_count + 1,
+            expires_at: new Date(Date.now() + 14 * 86_400_000).toISOString(),
+          })
+          .eq("id", invitation.id);
+        await sendTeamInvitation({
+          to: member.email,
+          teamName: team.name,
+          inviterName: profile.full_name,
+          token: invitation.token,
+        });
+      }
+    }
+  }
+
+  await supabase.from("audit_logs").insert({
+    actor_id: user.id,
+    action: "team.reminders_sent",
+    entity_type: "team",
+    entity_id: teamId,
+  });
+  revalidatePath(`/app/teams/${teamId}/dashboard`);
 }
 
 export async function revokeInvitation(teamId: string, invitationId: string): Promise<void> {
@@ -477,5 +573,5 @@ export async function revokeInvitation(teamId: string, invitationId: string): Pr
     .eq("id", invitationId)
     .eq("team_id", teamId)
     .eq("status", "pending");
-  revalidatePath(`/app/teams/${teamId}/members`);
+  revalidatePath(`/app/teams/${teamId}/dashboard`);
 }

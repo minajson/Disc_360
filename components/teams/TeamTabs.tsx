@@ -13,18 +13,17 @@ export function TeamTabs({ teamId, isAdmin }: TeamTabsProps) {
   const pathname = usePathname();
   const base = `/app/teams/${teamId}`;
 
-  const tabs = [
-    { href: base, label: "Overview", exact: true },
-    { href: `${base}/results`, label: "Results", exact: false },
-    ...(isAdmin
-      ? [
-          { href: `${base}/members`, label: "Members", exact: false },
-          { href: `${base}/campaigns`, label: "Campaigns", exact: false },
-          { href: `${base}/presentation`, label: "Presentation", exact: false },
-          { href: `${base}/settings`, label: "Settings", exact: false },
-        ]
-      : []),
-  ];
+  const tabs = isAdmin
+    ? [
+        { href: `${base}/dashboard`, label: "Dashboard", exact: false },
+        { href: `${base}/results`, label: "Results", exact: false },
+        { href: `${base}/presentation`, label: "Presentation", exact: false },
+        { href: `${base}/settings`, label: "Settings", exact: false },
+      ]
+    : [
+        { href: base, label: "Overview", exact: true },
+        { href: `${base}/results`, label: "Results", exact: false },
+      ];
 
   return (
     <nav aria-label="Team sections" className="flex gap-1 overflow-x-auto rule-b pb-px">
