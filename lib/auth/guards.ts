@@ -15,6 +15,7 @@ export interface ProfileRow {
   onboarding_intent: string | null;
   consented_at: string | null;
   onboarded_at: string | null;
+  deactivated_at: string | null;
 }
 
 export interface AuthContext {
@@ -34,13 +35,24 @@ export async function requireUser(): Promise<AuthContext> {
   const { data: profile } = await supabase
     .from("profiles")
     .select(
-      "id, email, full_name, preferred_name, profession, country, timezone, is_super_admin, onboarding_intent, consented_at, onboarded_at",
+      "id, email, full_name, preferred_name, profession, country, timezone, is_super_admin, onboarding_intent, consented_at, onboarded_at, deactivated_at",
     )
     .eq("id", user.id)
     .single();
 
   if (!profile) redirect("/sign-in");
+  if (profile.deactivated_at) {
+    await supabase.auth.signOut();
+    redirect("/sign-in?error=deactivated");
+  }
   return { supabase, user, profile: profile as ProfileRow };
+}
+
+/** Platform owner scope. All admin-area data access happens after this. */
+export async function requireSuperAdmin(): Promise<AuthContext> {
+  const context = await requireOnboarded();
+  if (!context.profile.is_super_admin) redirect("/app");
+  return context;
 }
 
 /** Signed-in AND onboarded, or redirect into onboarding. */

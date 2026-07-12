@@ -8,6 +8,7 @@ declare
   v_version uuid := '00000000-0000-4000-8000-000000000001';
   v_admin uuid := '10000000-0000-4000-8000-000000000001';
   v_solo uuid := '10000000-0000-4000-8000-000000000002';
+  v_super uuid := '10000000-0000-4000-8000-000000000003';
   v_org uuid := '20000000-0000-4000-8000-000000000001';
   v_team_product uuid := '30000000-0000-4000-8000-000000000001';
   v_team_eng uuid := '30000000-0000-4000-8000-000000000002';
@@ -38,6 +39,10 @@ begin
     ('00000000-0000-0000-0000-000000000000', v_solo, 'authenticated', 'authenticated',
      'solo@disc360.dev', crypt('disc360-demo', gen_salt('bf')), now(),
      '{"provider":"email","providers":["email"]}', '{"full_name":"Sam Okonkwo"}',
+     now(), now(), '', '', '', ''),
+    ('00000000-0000-0000-0000-000000000000', v_super, 'authenticated', 'authenticated',
+     'admin@disc360.dev', crypt('disc360-demo', gen_salt('bf')), now(),
+     '{"provider":"email","providers":["email"]}', '{"full_name":"Alex Reeve"}',
      now(), now(), '', '', '', '');
 
   insert into auth.identities (id, user_id, provider_id, identity_data, provider,
@@ -46,7 +51,9 @@ begin
     (gen_random_uuid(), v_admin, v_admin::text,
      jsonb_build_object('sub', v_admin::text, 'email', 'demo@disc360.dev'), 'email', now(), now(), now()),
     (gen_random_uuid(), v_solo, v_solo::text,
-     jsonb_build_object('sub', v_solo::text, 'email', 'solo@disc360.dev'), 'email', now(), now(), now());
+     jsonb_build_object('sub', v_solo::text, 'email', 'solo@disc360.dev'), 'email', now(), now(), now()),
+    (gen_random_uuid(), v_super, v_super::text,
+     jsonb_build_object('sub', v_super::text, 'email', 'admin@disc360.dev'), 'email', now(), now(), now());
 
   update public.profiles set
     preferred_name = 'Dana', profession = 'Head of People',
@@ -59,6 +66,12 @@ begin
     country = 'NG', timezone = 'Africa/Lagos',
     onboarding_intent = 'understand_myself', consented_at = now(), onboarded_at = now()
   where id = v_solo;
+
+  update public.profiles set
+    preferred_name = 'Alex', profession = 'Platform owner',
+    country = 'US', timezone = 'America/New_York', is_super_admin = true,
+    onboarding_intent = 'setup_organization', consented_at = now(), onboarded_at = now()
+  where id = v_super;
 
   -- ── organization + teams ───────────────────────────────────────────
   insert into public.organizations (id, name, industry, created_by)
@@ -207,6 +220,13 @@ begin
   values
     (v_team_eng, 'former@atlasdemo.dev', 'expired', v_admin, now() - interval '3 days'),
     (v_team_eng, 'declined@atlasdemo.dev', 'revoked', v_admin, now() + interval '5 days');
+
+  -- Entitlements: Dana has one consumed purchase (Product Leadership) and
+  -- one unused entitlement ready for a new team.
+  insert into public.entitlements (purchaser_id, status, team_id, purchased_at)
+  values
+    (v_admin, 'consumed', v_team_product, now() - interval '45 days'),
+    (v_admin, 'active', null, now() - interval '2 days');
 
   -- ── solo individual: history + one in-progress session ─────────────
   insert into public.assessment_sessions (profile_id, version_id, status, current_index, started_at, completed_at)

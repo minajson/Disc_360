@@ -8,35 +8,33 @@ import { createTeam, type ActionState } from "@/lib/actions/teams";
 
 const initialState: ActionState = { status: "idle", message: "" };
 
-interface OrgOption {
-  id: string;
-  name: string;
+interface NewTeamFormProps {
+  /** Prefilled from the user's existing organization, if any. */
+  defaultOrganizationName: string;
 }
 
-export function NewTeamForm({ organizations }: { organizations: OrgOption[] }) {
+export function NewTeamForm({ defaultOrganizationName }: NewTeamFormProps) {
   const [state, formAction, pending] = useActionState(createTeam, initialState);
 
   return (
     <form action={formAction} className="paper-card flex flex-col gap-5 p-7 sm:p-8" noValidate>
-      {organizations.length === 1 ? (
-        <input type="hidden" name="organization_id" value={organizations[0]!.id} />
-      ) : (
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="new-team-org" className="text-sm font-medium text-ink">
-            Organization
-          </label>
-          <select id="new-team-org" name="organization_id" className={authInputClasses}>
-            {organizations.map((org) => (
-              <option key={org.id} value={org.id}>
-                {org.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField label="Team name" id="new-team-name" name="name" required />
+        <TextField
+          label="Organization or company"
+          id="new-team-org"
+          name="organization_name"
+          defaultValue={defaultOrganizationName}
+          required
+        />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <TextField
+          label="Event or session name (optional)"
+          id="new-team-session"
+          name="session_name"
+          placeholder="e.g. Q3 Leadership Offsite"
+        />
         <TextField label="Department (optional)" id="new-team-dept" name="department" />
       </div>
       <div className="flex flex-col gap-1.5">
@@ -46,11 +44,10 @@ export function NewTeamForm({ organizations }: { organizations: OrgOption[] }) {
         <textarea id="new-team-description" name="description" rows={2} className={cn(authInputClasses, "resize-y")} />
       </div>
       <div className="grid gap-4 sm:grid-cols-4">
-        <TextField label="Approx. size" id="new-team-size" name="approx_size" type="number" min={2} max={500} />
-        <TextField label="Timezone" id="new-team-tz" name="timezone" placeholder="America/New_York" />
+        <TextField label="Team size" id="new-team-size" name="approx_size" type="number" min={2} max={500} />
         <div className="flex flex-col gap-1.5">
           <label htmlFor="new-team-visibility" className="text-sm font-medium text-ink">
-            Result visibility
+            Presentation preference
           </label>
           <select id="new-team-visibility" name="results_named" defaultValue="anonymized" className={authInputClasses}>
             <option value="anonymized">Anonymized</option>
@@ -58,6 +55,7 @@ export function NewTeamForm({ organizations }: { organizations: OrgOption[] }) {
           </select>
         </div>
         <TextField label="Deadline (optional)" id="new-team-deadline" name="deadline_at" type="date" />
+        <TextField label="Timezone (optional)" id="new-team-tz" name="timezone" placeholder="America/New_York" />
       </div>
       <label className="flex items-start gap-3 text-sm text-slate">
         <input
@@ -66,7 +64,7 @@ export function NewTeamForm({ organizations }: { organizations: OrgOption[] }) {
           defaultChecked
           className="mt-0.5 size-4 accent-[var(--color-botanical)]"
         />
-        <span>Members can view the team summary</span>
+        <span>Participants can view the team summary</span>
       </label>
 
       {state.status === "error" ? (

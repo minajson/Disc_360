@@ -36,8 +36,18 @@ export function SignInForm() {
     router.refresh();
   };
 
+  const blockedNotice =
+    searchParams.get("error") === "deactivated"
+      ? "This account has been deactivated by the platform administrator. Contact hello@disc360.app to restore access."
+      : null;
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+      {blockedNotice ? (
+        <p role="alert" className="rounded-xl bg-disc-d-soft px-4 py-3 text-sm text-disc-d">
+          {blockedNotice}
+        </p>
+      ) : null}
       <TextField
         label="Email"
         id="email"

@@ -180,6 +180,7 @@ export type Database = {
           score_s: number
           secondary_dimension: Database["public"]["Enums"]["dimension"] | null
           session_id: string
+          share_token: string
         }
         Insert: {
           archetype_code: Database["public"]["Enums"]["archetype_code"]
@@ -197,6 +198,7 @@ export type Database = {
           score_s: number
           secondary_dimension?: Database["public"]["Enums"]["dimension"] | null
           session_id: string
+          share_token?: string
         }
         Update: {
           archetype_code?: Database["public"]["Enums"]["archetype_code"]
@@ -214,6 +216,7 @@ export type Database = {
           score_s?: number
           secondary_dimension?: Database["public"]["Enums"]["dimension"] | null
           session_id?: string
+          share_token?: string
         }
         Relationships: [
           {
@@ -396,6 +399,60 @@ export type Database = {
             columns: ["team_member_id"]
             isOneToOne: false
             referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entitlements: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          id: string
+          product: string
+          purchased_at: string
+          purchaser_id: string
+          simulated: boolean
+          status: string
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount_cents?: number
+          created_at?: string
+          id?: string
+          product?: string
+          purchased_at?: string
+          purchaser_id: string
+          simulated?: boolean
+          status?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          id?: string
+          product?: string
+          purchased_at?: string
+          purchaser_id?: string
+          simulated?: boolean
+          status?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entitlements_purchaser_id_fkey"
+            columns: ["purchaser_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entitlements_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -653,6 +710,7 @@ export type Database = {
           consented_at: string | null
           country: string | null
           created_at: string
+          deactivated_at: string | null
           deletion_requested_at: string | null
           email: string
           full_name: string
@@ -671,6 +729,7 @@ export type Database = {
           consented_at?: string | null
           country?: string | null
           created_at?: string
+          deactivated_at?: string | null
           deletion_requested_at?: string | null
           email: string
           full_name?: string
@@ -689,6 +748,7 @@ export type Database = {
           consented_at?: string | null
           country?: string | null
           created_at?: string
+          deactivated_at?: string | null
           deletion_requested_at?: string | null
           email?: string
           full_name?: string
@@ -917,6 +977,7 @@ export type Database = {
           name: string
           organization_id: string
           results_named: boolean
+          session_name: string | null
           team_code: string
           timezone: string | null
           updated_at: string
@@ -936,6 +997,7 @@ export type Database = {
           name: string
           organization_id: string
           results_named?: boolean
+          session_name?: string | null
           team_code: string
           timezone?: string | null
           updated_at?: string
@@ -955,6 +1017,7 @@ export type Database = {
           name?: string
           organization_id?: string
           results_named?: boolean
+          session_name?: string | null
           team_code?: string
           timezone?: string | null
           updated_at?: string

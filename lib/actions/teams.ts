@@ -49,11 +49,12 @@ function generateTeamCode(name: string): string {
   return `${stem}-${digits}`;
 }
 
-/* ── create team ─────────────────────────────────────────────────────── */
+/* ── create team (entitlement-gated) ─────────────────────────────────── */
 
 const createTeamSchema = z.object({
-  organization_id: z.uuid(),
   name: z.string().min(2).max(120),
+  organization_name: z.string().min(2).max(120),
+  session_name: z.string().max(120).optional().or(z.literal("")),
   description: z.string().max(500).optional().or(z.literal("")),
   department: z.string().max(120).optional().or(z.literal("")),
   timezone: z.string().max(80).optional().or(z.literal("")),
@@ -68,8 +69,9 @@ export async function createTeam(
   formData: FormData,
 ): Promise<ActionState> {
   const parsed = createTeamSchema.safeParse({
-    organization_id: formData.get("organization_id"),
     name: formData.get("name"),
+    organization_name: formData.get("organization_name"),
+    session_name: formData.get("session_name"),
     description: formData.get("description"),
     department: formData.get("department"),
     timezone: formData.get("timezone"),
@@ -80,23 +82,54 @@ export async function createTeam(
   });
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Check the team details.");
 
-  const { supabase, user, profile } = await requireOnboarded();
+  const context = await requireOnboarded();
+  const { supabase, user, profile } = context;
 
-  // Server-side org authorization — never trust the submitted org id.
-  const { data: membership } = await supabase
+  // Entitlement check on the server — never trust the client's word for it.
+  const { getTeamEntitlement, consumeEntitlement } = await import(
+    "@/lib/payments/entitlements"
+  );
+  const entitlement = await getTeamEntitlement(context);
+  if (!entitlement.allowed) redirect("/pricing?intent=create-team");
+
+  // Resolve the organization: reuse an org the user administers when its
+  // name matches, otherwise create one from the company name.
+  const { data: memberships } = await supabase
     .from("organization_members")
-    .select("id, role")
-    .eq("organization_id", parsed.data.organization_id)
+    .select("organization_id, organizations (id, name)")
     .eq("profile_id", user.id)
-    .in("role", ["organization_admin", "coach"])
-    .maybeSingle();
-  if (!membership) return fail("You don't have permission to create teams in this organization.");
+    .in("role", ["organization_admin", "coach"]);
+
+  let organizationId: string | null = null;
+  for (const row of memberships ?? []) {
+    const org = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations;
+    if (org && org.name.trim().toLowerCase() === parsed.data.organization_name.trim().toLowerCase()) {
+      organizationId = org.id;
+      break;
+    }
+  }
+  if (!organizationId) {
+    const { data: org, error: orgError } = await supabase
+      .from("organizations")
+      .insert({ name: parsed.data.organization_name.trim(), created_by: user.id })
+      .select("id")
+      .single();
+    if (orgError || !org) return fail("Could not create the organization.");
+    const { error: memberError } = await supabase.from("organization_members").insert({
+      organization_id: org.id,
+      profile_id: user.id,
+      role: "organization_admin",
+    });
+    if (memberError) return fail("Could not attach you to the organization.");
+    organizationId = org.id;
+  }
 
   const { data: team, error } = await supabase
     .from("teams")
     .insert({
-      organization_id: parsed.data.organization_id,
+      organization_id: organizationId,
       name: parsed.data.name,
+      session_name: parsed.data.session_name || null,
       description: parsed.data.description || "",
       department: parsed.data.department || null,
       timezone: parsed.data.timezone || null,
@@ -122,7 +155,19 @@ export async function createTeam(
     role: "team_admin",
   });
 
-  redirect(`/app/teams/${team.id}`);
+  if (entitlement.entitlementId) {
+    await consumeEntitlement(context, entitlement.entitlementId, team.id);
+  }
+
+  await supabase.from("audit_logs").insert({
+    actor_id: user.id,
+    action: "team.created",
+    entity_type: "team",
+    entity_id: team.id,
+    metadata: { entitlement_id: entitlement.entitlementId },
+  });
+
+  redirect(`/app/teams/${team.id}/dashboard`);
 }
 
 /* ── team settings ───────────────────────────────────────────────────── */
