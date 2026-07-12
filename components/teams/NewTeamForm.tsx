@@ -37,6 +37,20 @@ export function NewTeamForm({ defaultOrganizationName }: NewTeamFormProps) {
         />
         <TextField label="Department (optional)" id="new-team-dept" name="department" />
       </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <TextField
+          label="Client organisation (optional)"
+          id="new-team-client"
+          name="client_organization"
+          placeholder="For coaching engagements"
+        />
+        <TextField
+          label="Engagement start date (optional)"
+          id="new-team-start"
+          name="engagement_starts_at"
+          type="date"
+        />
+      </div>
       <div className="flex flex-col gap-1.5">
         <label htmlFor="new-team-description" className="text-sm font-medium text-ink">
           Description (optional)

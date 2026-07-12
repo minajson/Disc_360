@@ -20,7 +20,7 @@ export default async function TeamSettingsPage({
 
   const { data: team } = await supabase
     .from("teams")
-    .select("id, name, description, department, timezone, logo_url, results_named, members_can_view_summary, deadline_at, team_code, invite_token")
+    .select("id, name, description, department, timezone, logo_url, cover_path, results_named, members_can_view_summary, deadline_at, team_code, invite_token")
     .eq("id", teamId)
     .maybeSingle();
   if (!team) notFound();

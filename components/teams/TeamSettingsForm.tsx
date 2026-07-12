@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/Button";
 import { TextField, authInputClasses } from "@/components/auth/fields";
+import { ImageUploadField } from "@/components/uploads/ImageUploadField";
 import {
   archiveTeam,
   rotateInviteLink,
@@ -20,6 +21,7 @@ interface TeamSettings {
   department: string | null;
   timezone: string | null;
   logo_url: string | null;
+  cover_path: string | null;
   results_named: boolean;
   members_can_view_summary: boolean;
   deadline_at: string | null;
@@ -56,6 +58,17 @@ export function TeamSettingsForm({ team }: { team: TeamSettings }) {
           name="deadline_at"
           type="date"
           defaultValue={team.deadline_at ? team.deadline_at.slice(0, 10) : ""}
+        />
+      </div>
+
+      <div className="rule-t pt-5">
+        <ImageUploadField
+          kind="team-cover"
+          name="cover_path"
+          label="Team cover image (optional)"
+          hint="16:9, recommended 1600×900 — shown to participants on the join page."
+          ratio="16:9"
+          initialPath={team.cover_path}
         />
       </div>
 

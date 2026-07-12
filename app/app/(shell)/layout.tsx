@@ -12,22 +12,31 @@ export default async function AppLayout({
 
   // Role-aware navigation: individuals see personal links; team-admin-capable
   // users add team management; super admins add the platform admin area.
-  const [{ data: adminMembership }, entitlement] = await Promise.all([
-    supabase
-      .from("team_members")
-      .select("id")
-      .eq("profile_id", user.id)
-      .eq("role", "team_admin")
-      .limit(1)
-      .maybeSingle(),
-    getTeamEntitlement(context),
-  ]);
+  const [{ data: adminMembership }, { data: coachProfile }, entitlement] =
+    await Promise.all([
+      supabase
+        .from("team_members")
+        .select("id")
+        .eq("profile_id", user.id)
+        .eq("role", "team_admin")
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("coach_profiles")
+        .select("profile_id")
+        .eq("profile_id", user.id)
+        .maybeSingle(),
+      getTeamEntitlement(context),
+    ]);
   const teamCapable = Boolean(adminMembership) || entitlement.allowed;
+  const coachCapable =
+    Boolean(coachProfile) || profile.onboarding_intent === "manage_clients";
 
   const links: AppNavLink[] = [
     { href: "/app", label: "Dashboard" },
     { href: "/app/assessments", label: "My assessment" },
     { href: "/app/history", label: "My results" },
+    ...(coachCapable ? [{ href: "/app/coach", label: "Coach" }] : []),
     ...(teamCapable
       ? [
           { href: "/app/teams", label: "Teams" },

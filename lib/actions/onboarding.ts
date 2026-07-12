@@ -85,7 +85,7 @@ export async function completeCoachOnboarding(
 ): Promise<OnboardingState> {
   const result = await completeProfile(formData, "manage_clients");
   if (result.error) return { status: "error", message: result.error };
-  redirect("/app/teams");
+  redirect("/app/coach/profile");
 }
 
 const teamCreatorSchema = z.object({
