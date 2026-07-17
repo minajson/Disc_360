@@ -66,9 +66,15 @@ export interface Result {
   userId: string;
   rawMost: DiscScores;
   rawLeast: DiscScores;
+  /** Signed most − least per dimension. Negative values are preserved. */
   net: DiscScores;
+  /** Independent 0–100 intensity per dimension (midpoint 50). Does not sum to 100. */
   normalized: DiscScores;
+  /** Displayed percentage split. Always totals exactly 100. */
+  distribution: DiscScores;
   archetypeCode: ArchetypeCode;
+  /** Two highest dimensions in display letters, e.g. "DA". Always two letters. */
+  hybridType: string;
   primaryDimension: Dimension;
   secondaryDimension: Dimension | null;
   intensity: Record<Dimension, IntensityBand>;

@@ -100,6 +100,17 @@ not in the client.
 - Scoring: `lib/scoring/computeResult()` is the only entry point — pure,
   deterministic, tested. Thresholds: balanced spread ≤ 12, pure gap ≥ 15,
   diagonal window ≤ 8, tie-break D→I→S→C. Do not change without updating tests.
+- **Two score scales, deliberately.** `normalized` is per-dimension intensity
+  (0–100, midpoint 50) — it does **not** sum to 100, and it is what the
+  archetype thresholds and `score_d/i/s/c` use. `distribution` is the displayed
+  share-of-100 (largest-remainder, always totals exactly 100). Likewise
+  `archetypeCode` suppresses behavioural opposites (D↔S, I↔C never pair) while
+  `hybridType` is the plain top-two reading and can express DS/IA. Never
+  conflate them.
+- Question bank: authored in `data/assessment-scenarios.ts` (user-facing
+  D/I/S/**A**); `data/disc-questions.ts` adapts A→C for the internal model.
+  **Postgres is the runtime source** (`questions`/`question_options`) — edit
+  the TS bank, then add a migration; never edit an applied one.
 - Campaigns: `draft → scheduled → active → closed → archived` (reopen:
   closed → active).
 

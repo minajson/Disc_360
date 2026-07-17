@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { signOut } from "./helpers";
 
 /**
  * Journey smoke tests against the seeded local Supabase stack.
@@ -60,21 +61,99 @@ test("free individual clicking Create a team lands on the pricing prompt", async
   await expect(page.getByRole("button", { name: /Buy Team plan/i }).first()).toBeVisible();
 });
 
-test("purchasing the team plan unlocks team creation end to end", async ({ page }) => {
+test("purchasing the team plan unlocks the wizard end to end", async ({ page }) => {
+  test.slow();
   await signUpIndividual(page, "Team Buyer", `pw-buyer-${Date.now()}@disc360.dev`);
   await page.goto("/pricing?intent=create-team");
   await page.getByRole("button", { name: /Buy Team plan/i }).first().click();
 
+  // Purchase lands directly in the wizard — never in a second onboarding form.
   await page.waitForURL("**/app/teams/new");
   const teamName = `Playwright Guild ${Date.now() % 10_000}`;
+
+  // Step 1 — team.
   await page.getByLabel("Team name").fill(teamName);
   await page.getByLabel("Organization or company").fill("Playwright Co");
-  await page.getByLabel(/Event or session name/).fill("E2E Offsite");
-  await page.getByRole("button", { name: "Create team" }).click();
+  await page.getByLabel(/Session or event name/).fill("E2E Offsite");
+  await page.getByLabel(/Approximate team size/).fill("12");
+  await page.getByRole("button", { name: "Continue" }).click();
 
-  await page.waitForURL("**/dashboard");
+  // Step 2 — assessment settings.
+  await expect(page.getByLabel("Presentation")).toBeVisible();
+  await page.getByLabel("Presentation").selectOption("named");
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  // Step 3 — review shows what was typed once, in step 1.
+  const review = page.getByTestId("wizard-review");
+  await expect(review).toContainText(teamName);
+  await expect(review).toContainText("Playwright Co");
+  await expect(review).toContainText("E2E Offsite");
+  await expect(review).toContainText("Named results");
+
+  await page.getByRole("button", { name: "Create team" }).click();
+  await page.waitForURL("**/dashboard", { timeout: 30_000 });
   await expect(page.getByRole("heading", { name: teamName })).toBeVisible();
   await expect(page.getByText("Completion")).toBeVisible();
+});
+
+test("wizard back-navigation preserves every entered value", async ({ page }) => {
+  test.slow();
+  await signUpIndividual(page, "Back Tracker", `pw-back-${Date.now()}@disc360.dev`);
+  await page.goto("/pricing?intent=create-team");
+  await page.getByRole("button", { name: /Buy Team plan/i }).first().click();
+  await page.waitForURL("**/app/teams/new");
+
+  const teamName = `Back Nav ${Date.now() % 10_000}`;
+  await page.getByLabel("Team name").fill(teamName);
+  await page.getByLabel("Organization or company").fill("Reversible Ltd");
+  await page.getByLabel(/Department/).fill("Research");
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  // Step 2 → Back → step 1 still holds everything.
+  await expect(page.getByLabel("Presentation")).toBeVisible();
+  await page.getByRole("button", { name: "← Back" }).click();
+  await expect(page.getByLabel("Team name")).toHaveValue(teamName);
+  await expect(page.getByLabel("Organization or company")).toHaveValue("Reversible Ltd");
+  await expect(page.getByLabel(/Department/)).toHaveValue("Research");
+
+  // And a full reload restores from the server draft, not browser memory.
+  await page.reload();
+  await expect(page.getByLabel("Team name")).toHaveValue(teamName);
+  await expect(page.getByLabel("Organization or company")).toHaveValue("Reversible Ltd");
+});
+
+test("double-clicking Create team creates exactly one team", async ({ page }) => {
+  test.slow();
+  const email = `pw-dupe-${Date.now()}@disc360.dev`;
+  await signUpIndividual(page, "Dupe Clicker", email);
+  await page.goto("/pricing?intent=create-team");
+  await page.getByRole("button", { name: /Buy Team plan/i }).first().click();
+  await page.waitForURL("**/app/teams/new");
+
+  const teamName = `Dupe Guard ${Date.now() % 10_000}`;
+  await page.getByLabel("Team name").fill(teamName);
+  await page.getByLabel("Organization or company").fill("Once Only Inc");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  await page.getByRole("button", { name: "Create team" }).click();
+  await page.waitForURL("**/dashboard", { timeout: 30_000 });
+
+  // Go back and submit the very same draft again — a back button, a stale
+  // tab or a double submit all reach the server with the same draft id. The
+  // draft's draft→completed transition is the mutex, so the second attempt
+  // must be refused rather than create a second team.
+  await page.goBack();
+  const resubmit = page.getByRole("button", { name: "Create team" });
+  if (await resubmit.isVisible().catch(() => false)) {
+    await resubmit.click();
+    await expect(page.getByRole("alert")).toContainText(/already been created/i);
+  }
+
+  // My Teams lists this team exactly once, whatever happened above.
+  // (Team names render as spans on this page, not headings.)
+  await page.goto("/app/teams");
+  await expect(page.getByText(teamName, { exact: true })).toHaveCount(1);
 });
 
 test("individual assessment completes end to end", async ({ page }) => {
@@ -160,8 +239,7 @@ test("super admin sees the platform overview; others are turned away", async ({ 
   await page.goto("/sign-in").catch(() => undefined);
   // sign out solo by using the app header
   await page.goto("/app");
-  await page.getByRole("button", { name: "Sign out" }).click();
-  await page.waitForURL("**/");
+  await signOut(page);
 
   await signIn(page, "admin@disc360.dev");
   await page.goto("/admin");

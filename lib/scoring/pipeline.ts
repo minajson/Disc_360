@@ -110,6 +110,13 @@ export function computeNet(raw: RawScores): DiscScores {
 /**
  * Linear normalization of net scores to 0–100 (midpoint 50 = neutral).
  * `questionCount` is the maximum absolute net value per dimension.
+ *
+ * Each dimension is scaled independently, so these four values are an
+ * intensity reading and do NOT sum to 100. This is the scale the archetype
+ * thresholds are calibrated against and the scale stored in score_d/i/s/c.
+ * For the share-of-100 figures shown to participants, use
+ * `computeDistribution` — the two answer different questions ("how strong is
+ * this dimension?" vs "how is the profile divided?").
  */
 export function normalizeScores(net: DiscScores, questionCount: number): DiscScores {
   const normalized = zeroScores();
@@ -119,4 +126,56 @@ export function normalizeScores(net: DiscScores, questionCount: number): DiscSco
     normalized[key] = Math.max(0, Math.min(100, value));
   }
   return normalized;
+}
+
+/**
+ * Displayed percentage split across the four dimensions, guaranteed to total
+ * exactly 100.
+ *
+ * Each net score (−N…+N) is shifted by `questionCount` into a non-negative
+ * weight (0…2N) so a strongly rejected dimension contributes zero rather
+ * than a negative share. Because every answer adds +1 to one dimension and
+ * −1 to another, the net scores always sum to 0 and the weights therefore
+ * always sum to 4 × questionCount — the denominator can never be zero.
+ *
+ * Rounding uses the largest-remainder (Hamilton) method: floor every share,
+ * then hand the leftover points to the largest fractional parts. Ties on the
+ * fractional part resolve in D → I → S → C order, the same deterministic
+ * precedence the archetype ranking uses.
+ */
+export function computeDistribution(
+  net: DiscScores,
+  questionCount: number,
+): DiscScores {
+  const weights = DIMENSIONS.map((dim) =>
+    Math.max(0, net[DIMENSION_KEY[dim]] + questionCount),
+  );
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+
+  if (total === 0) {
+    throw new ScoringError(
+      "EMPTY_DISTRIBUTION",
+      "Cannot build a distribution from zero total weight",
+    );
+  }
+
+  const exact = weights.map((weight) => (weight / total) * 100);
+  const shares = exact.map((value) => Math.floor(value));
+  const leftover = 100 - shares.reduce((sum, share) => sum + share, 0);
+
+  const byRemainder = exact
+    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+    .sort((a, b) => b.fraction - a.fraction || a.index - b.index);
+
+  for (let awarded = 0; awarded < leftover; awarded += 1) {
+    const target = byRemainder[awarded];
+    if (!target) break;
+    shares[target.index] = (shares[target.index] ?? 0) + 1;
+  }
+
+  const distribution = zeroScores();
+  DIMENSIONS.forEach((dim, index) => {
+    distribution[DIMENSION_KEY[dim]] = shares[index] ?? 0;
+  });
+  return distribution;
 }

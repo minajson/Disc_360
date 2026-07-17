@@ -5,6 +5,7 @@ import { getTeamEntitlement } from "@/lib/payments/entitlements";
 import { startAssessment } from "@/lib/actions/assessment";
 import { insightMap } from "@/data/insight-maps";
 import { displayArchetypeCode } from "@/lib/utils/display";
+import { buildSharedReportUrl, getPublicBaseUrl } from "@/lib/utils/site-url";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { Button } from "@/components/ui/Button";
 import { DimensionMark } from "@/components/ui/DimensionMark";
@@ -103,7 +104,10 @@ export default async function AppDashboardPage() {
                 <DimensionMark dimension={latest.secondary_dimension as Dimension} />
               ) : null}
             </div>
-            <ResultQuickActions resultId={latest.id} shareToken={latest.share_token} />
+            <ResultQuickActions
+              resultId={latest.id}
+              shareUrl={buildSharedReportUrl(getPublicBaseUrl(), latest.share_token)}
+            />
           </div>
         </section>
       ) : (

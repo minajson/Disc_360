@@ -1,7 +1,13 @@
 import { requireOnboarded } from "@/lib/auth/guards";
 import { getTeamEntitlement } from "@/lib/payments/entitlements";
-import { AppHeader, type AppNavLink } from "@/components/app/AppHeader";
+import { accountMenuFor, navFor, resolveExperience } from "@/lib/navigation/app-nav";
+import { AppHeader } from "@/components/app/AppHeader";
 
+/**
+ * Resolves which of the three product experiences this person is in and hands
+ * the matching navigation to the header. The membership lookups happen here,
+ * server-side; `resolveExperience` and `navFor` are pure and unit-tested.
+ */
 export default async function AppLayout({
   children,
 }: {
@@ -10,8 +16,6 @@ export default async function AppLayout({
   const context = await requireOnboarded();
   const { supabase, user, profile } = context;
 
-  // Role-aware navigation: individuals see personal links; team-admin-capable
-  // users add team management; super admins add the platform admin area.
   const [{ data: adminMembership }, { data: coachProfile }, entitlement] =
     await Promise.all([
       supabase
@@ -28,30 +32,21 @@ export default async function AppLayout({
         .maybeSingle(),
       getTeamEntitlement(context),
     ]);
-  const teamCapable = Boolean(adminMembership) || entitlement.allowed;
-  const coachCapable =
-    Boolean(coachProfile) || profile.onboarding_intent === "manage_clients";
 
-  const links: AppNavLink[] = [
-    { href: "/app", label: "Dashboard" },
-    { href: "/app/assessments", label: "My assessment" },
-    { href: "/app/history", label: "My results" },
-    ...(coachCapable ? [{ href: "/app/coach", label: "Coach" }] : []),
-    ...(teamCapable
-      ? [
-          { href: "/app/teams", label: "Teams" },
-          { href: "/app/reports", label: "Reports" },
-        ]
-      : [{ href: "/app/invitations", label: "Invitations" }]),
-    { href: "/app/settings", label: "Settings" },
-    ...(profile.is_super_admin ? [{ href: "/admin", label: "Platform Admin" }] : []),
-  ];
+  const experience = resolveExperience({
+    isCoach:
+      Boolean(coachProfile) || profile.onboarding_intent === "manage_clients",
+    isTeamAdmin: Boolean(adminMembership),
+    hasTeamEntitlement: entitlement.allowed,
+  });
 
   return (
     <>
       <AppHeader
         preferredName={profile.preferred_name || profile.full_name}
-        links={links}
+        links={navFor(experience)}
+        accountLinks={accountMenuFor(experience, profile.is_super_admin)}
+        showPlatformAdmin={profile.is_super_admin}
       />
       <main className="flex-1 bg-mineral">{children}</main>
     </>

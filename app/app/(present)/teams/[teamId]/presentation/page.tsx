@@ -5,6 +5,7 @@ import { mediaUrl } from "@/lib/utils/media";
 import { createSupabaseAdminClient } from "@/lib/db/admin";
 import {
   buildJoinUrl,
+  buildTeamResultsUrl,
   displayJoinUrl,
   getPublicBaseUrl,
 } from "@/lib/utils/site-url";
@@ -61,7 +62,7 @@ export default async function TeamPresentationPage({
   return (
     <PresentationDeck
       data={data}
-      resultsUrl={`${base.url}/app/teams/${teamId}/results`}
+      resultsUrl={buildTeamResultsUrl(base, teamId)}
       joinUrl={buildJoinUrl(base, team?.invite_token ?? "")}
       joinDisplayUrl={displayJoinUrl(base, team?.invite_token ?? "")}
       teamCode={team?.team_code ?? ""}

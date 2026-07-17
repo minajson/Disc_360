@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { signOut } from "./helpers";
 
 /**
  * QR / join-link acceptance tests (spec A–C).
@@ -25,8 +26,7 @@ async function getJoinUrl(page: Page, teamId: string): Promise<string> {
   const link = page.getByRole("link", { name: "Open participant join page" });
   const href = await link.getAttribute("href");
   expect(href).toBeTruthy();
-  await page.getByRole("button", { name: "Sign out" }).click();
-  await page.waitForURL("**/");
+  await signOut(page);
   return href!;
 }
 
@@ -40,8 +40,7 @@ test("A: QR join — register, assess, appear once on the dashboard", async ({ p
     await signIn(page, "demo@disc360.dev");
     await page.goto(`/app/teams/${ENG_TEAM}/dashboard`);
     await expect(page.getByText(/Local development only/i)).toBeVisible();
-    await page.getByRole("button", { name: "Sign out" }).click();
-    await page.waitForURL("**/");
+    await signOut(page);
   }
 
   const email = `qr-${Date.now()}@atlasdemo.dev`;
@@ -64,8 +63,7 @@ test("A: QR join — register, assess, appear once on the dashboard", async ({ p
   await page.waitForURL("**/app/results/**", { timeout: 30_000 });
 
   // Dashboard reflects the new participant exactly once, completed with a type.
-  await page.getByRole("button", { name: "Sign out" }).click();
-  await page.waitForURL("**/");
+  await signOut(page);
   await signIn(page, "demo@disc360.dev");
   await page.goto(`/app/teams/${ENG_TEAM}/dashboard`);
   const row = page.getByRole("row").filter({ hasText: email });
@@ -85,8 +83,7 @@ test("B: team isolation — joining Alpha never attaches Beta", async ({ page })
   await page.waitForURL("**/app/assessments/**", { timeout: 20_000 });
 
   await page.goto("/app");
-  await page.getByRole("button", { name: "Sign out" }).click();
-  await page.waitForURL("**/");
+  await signOut(page);
 
   await signIn(page, "demo@disc360.dev");
   await page.goto(`/app/teams/${ENG_TEAM}/dashboard`);

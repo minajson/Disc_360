@@ -4,6 +4,7 @@ import { requireOnboarded } from "@/lib/auth/guards";
 import { insightMap, type ArchetypeInsight } from "@/data/insight-maps";
 import { dimensionMeta } from "@/data/dimension-meta";
 import { displayArchetypeCode } from "@/lib/utils/display";
+import { buildSharedReportUrl, getPublicBaseUrl } from "@/lib/utils/site-url";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { DimensionMark } from "@/components/ui/DimensionMark";
 import { ExpandableSection } from "@/components/ui/ExpandableSection";
@@ -92,7 +93,7 @@ export default async function ResultPage({
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-5 py-8 sm:px-8">
       <ReportActionBar
         resultId={result.id}
-        shareToken={result.share_token}
+        shareUrl={buildSharedReportUrl(getPublicBaseUrl(), result.share_token)}
         autoprint={autoprint === "1"}
       />
 

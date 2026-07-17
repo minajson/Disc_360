@@ -1,5 +1,6 @@
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { signOut } from "./helpers";
 
 /**
  * v2.2 deliverable screenshots (09–18) into docs/screenshots/.
@@ -30,8 +31,7 @@ async function getJoinUrl(page: Page, teamId: string): Promise<string> {
     .getByRole("link", { name: "Open participant join page" })
     .getAttribute("href");
   expect(href).toBeTruthy();
-  await page.getByRole("button", { name: "Sign out" }).click();
-  await page.waitForURL("**/");
+  await signOut(page);
   return href!;
 }
 
@@ -74,7 +74,8 @@ test("capture 11+12: participant join page and registration form", async ({ page
 
 test("capture 13+14: coach profile setup, then with uploaded photo", async ({ page }) => {
   test.slow();
-  await signIn(page, "demo@disc360.dev");
+  // The seeded coach persona — never demo@, whose experience is facilitator.
+  await signIn(page, "coach@disc360.dev");
   await page.goto("/app/coach/profile");
   await expect(page.getByLabel("Professional title")).toBeVisible();
   await page.waitForTimeout(800);
@@ -99,7 +100,7 @@ test("capture 13+14: coach profile setup, then with uploaded photo", async ({ pa
 });
 
 test("capture 15: coaching workspace", async ({ page }) => {
-  await signIn(page, "demo@disc360.dev");
+  await signIn(page, "coach@disc360.dev");
   await page.goto("/app/coach");
   await expect(page.getByText(/engagement/i).first()).toBeVisible();
   await page.waitForTimeout(800);

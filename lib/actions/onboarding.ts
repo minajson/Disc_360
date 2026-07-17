@@ -88,108 +88,46 @@ export async function completeCoachOnboarding(
   redirect("/app/coach/profile");
 }
 
-const teamCreatorSchema = z.object({
-  organization_name: z.string().min(2).max(120),
-  industry: z.string().max(120).optional().or(z.literal("")),
-  team_name: z.string().min(2).max(120),
-  team_description: z.string().max(500).optional().or(z.literal("")),
-  department: z.string().max(120).optional().or(z.literal("")),
-  approx_size: z.coerce.number().int().min(2).max(500).optional(),
-  results_named: z.enum(["named", "anonymized"]),
-  deadline_at: z.string().optional().or(z.literal("")),
-});
-
-function generateTeamCode(name: string): string {
-  const stem = name.replace(/[^a-zA-Z]/g, "").slice(0, 5).toUpperCase() || "TEAM";
-  const digits = Math.floor(1000 + Math.random() * 9000);
-  return `${stem}-${digits}`;
-}
-
-/** Team creator / organization setup: profile + organization + first team. */
+/**
+ * Team creator / organization setup: profile and consent only.
+ *
+ * This action used to collect and insert the organization and first team from
+ * onboarding. That produced the two defects this flow is built to avoid:
+ *
+ *  - It asked for organization name, team name, department, size, visibility
+ *    and deadline, then discarded every value at the entitlement gate and made
+ *    the user retype them into /app/teams/new.
+ *  - It always inserted a new organization, so a second team created this way
+ *    produced a duplicate org — unlike `createTeam`, which reuses a matching
+ *    one.
+ *
+ * Team details now belong to exactly one place: the wizard at /app/teams/new.
+ * This step only establishes who the person is, then routes them to the plan
+ * (if they need it) or straight to the wizard.
+ */
 export async function completeTeamCreatorOnboarding(
   _prev: OnboardingState,
   formData: FormData,
 ): Promise<OnboardingState> {
-  const parsedTeam = teamCreatorSchema.safeParse({
-    organization_name: formData.get("organization_name"),
-    industry: formData.get("industry"),
-    team_name: formData.get("team_name"),
-    team_description: formData.get("team_description"),
-    department: formData.get("department"),
-    approx_size: formData.get("approx_size") || undefined,
-    results_named: formData.get("results_named"),
-    deadline_at: formData.get("deadline_at"),
-  });
-  if (!parsedTeam.success) {
-    return {
-      status: "error",
-      message: parsedTeam.error.issues[0]?.message ?? "Please complete the team details.",
-    };
-  }
-
   const intent =
     formData.get("intent_variant") === "organization"
       ? "setup_organization"
       : "create_team";
+
   const profileResult = await completeProfile(formData, intent);
   if (profileResult.error) return { status: "error", message: profileResult.error };
 
-  const { supabase, user, profile } = await requireUser();
+  const context = await requireUser();
 
-  const { data: org, error: orgError } = await supabase
-    .from("organizations")
-    .insert({
-      name: parsedTeam.data.organization_name,
-      industry: parsedTeam.data.industry || null,
-      created_by: user.id,
-    })
-    .select("id")
-    .single();
-  if (orgError || !org) {
-    return { status: "error", message: "Could not create the organization — please try again." };
-  }
+  // Team creation is the paid ($8) action; the gate lives on the server, and
+  // is repeated in `createTeam` and on the wizard page. The profile is already
+  // saved, so the user arrives at pricing fully onboarded and returns to the
+  // wizard afterwards.
+  const { getTeamEntitlement } = await import("@/lib/payments/entitlements");
+  const entitlement = await getTeamEntitlement(context);
+  if (!entitlement.allowed) redirect("/pricing?intent=create-team");
 
-  const { error: memberError } = await supabase.from("organization_members").insert({
-    organization_id: org.id,
-    profile_id: user.id,
-    role: "organization_admin",
-  });
-  if (memberError) {
-    return { status: "error", message: "Could not attach you to the organization." };
-  }
-
-  const { data: team, error: teamError } = await supabase
-    .from("teams")
-    .insert({
-      organization_id: org.id,
-      name: parsedTeam.data.team_name,
-      description: parsedTeam.data.team_description || "",
-      department: parsedTeam.data.department || null,
-      approx_size: parsedTeam.data.approx_size ?? null,
-      results_named: parsedTeam.data.results_named === "named",
-      deadline_at: parsedTeam.data.deadline_at
-        ? new Date(parsedTeam.data.deadline_at).toISOString()
-        : null,
-      team_code: generateTeamCode(parsedTeam.data.team_name),
-      created_by: user.id,
-      timezone: formData.get("timezone") ? String(formData.get("timezone")) : null,
-    })
-    .select("id")
-    .single();
-  if (teamError || !team) {
-    return { status: "error", message: "Could not create the team — please try again." };
-  }
-
-  await supabase.from("team_members").insert({
-    team_id: team.id,
-    profile_id: user.id,
-    display_name: profile.full_name || parsedTeam.data.organization_name,
-    email: profile.email,
-    department: parsedTeam.data.department || null,
-    role: "team_admin",
-  });
-
-  redirect(`/app/teams/${team.id}`);
+  redirect("/app/teams/new");
 }
 
 const joinSchema = z.object({

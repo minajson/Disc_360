@@ -28,12 +28,18 @@ cp .env.example .env.local  # fill values printed by `supabase start`
 npm run dev               # http://localhost:3000
 ```
 
-Seeded logins (password `disc360-demo`):
+Seeded logins (password `disc360-demo`) — one clean account per navigation
+experience, so all four are demonstrable without one affecting another:
 
-| Account | Role |
+| Account | Experience |
 |---|---|
-| `demo@disc360.dev` | Org + team admin — 3 teams, campaigns, invitations |
-| `solo@disc360.dev` | Individual — result history + in-progress session |
+| `solo@disc360.dev` | **Individual** — result history + in-progress session |
+| `demo@disc360.dev` | **Facilitator** — org + team admin, 3 teams, campaigns, invitations |
+| `coach@disc360.dev` | **Coach** — coach profile + one client engagement |
+| `admin@disc360.dev` | **Super admin** — platform administration |
+
+A coach profile outranks `team_admin` in `resolveExperience()`, so `demo@`
+deliberately has no coach profile — giving it one hides the facilitator nav.
 
 Local email: Supabase's mailbox UI at http://127.0.0.1:54324 captures auth
 emails; product emails are logged to `notification_logs` unless

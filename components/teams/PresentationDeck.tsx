@@ -318,6 +318,18 @@ export function PresentationDeck({
               Members: scan to open the team summary and your personal report
               (sign-in required; visibility follows team settings).
             </p>
+            {/* The join QR has always warned on a local base; this one did
+                not, so a presenter could project an unscannable report QR
+                with no indication it was unusable. */}
+            {isLocalBase ? (
+              <p
+                role="alert"
+                className="max-w-xs rounded-xl bg-disc-i-soft px-4 py-2.5 text-center text-xs leading-relaxed text-disc-i"
+              >
+                Local development only — this QR cannot be opened from another
+                device until a public URL is configured.
+              </p>
+            ) : null}
           </div>
         </div>
       ) : null}

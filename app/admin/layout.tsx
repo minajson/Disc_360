@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireSuperAdmin } from "@/lib/auth/guards";
+import { RETURN_TO_APP } from "@/lib/navigation/app-nav";
 import { BrandMark } from "@/components/marketing/BrandMark";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { signOut } from "@/lib/actions/auth";
@@ -22,8 +23,11 @@ export default async function AdminLayout({
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/app" className="text-sm text-slate hover:text-ink">
-              Return to DISC360
+            <Link
+              href={RETURN_TO_APP.href}
+              className="text-sm text-slate hover:text-ink"
+            >
+              {RETURN_TO_APP.label}
             </Link>
             <span className="hidden font-mono text-xs text-faint sm:inline">
               {profile.email}

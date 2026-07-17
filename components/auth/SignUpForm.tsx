@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/db/browser";
+import { onboardingDestination, parseIntent } from "@/lib/auth/intent";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/auth/fields";
 
@@ -26,13 +27,21 @@ export function SignUpForm() {
 
     setPending(true);
     const supabase = createSupabaseBrowserClient();
-    const intent = searchParams.get("intent");
+    const intent = parseIntent(searchParams.get("intent"));
+
+    // Built with URL rather than interpolation: the previous string produced
+    // "?next=/onboarding?intent=team", where the un-encoded "?intent" became a
+    // parameter of the callback instead of part of next. The callback owns the
+    // onboarding-vs-app decision, so it only needs the intent.
+    const callback = new URL("/auth/callback", window.location.origin);
+    if (intent) callback.searchParams.set("intent", intent);
+
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: String(form.get("email")),
       password,
       options: {
         data: { full_name: String(form.get("full_name")) },
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding${intent ? `?intent=${intent}` : ""}`,
+        emailRedirectTo: callback.toString(),
       },
     });
 
@@ -44,7 +53,7 @@ export function SignUpForm() {
 
     // Local/dev without confirmations: session exists → continue directly.
     if (data.session) {
-      router.push(`/onboarding${intent ? `?intent=${intent}` : ""}`);
+      router.push(onboardingDestination(intent));
       router.refresh();
       return;
     }

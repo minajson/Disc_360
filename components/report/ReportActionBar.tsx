@@ -7,14 +7,19 @@ import { emailMyReport, logReportExport } from "@/lib/actions/reports";
 
 interface ReportActionBarProps {
   resultId: string;
-  shareToken: string;
+  /**
+   * Fully-resolved share URL, built server-side from SITE_URL. Not derived
+   * from window.location.origin: the origin the owner happens to be browsing
+   * is not necessarily the one other people should receive.
+   */
+  shareUrl: string;
   /** Auto-open the print dialog on mount (dashboard "Download PDF"). */
   autoprint?: boolean;
 }
 
 export function ReportActionBar({
   resultId,
-  shareToken,
+  shareUrl,
   autoprint = false,
 }: ReportActionBarProps) {
   const [notice, setNotice] = useState<string | null>(null);
@@ -40,12 +45,11 @@ export function ReportActionBar({
   };
 
   const share = async () => {
-    const url = `${window.location.origin}/r/${shareToken}`;
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(shareUrl);
       flash("Secure share link copied.");
     } catch {
-      flash(url);
+      flash(shareUrl);
     }
   };
 

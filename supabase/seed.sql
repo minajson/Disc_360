@@ -1,15 +1,29 @@
 -- DISC360 development seed. Fictional people only — never real data.
 -- Local sign-in for every seeded account: password "disc360-demo".
---   demo@disc360.dev  → organization/team admin with three teams
---   solo@disc360.dev  → individual with history + an in-progress session
+--
+-- One clean account per navigation experience, so all four are demonstrable
+-- and none depends on another's state:
+--   solo@disc360.dev  → individual: history + an in-progress session
+--   demo@disc360.dev  → facilitator: org/team admin with three teams
+--   coach@disc360.dev → coach: coach profile + its own client engagement
+--   admin@disc360.dev → super admin
+--
+-- demo@ deliberately has NO coach profile: a coach profile outranks team_admin
+-- in resolveExperience(), so giving demo@ one would hide the facilitator nav.
 
 do $$
 declare
-  v_version uuid := '00000000-0000-4000-8000-000000000001';
+  -- v2 (Workplace Scenarios) — the active bank. Seeded sessions must use the
+  -- same questions a real participant gets, or resuming demo data shows the
+  -- retired v1 wording.
+  v_version uuid := '00000000-0000-4000-8000-000000000002';
   v_admin uuid := '10000000-0000-4000-8000-000000000001';
   v_solo uuid := '10000000-0000-4000-8000-000000000002';
   v_super uuid := '10000000-0000-4000-8000-000000000003';
+  v_coach uuid := '10000000-0000-4000-8000-000000000004';
   v_org uuid := '20000000-0000-4000-8000-000000000001';
+  v_org_coach uuid := '20000000-0000-4000-8000-000000000002';
+  v_team_coach uuid := '30000000-0000-4000-8000-000000000004';
   v_team_product uuid := '30000000-0000-4000-8000-000000000001';
   v_team_eng uuid := '30000000-0000-4000-8000-000000000002';
   v_team_gtm uuid := '30000000-0000-4000-8000-000000000003';
@@ -43,6 +57,10 @@ begin
     ('00000000-0000-0000-0000-000000000000', v_super, 'authenticated', 'authenticated',
      'admin@disc360.dev', crypt('disc360-demo', gen_salt('bf')), now(),
      '{"provider":"email","providers":["email"]}', '{"full_name":"Alex Reeve"}',
+     now(), now(), '', '', '', ''),
+    ('00000000-0000-0000-0000-000000000000', v_coach, 'authenticated', 'authenticated',
+     'coach@disc360.dev', crypt('disc360-demo', gen_salt('bf')), now(),
+     '{"provider":"email","providers":["email"]}', '{"full_name":"Rosa Lindqvist"}',
      now(), now(), '', '', '', '');
 
   insert into auth.identities (id, user_id, provider_id, identity_data, provider,
@@ -53,7 +71,9 @@ begin
     (gen_random_uuid(), v_solo, v_solo::text,
      jsonb_build_object('sub', v_solo::text, 'email', 'solo@disc360.dev'), 'email', now(), now(), now()),
     (gen_random_uuid(), v_super, v_super::text,
-     jsonb_build_object('sub', v_super::text, 'email', 'admin@disc360.dev'), 'email', now(), now(), now());
+     jsonb_build_object('sub', v_super::text, 'email', 'admin@disc360.dev'), 'email', now(), now(), now()),
+    (gen_random_uuid(), v_coach, v_coach::text,
+     jsonb_build_object('sub', v_coach::text, 'email', 'coach@disc360.dev'), 'email', now(), now(), now());
 
   update public.profiles set
     preferred_name = 'Dana', profession = 'Head of People',
@@ -72,6 +92,39 @@ begin
     country = 'US', timezone = 'America/New_York', is_super_admin = true,
     onboarding_intent = 'setup_organization', consented_at = now(), onboarded_at = now()
   where id = v_super;
+
+  update public.profiles set
+    preferred_name = 'Rosa', profession = 'Leadership coach',
+    country = 'SE', timezone = 'Europe/Stockholm',
+    onboarding_intent = 'manage_clients', consented_at = now(), onboarded_at = now()
+  where id = v_coach;
+
+  -- ── the coach persona: profile + one client engagement ─────────────
+  insert into public.coach_profiles (profile_id, title, organization, location, bio,
+    credentials, expertise, years_experience)
+  values (v_coach, 'Leadership Coach', 'Northlight Coaching', 'Stockholm, SE',
+    'Fifteen years helping engineering and product leaders build teams that '
+    || 'communicate well under pressure.',
+    array['ICF Professional Certified Coach', 'DISC360 Certified Practitioner'],
+    array['Team dynamics', 'Conflict resolution', 'Leadership transitions'],
+    15);
+
+  insert into public.organizations (id, name, industry, created_by)
+  values (v_org_coach, 'Northlight Coaching', 'Professional services', v_coach);
+
+  insert into public.organization_members (organization_id, profile_id, role)
+  values (v_org_coach, v_coach, 'organization_admin');
+
+  insert into public.teams (id, organization_id, name, description, department,
+    team_code, client_organization, session_name, results_named,
+    members_can_view_summary, deadline_at, created_by, timezone)
+  values (v_team_coach, v_org_coach, 'Meridian Bank — Exec Team',
+    'Executive team offsite preparation.', 'Executive',
+    'NORTH-2001', 'Meridian Bank', 'Q3 Executive Offsite', true, true,
+    now() + interval '18 days', v_coach, 'Europe/Stockholm');
+
+  insert into public.team_members (team_id, profile_id, display_name, email, department, role)
+  values (v_team_coach, v_coach, 'Rosa Lindqvist', 'coach@disc360.dev', 'Executive', 'team_admin');
 
   -- ── organization + teams ───────────────────────────────────────────
   insert into public.organizations (id, name, industry, created_by)

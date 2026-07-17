@@ -10,7 +10,7 @@ import {
   TeamInvitationEmail,
   WelcomeEmail,
 } from "@/emails/templates";
-import { getPublicBaseUrl } from "@/lib/utils/site-url";
+import { buildJoinUrl, getPublicBaseUrl } from "@/lib/utils/site-url";
 
 const siteUrl = () => getPublicBaseUrl().url;
 
@@ -43,7 +43,7 @@ export async function sendTeamInvitation(options: {
         teamName={options.teamName}
         inviterName={options.inviterName}
         message={options.message}
-        joinUrl={`${siteUrl()}/join/${options.token}`}
+        joinUrl={buildJoinUrl(getPublicBaseUrl(), options.token)}
       />
     ),
   });

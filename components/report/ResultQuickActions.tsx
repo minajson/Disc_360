@@ -7,11 +7,16 @@ import { emailMyReport } from "@/lib/actions/reports";
 
 interface ResultQuickActionsProps {
   resultId: string;
-  shareToken: string;
+  /**
+   * Fully-resolved share URL, built server-side from SITE_URL. Not derived
+   * from window.location.origin: the origin the owner happens to be browsing
+   * is not necessarily the one other people should receive.
+   */
+  shareUrl: string;
 }
 
 /** Compact action row for a result card (dashboard, history). */
-export function ResultQuickActions({ resultId, shareToken }: ResultQuickActionsProps) {
+export function ResultQuickActions({ resultId, shareUrl }: ResultQuickActionsProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -21,12 +26,11 @@ export function ResultQuickActions({ resultId, shareToken }: ResultQuickActionsP
   };
 
   const share = async () => {
-    const url = `${window.location.origin}/r/${shareToken}`;
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(shareUrl);
       flash("Share link copied.");
     } catch {
-      flash(url);
+      flash(shareUrl);
     }
   };
 

@@ -37,6 +37,32 @@ export interface ArchetypeDerivation {
   secondary: Dimension | null;
 }
 
+/** Internal dimension key → user-facing letter. Analytical displays as "A". */
+const DISPLAY_LETTER: Record<Dimension, string> = {
+  D: "D",
+  I: "I",
+  S: "S",
+  C: "A",
+};
+
+/**
+ * User-facing hybrid type: the two highest dimensions in display letters,
+ * highest first — DI, DS, DA, IS, IA, SA and their reverses.
+ *
+ * This is deliberately NOT `archetypeCode`. The archetype is a psychometric
+ * reading that suppresses behavioural opposites (D↔S, I↔C never pair) and
+ * collapses to a single letter when one dimension dominates, so it cannot
+ * express DS or IA. The hybrid type answers the plainer question "which two
+ * scored highest?" and always returns two letters. Both are derived from the
+ * same `rankDimensions` ordering, so they can never disagree about which
+ * dimension is primary.
+ */
+export function deriveHybridType(normalized: DiscScores): string {
+  const ranked = rankDimensions(normalized);
+  const [first, second] = ranked as [Dimension, Dimension];
+  return `${DISPLAY_LETTER[first]}${DISPLAY_LETTER[second]}`;
+}
+
 /** Dimensions sorted by score descending; ties resolve in D→I→S→C order. */
 export function rankDimensions(normalized: DiscScores): Dimension[] {
   return [...DIMENSIONS].sort((a, b) => {

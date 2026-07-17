@@ -34,3 +34,23 @@ export function buildJoinUrl(base: PublicBaseUrl, inviteToken: string): string {
 export function displayJoinUrl(base: PublicBaseUrl, inviteToken: string): string {
   return buildJoinUrl(base, inviteToken).replace(/^https?:\/\//, "");
 }
+
+/**
+ * The team summary page. Authenticated — scanning this lands on sign-in
+ * first. Distinct from a shared report link, which needs no account.
+ */
+export function buildTeamResultsUrl(base: PublicBaseUrl, teamId: string): string {
+  return `${base.url}/app/teams/${teamId}/results`;
+}
+
+/**
+ * The public, name-free shared report for one result. The unguessable token
+ * is the authorization, so this URL must be treated as a secret.
+ *
+ * Built from the configured base rather than `window.location.origin`:
+ * behind a proxy, a preview alias or a custom domain the browsing origin is
+ * not the origin we want other people to receive.
+ */
+export function buildSharedReportUrl(base: PublicBaseUrl, shareToken: string): string {
+  return `${base.url}/r/${shareToken}`;
+}

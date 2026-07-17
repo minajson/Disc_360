@@ -52,55 +52,63 @@ function generateTeamCode(name: string): string {
   return `${stem}-${digits}`;
 }
 
-/* ── create team (entitlement-gated) ─────────────────────────────────── */
+/* ── create team from the wizard draft ───────────────────────────────── */
 
-const createTeamSchema = z.object({
-  name: z.string().min(2).max(120),
-  organization_name: z.string().min(2).max(120),
-  session_name: z.string().max(120).optional().or(z.literal("")),
-  client_organization: z.string().max(120).optional().or(z.literal("")),
-  engagement_starts_at: z.string().optional().or(z.literal("")),
-  description: z.string().max(500).optional().or(z.literal("")),
-  department: z.string().max(120).optional().or(z.literal("")),
-  timezone: z.string().max(80).optional().or(z.literal("")),
-  approx_size: z.coerce.number().int().min(2).max(500).optional(),
-  results_named: z.enum(["named", "anonymized"]),
-  members_can_view_summary: z.string().optional(),
-  deadline_at: z.string().optional().or(z.literal("")),
-});
-
-export async function createTeam(
+/**
+ * The single creation path used by the /app/teams/new wizard.
+ *
+ * Everything it needs is already on the draft — the user typed it once, in the
+ * wizard, and it has survived sign-in and payment. Nothing is re-asked and
+ * nothing is read from the client beyond the draft id, whose ownership the
+ * database re-checks.
+ */
+export async function createTeamFromDraft(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const parsed = createTeamSchema.safeParse({
-    name: formData.get("name"),
-    organization_name: formData.get("organization_name"),
-    session_name: formData.get("session_name"),
-    client_organization: formData.get("client_organization"),
-    engagement_starts_at: formData.get("engagement_starts_at"),
-    description: formData.get("description"),
-    department: formData.get("department"),
-    timezone: formData.get("timezone"),
-    approx_size: formData.get("approx_size") || undefined,
-    results_named: formData.get("results_named"),
-    members_can_view_summary: formData.get("members_can_view_summary") ?? undefined,
-    deadline_at: formData.get("deadline_at"),
-  });
-  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Check the team details.");
+  const draftId = z.uuid().safeParse(formData.get("draft_id"));
+  if (!draftId.success) {
+    return fail("That draft is no longer available — start a new team.");
+  }
 
   const context = await requireOnboarded();
   const { supabase, user, profile } = context;
 
-  // Entitlement check on the server — never trust the client's word for it.
   const { getTeamEntitlement, consumeEntitlement } = await import(
     "@/lib/payments/entitlements"
   );
   const entitlement = await getTeamEntitlement(context);
   if (!entitlement.allowed) redirect("/pricing?intent=create-team");
 
-  // Resolve the organization: reuse an org the user administers when its
-  // name matches, otherwise create one from the company name.
+  /*
+   * Claim the draft before creating anything. The status transition
+   * draft → completed is conditional on the row still being 'draft', so it
+   * acts as a mutex: a double-clicked "Create team" runs this twice, the
+   * second call matches zero rows, and exactly one team is created.
+   */
+  const { data: draft } = await supabase
+    .from("team_creation_drafts")
+    .update({ status: "completed" })
+    .eq("id", draftId.data)
+    .eq("owner_profile_id", user.id)
+    .eq("status", "draft")
+    .select(
+      "organization_name, team_name, session_name, department, approximate_size, timezone, deadline_at, results_named, members_can_view_summary, participant_limit",
+    )
+    .maybeSingle();
+
+  if (!draft) {
+    return fail(
+      "This team has already been created — open My Teams to find it.",
+    );
+  }
+
+  if (draft.team_name.trim().length < 2 || draft.organization_name.trim().length < 2) {
+    return fail("Add a team name and organization before creating the team.");
+  }
+
+  // Reuse an organization this person already administers under the same
+  // name, so a second team never spawns a duplicate org.
   const { data: memberships } = await supabase
     .from("organization_members")
     .select("organization_id, organizations (id, name)")
@@ -110,15 +118,19 @@ export async function createTeam(
   let organizationId: string | null = null;
   for (const row of memberships ?? []) {
     const org = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations;
-    if (org && org.name.trim().toLowerCase() === parsed.data.organization_name.trim().toLowerCase()) {
+    if (
+      org &&
+      org.name.trim().toLowerCase() === draft.organization_name.trim().toLowerCase()
+    ) {
       organizationId = org.id;
       break;
     }
   }
+
   if (!organizationId) {
     const { data: org, error: orgError } = await supabase
       .from("organizations")
-      .insert({ name: parsed.data.organization_name.trim(), created_by: user.id })
+      .insert({ name: draft.organization_name.trim(), created_by: user.id })
       .select("id")
       .single();
     if (orgError || !org) return fail("Could not create the organization.");
@@ -135,32 +147,37 @@ export async function createTeam(
     .from("teams")
     .insert({
       organization_id: organizationId,
-      name: parsed.data.name,
-      session_name: parsed.data.session_name || null,
-      client_organization: parsed.data.client_organization || null,
-      engagement_starts_at: parsed.data.engagement_starts_at || null,
-      description: parsed.data.description || "",
-      department: parsed.data.department || null,
-      timezone: parsed.data.timezone || null,
-      approx_size: parsed.data.approx_size ?? null,
-      results_named: parsed.data.results_named === "named",
-      members_can_view_summary: parsed.data.members_can_view_summary === "on",
-      deadline_at: parsed.data.deadline_at
-        ? new Date(parsed.data.deadline_at).toISOString()
-        : null,
-      team_code: generateTeamCode(parsed.data.name),
+      name: draft.team_name.trim(),
+      session_name: draft.session_name || null,
+      description: "",
+      department: draft.department || null,
+      timezone: draft.timezone || null,
+      approx_size: draft.approximate_size ?? null,
+      results_named: draft.results_named,
+      members_can_view_summary: draft.members_can_view_summary,
+      deadline_at: draft.deadline_at,
+      team_code: generateTeamCode(draft.team_name),
       created_by: user.id,
     })
     .select("id")
     .single();
-  if (error || !team) return fail("Could not create the team.");
+
+  if (error || !team) {
+    // Release the draft so the user can retry without retyping anything.
+    await supabase
+      .from("team_creation_drafts")
+      .update({ status: "draft" })
+      .eq("id", draftId.data)
+      .eq("owner_profile_id", user.id);
+    return fail("Could not create the team — please try again.");
+  }
 
   await supabase.from("team_members").insert({
     team_id: team.id,
     profile_id: user.id,
     display_name: profile.full_name,
     email: profile.email,
-    department: parsed.data.department || null,
+    department: draft.department || null,
     role: "team_admin",
   });
 
@@ -173,7 +190,7 @@ export async function createTeam(
     action: "team.created",
     entity_type: "team",
     entity_id: team.id,
-    metadata: { entitlement_id: entitlement.entitlementId },
+    metadata: { entitlement_id: entitlement.entitlementId, source: "wizard" },
   });
 
   redirect(`/app/teams/${team.id}/dashboard`);

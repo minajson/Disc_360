@@ -122,40 +122,31 @@ export function OnboardingFlow({
         />
       ) : null}
       {intent === "create_team" || intent === "setup_organization" ? (
+        /*
+         * Profile only — deliberately no team fields.
+         *
+         * This step used to collect organization name, team name, department,
+         * size, visibility and deadline, and then throw all of it away at the
+         * entitlement gate, leaving the user to retype every value into
+         * /app/teams/new. Team details are now asked exactly once, by the
+         * wizard, after the plan is settled.
+         */
         <ProfileForm
           action={completeTeamCreatorOnboarding}
-          submitLabel={intent === "create_team" ? "Create team" : "Create organization"}
+          submitLabel="Continue"
           defaultFullName={defaultFullName}
           extraFields={
             <>
-              <input type="hidden" name="intent_variant" value={intent === "setup_organization" ? "organization" : "team"} />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <TextField label="Organization name" id="organization_name" name="organization_name" required />
-                <TextField label="Industry (optional)" id="industry" name="industry" />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <TextField label="Team name" id="team_name" name="team_name" required />
-                <TextField label="Department (optional)" id="department" name="department" />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="team_description" className="text-sm font-medium text-ink">
-                  Team description (optional)
-                </label>
-                <textarea id="team_description" name="team_description" rows={2} className={cn(authInputClasses, "resize-y")} />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <TextField label="Approx. team size" id="approx_size" name="approx_size" type="number" min={2} max={500} />
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="results_named" className="text-sm font-medium text-ink">
-                    Result visibility
-                  </label>
-                  <select id="results_named" name="results_named" defaultValue="anonymized" className={authInputClasses}>
-                    <option value="anonymized">Anonymized summaries</option>
-                    <option value="named">Named results</option>
-                  </select>
-                </div>
-                <TextField label="Deadline (optional)" id="deadline_at" name="deadline_at" type="date" />
-              </div>
+              <input
+                type="hidden"
+                name="intent_variant"
+                value={intent === "setup_organization" ? "organization" : "team"}
+              />
+              <p className="rule-t pt-4 text-sm leading-relaxed text-slate">
+                Next you&rsquo;ll set up the team itself — name, size, deadline
+                and how results are presented. We only need your own details
+                here.
+              </p>
             </>
           }
         />

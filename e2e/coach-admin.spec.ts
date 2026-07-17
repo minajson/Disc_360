@@ -1,6 +1,7 @@
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { mediaRegistry } from "../data/media-registry";
+import { signOut } from "./helpers";
 
 /**
  * Acceptance tests D–F: coach profile with a real photo upload,
@@ -17,10 +18,10 @@ async function signIn(page: Page, email: string) {
   await page.waitForURL("**/app");
 }
 
-async function signOut(page: Page) {
+/** The account menu only exists inside the app shell, so land there first. */
+async function leaveSession(page: Page) {
   await page.goto("/app");
-  await page.getByRole("button", { name: "Sign out" }).click();
-  await page.waitForURL("**/");
+  await signOut(page);
 }
 
 test("D: coach onboarding, profile with photo upload, persistence after reload", async ({ page }) => {
@@ -79,7 +80,7 @@ test("E: Platform Admin is discoverable for super admins and absent for others",
   // Non-admins never see the entry point.
   await signIn(page, "solo@disc360.dev");
   await expect(page.getByRole("link", { name: "Platform Admin" })).toHaveCount(0);
-  await signOut(page);
+  await leaveSession(page);
 
   // Super admins see it in the shell nav, and it round-trips.
   await signIn(page, "admin@disc360.dev");
@@ -94,29 +95,38 @@ test("E: Platform Admin is discoverable for super admins and absent for others",
 
 test("E2: admin can manage organization roles on the user detail page", async ({ page }) => {
   await signIn(page, "admin@disc360.dev");
-  await page.goto("/admin/users");
+  // Search rather than assume page 1: the list is paginated newest-first, so
+  // any test that creates accounts pushes the seeded users off it.
+  await page.goto("/admin/users?q=Dana");
   await page.getByRole("link", { name: /Dana Whitfield/i }).first().click();
   await page.waitForURL("**/admin/users/**");
 
   const orgSection = page.getByRole("region", { name: "Organization roles" });
   await expect(orgSection.getByText("Atlas Collective")).toBeVisible();
-  const roleSelect = orgSection.getByRole("combobox").first();
 
-  // Promote to coach; a full reload must show the persisted role.
-  await roleSelect.selectOption("coach");
-  await orgSection.getByRole("button", { name: "Update role" }).first().click();
-  await page.waitForLoadState("networkidle");
-  await page.reload();
-  await expect(orgSection.getByRole("combobox").first()).toHaveValue("coach", { timeout: 15_000 });
+  /*
+   * Reload-and-check rather than reload-once-and-assert. A single reload
+   * races the server action's revalidation — it passed alone and failed under
+   * full-suite load, which is flakiness, not a real signal. Polling the reload
+   * asserts the same thing (the role persisted) without the race.
+   */
+  const setRoleAndExpect = async (role: string) => {
+    await orgSection.getByRole("combobox").first().selectOption(role);
+    await orgSection.getByRole("button", { name: "Update role" }).first().click();
+    await expect
+      .poll(
+        async () => {
+          await page.reload();
+          return orgSection.getByRole("combobox").first().inputValue();
+        },
+        { timeout: 20_000, message: `role should persist as ${role}` },
+      )
+      .toBe(role);
+  };
 
-  // Restore the seeded role the same way.
-  await orgSection.getByRole("combobox").first().selectOption("organization_admin");
-  await orgSection.getByRole("button", { name: "Update role" }).first().click();
-  await page.waitForLoadState("networkidle");
-  await page.reload();
-  await expect(orgSection.getByRole("combobox").first()).toHaveValue("organization_admin", {
-    timeout: 15_000,
-  });
+  await setRoleAndExpect("coach");
+  // Restore the seeded role so the suite is re-runnable.
+  await setRoleAndExpect("organization_admin");
 });
 
 test("F: /media-guide lists every registry entry with complete specs", async ({ page }) => {

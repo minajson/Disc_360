@@ -4,6 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/db/browser";
+import {
+  authErrorMessage,
+  onboardedDestination,
+  parseIntent,
+  safeNextOr,
+} from "@/lib/auth/intent";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/auth/fields";
 
@@ -32,20 +38,24 @@ export function SignInForm() {
       setPending(false);
       return;
     }
-    router.push(searchParams.get("next") ?? "/app");
+    // `next` is attacker-supplied via a crafted link, so it is validated
+    // rather than trusted; an intent alone routes to the right landing place.
+    const next = searchParams.get("next");
+    const intent = parseIntent(searchParams.get("intent"));
+    router.push(safeNextOr(next, onboardedDestination(intent)));
     router.refresh();
   };
 
-  const blockedNotice =
-    searchParams.get("error") === "deactivated"
-      ? "This account has been deactivated by the platform administrator. Contact hello@disc360.app to restore access."
-      : null;
+  // Every code the auth callback can emit renders here. Previously only
+  // "deactivated" did, so an OAuth failure bounced back to this page showing
+  // nothing at all — indistinguishable from a button that does nothing.
+  const notice = error ?? authErrorMessage(searchParams.get("error"));
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-      {blockedNotice ? (
+      {notice ? (
         <p role="alert" className="rounded-xl bg-disc-d-soft px-4 py-3 text-sm text-disc-d">
-          {blockedNotice}
+          {notice}
         </p>
       ) : null}
       <TextField
@@ -72,11 +82,6 @@ export function SignInForm() {
           Forgot password?
         </Link>
       </div>
-      {error ? (
-        <p role="alert" className="text-sm text-disc-d">
-          {error}
-        </p>
-      ) : null}
       <Button type="submit" size="lg" disabled={pending}>
         {pending ? "Signing in…" : "Sign in"}
       </Button>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { getOAuthProviderStatus } from "@/lib/auth/oauth-providers";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { SignUpForm } from "@/components/auth/SignUpForm";
@@ -8,6 +9,8 @@ import { SignUpForm } from "@/components/auth/SignUpForm";
 export const metadata: Metadata = { title: "Create your account" };
 
 export default function SignUpPage() {
+  const providers = getOAuthProviderStatus();
+
   return (
     <AuthCard
       title="Create your account"
@@ -21,7 +24,9 @@ export default function SignUpPage() {
         </>
       }
     >
-      <OAuthButtons />
+      <Suspense>
+        <OAuthButtons providers={providers} />
+      </Suspense>
       <Suspense>
         <SignUpForm />
       </Suspense>
