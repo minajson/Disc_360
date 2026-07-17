@@ -1,0 +1,31 @@
+# Netlify deployment for DISC360 (Next.js 16 App Router).
+#
+# The official @netlify/plugin-nextjs adapts the App Router — server
+# components, server actions, route handlers and middleware all run as
+# Netlify Functions. Do not swap in a static `publish` directory: this app is
+# server-rendered and reads SITE_URL at request time.
+#
+# Secrets are NOT set here. Every value below is public or a build knob;
+# Supabase keys, the service-role key and the Resend key are set in
+# Netlify UI → Site settings → Environment variables (see
+# docs/DEPLOYMENT_RUNBOOK.md). netlify.toml is committed, so nothing secret
+# may live in it.
+
+[build]
+  command = "npm run build"
+  # The plugin manages the actual publish target; this is the app's own output.
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[build.environment]
+  # Match the local toolchain. Netlify defaults can lag; pin to avoid a
+  # build that passes locally and fails in CI on an older Node.
+  NODE_VERSION = "20"
+  # SITE_URL / NEXT_PUBLIC_* are public by design and appear in the client
+  # bundle, so exclude them from Netlify's secret scanner (else the build
+  # fails on a false positive). The genuinely secret keys —
+  # SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY — are never listed here and stay
+  # scanned; if the scanner ever finds one in the bundle, that is a real leak.
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,NEXT_PUBLIC_SITE_URL,SITE_URL"

@@ -77,11 +77,17 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
   try {
     const { Resend } = await import("resend");
     const resend = new Resend(apiKey);
+    // Reply-To: until a DISC360 sending domain is verified, product mail goes
+    // out on a shared/unbranded sender, so replies must be routed somewhere a
+    // human reads. EMAIL_REPLY_TO carries that address (minajjumbo@gmail.com
+    // pre-domain); once a branded domain exists it can be cleared.
+    const replyTo = process.env.EMAIL_REPLY_TO?.trim();
     const { data, error } = await resend.emails.send({
       from: process.env.EMAIL_FROM ?? "DISC360 <notifications@disc360.app>",
       to: input.to,
       subject: input.subject,
       react: input.react,
+      ...(replyTo ? { replyTo } : {}),
     });
     await admin.from("notification_logs").insert({
       profile_id: input.profileId ?? null,
