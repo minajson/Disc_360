@@ -59,11 +59,19 @@ export default async function AssessmentsPage() {
           ))}
         </section>
       ) : (
-        <form action={startAssessment}>
-          <Button type="submit" size="lg">
-            Start a new assessment
-          </Button>
-        </form>
+        <div className="flex flex-wrap items-center gap-4">
+          <form action={startAssessment}>
+            <Button type="submit" size="lg">
+              Start a new assessment
+            </Button>
+          </form>
+          <Link
+            href="/present/disc"
+            className="text-sm font-medium text-botanical underline-offset-2 hover:underline"
+          >
+            or start with an introduction →
+          </Link>
+        </div>
       )}
 
       {completed.length > 0 ? (

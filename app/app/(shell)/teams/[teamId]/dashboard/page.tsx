@@ -82,10 +82,16 @@ export default async function TeamDashboardPage({
           </button>
         </form>
         <Link
-          href={`/app/teams/${teamId}/presentation`}
+          href={`/app/teams/${teamId}/presentation/introduction`}
           className="rounded-full bg-botanical px-5 py-2 text-sm font-medium text-mineral transition-colors hover:bg-botanical-deep"
         >
-          Open presentation
+          Present introduction
+        </Link>
+        <Link
+          href={`/app/teams/${teamId}/presentation`}
+          className="rounded-full border border-hairline bg-paper px-4 py-2 font-mono text-xs text-slate transition-colors hover:border-botanical hover:text-botanical"
+        >
+          Present results
         </Link>
         <Link
           href={`/app/teams/${teamId}/results`}
