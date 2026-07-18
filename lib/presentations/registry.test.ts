@@ -60,7 +60,8 @@ test("route param type guards accept only the three known ids", () => {
   }
 });
 
-test("assessmentLive is honest — DISC live, Focus not yet", () => {
+test("every product now has a live scored assessment", () => {
   assert.equal(PRODUCTS.disc.assessmentLive, true);
-  assert.equal(PRODUCTS.focus.assessmentLive, false);
+  assert.equal(PRODUCTS.focus.assessmentLive, true);
+  assert.equal(PRODUCTS.combined.assessmentLive, true);
 });

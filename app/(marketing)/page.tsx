@@ -1,5 +1,6 @@
 import { MotionSection } from "@/components/motion/MotionSection";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { ProductCards } from "@/components/presentations/ProductCards";
 import { HomeHero } from "@/components/marketing/home/HomeHero";
 import { TrustRow } from "@/components/marketing/home/TrustRow";
 import { PathwaysSplit } from "@/components/marketing/home/PathwaysSplit";
@@ -17,12 +18,25 @@ export default function HomePage() {
     <>
       <HomeHero />
       <TrustRow />
-      <PathwaysSplit />
 
       <MotionSection>
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-12 px-5 py-20 sm:px-8 lg:py-24">
           <SectionHeading
             index="01"
+            eyebrow="Three ways in"
+            title="Choose your assessment"
+            description="Behaviour, attention, or both. Start with a facilitator introduction or go straight in — no account needed to explore."
+          />
+          <ProductCards />
+        </div>
+      </MotionSection>
+
+      <PathwaysSplit />
+
+      <MotionSection>
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-12 px-5 py-20 sm:px-8 lg:py-24">
+          <SectionHeading
+            index="02"
             eyebrow="The four dimensions"
             title="Four ways people move through work"
             description="Open each dimension to see what it governs — and what it looks like under pressure."

@@ -12,6 +12,7 @@ import { DimensionMark } from "@/components/ui/DimensionMark";
 import { DiscRadarChart } from "@/components/charts/DiscRadarChart";
 import { ResultGlyph } from "@/components/charts/ResultGlyph";
 import { ResultQuickActions } from "@/components/report/ResultQuickActions";
+import { ProductCards } from "@/components/presentations/ProductCards";
 import { JoinByCodeForm } from "@/components/teams/JoinByCodeForm";
 import type { ArchetypeCode, Dimension } from "@/lib/types";
 
@@ -118,6 +119,13 @@ export default async function AppDashboardPage() {
           </p>
         </section>
       )}
+
+      <section aria-labelledby="products-heading" className="flex flex-col gap-4">
+        <h2 id="products-heading" className="font-display text-h3 font-semibold">
+          Assessments
+        </h2>
+        <ProductCards />
+      </section>
 
       <div className="grid gap-5 lg:grid-cols-2">
         {/* history */}

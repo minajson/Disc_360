@@ -89,7 +89,7 @@ export const PRODUCTS: Record<ProductId, AssessmentProduct> = {
       },
       STRAIGHT_TO_ASSESSMENT,
     ],
-    assessmentLive: false,
+    assessmentLive: true,
   },
   combined: {
     id: "combined",

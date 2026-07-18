@@ -247,6 +247,17 @@ export async function submitAssessment(sessionId: string): Promise<SubmitResult>
     .update({ status: "completed", completed_at: new Date().toISOString() })
     .eq("id", sessionId);
 
+  // Combined flow: when this DISC session belongs to a combined_session, return
+  // to the controller (which continues to the Focus Pulse) rather than showing
+  // the standalone DISC result.
+  const { data: combined } = await supabase
+    .from("combined_sessions")
+    .select("id")
+    .eq("disc_session_id", sessionId)
+    .eq("status", "in_progress")
+    .maybeSingle();
+  if (combined) redirect("/combined/assessment");
+
   // Report-ready notification (preference-gated).
   const { profile } = await requireOnboarded();
   await sendReportReady({
