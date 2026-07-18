@@ -93,7 +93,7 @@ export async function createTeamFromDraft(
     .eq("owner_profile_id", user.id)
     .eq("status", "draft")
     .select(
-      "organization_name, team_name, session_name, department, approximate_size, timezone, deadline_at, results_named, members_can_view_summary, participant_limit",
+      "organization_name, team_name, session_name, department, approximate_size, timezone, deadline_at, results_named, members_can_view_summary, participant_limit, assessment_type",
     )
     .maybeSingle();
 
@@ -155,6 +155,7 @@ export async function createTeamFromDraft(
       approx_size: draft.approximate_size ?? null,
       results_named: draft.results_named,
       members_can_view_summary: draft.members_can_view_summary,
+      assessment_type: draft.assessment_type,
       deadline_at: draft.deadline_at,
       team_code: generateTeamCode(draft.team_name),
       created_by: user.id,

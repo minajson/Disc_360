@@ -474,6 +474,68 @@ export type Database = {
           },
         ]
       }
+      combined_sessions: {
+        Row: {
+          campaign_id: string | null
+          created_at: string
+          disc_session_id: string | null
+          focus_session_id: string | null
+          id: string
+          profile_id: string
+          status: Database["public"]["Enums"]["session_status"]
+          updated_at: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          created_at?: string
+          disc_session_id?: string | null
+          focus_session_id?: string | null
+          id?: string
+          profile_id: string
+          status?: Database["public"]["Enums"]["session_status"]
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string | null
+          created_at?: string
+          disc_session_id?: string | null
+          focus_session_id?: string | null
+          id?: string
+          profile_id?: string
+          status?: Database["public"]["Enums"]["session_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "combined_sessions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combined_sessions_disc_session_id_fkey"
+            columns: ["disc_session_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combined_sessions_focus_session_id_fkey"
+            columns: ["focus_session_id"]
+            isOneToOne: false
+            referencedRelation: "focus_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combined_sessions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       entitlements: {
         Row: {
           amount_cents: number
@@ -527,6 +589,279 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      focus_options: {
+        Row: {
+          external_id: string
+          id: string
+          label: string
+          position: number
+          question_id: string
+        }
+        Insert: {
+          external_id: string
+          id?: string
+          label: string
+          position: number
+          question_id: string
+        }
+        Update: {
+          external_id?: string
+          id?: string
+          label?: string
+          position?: number
+          question_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "focus_options_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "focus_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      focus_questions: {
+        Row: {
+          external_id: string
+          id: string
+          kind: Database["public"]["Enums"]["focus_question_kind"]
+          position: number
+          prompt: string
+          scale_max: number | null
+          scale_min: number | null
+          version_id: string
+        }
+        Insert: {
+          external_id: string
+          id?: string
+          kind?: Database["public"]["Enums"]["focus_question_kind"]
+          position: number
+          prompt: string
+          scale_max?: number | null
+          scale_min?: number | null
+          version_id: string
+        }
+        Update: {
+          external_id?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["focus_question_kind"]
+          position?: number
+          prompt?: string
+          scale_max?: number | null
+          scale_min?: number | null
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "focus_questions_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "focus_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      focus_responses: {
+        Row: {
+          answered_at: string
+          id: string
+          option_id: string | null
+          question_id: string
+          scale_value: number | null
+          session_id: string
+        }
+        Insert: {
+          answered_at?: string
+          id?: string
+          option_id?: string | null
+          question_id: string
+          scale_value?: number | null
+          session_id: string
+        }
+        Update: {
+          answered_at?: string
+          id?: string
+          option_id?: string | null
+          question_id?: string
+          scale_value?: number | null
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "focus_responses_option_id_fkey"
+            columns: ["option_id"]
+            isOneToOne: false
+            referencedRelation: "focus_options"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "focus_responses_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "focus_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "focus_responses_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "focus_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      focus_results: {
+        Row: {
+          automaticity: number
+          created_at: string
+          distraction: number
+          energy_pattern: string
+          id: string
+          mental_load: number
+          notification_pattern: string
+          pattern_code: string
+          preferred_reset: string
+          primary_loop: string
+          profile_id: string
+          raw: Json
+          recovery: number
+          session_id: string
+        }
+        Insert: {
+          automaticity: number
+          created_at?: string
+          distraction: number
+          energy_pattern: string
+          id?: string
+          mental_load: number
+          notification_pattern: string
+          pattern_code: string
+          preferred_reset: string
+          primary_loop: string
+          profile_id: string
+          raw?: Json
+          recovery: number
+          session_id: string
+        }
+        Update: {
+          automaticity?: number
+          created_at?: string
+          distraction?: number
+          energy_pattern?: string
+          id?: string
+          mental_load?: number
+          notification_pattern?: string
+          pattern_code?: string
+          preferred_reset?: string
+          primary_loop?: string
+          profile_id?: string
+          raw?: Json
+          recovery?: number
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "focus_results_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "focus_results_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "focus_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      focus_sessions: {
+        Row: {
+          campaign_id: string | null
+          completed_at: string | null
+          created_at: string
+          current_index: number
+          id: string
+          profile_id: string
+          started_at: string
+          status: Database["public"]["Enums"]["session_status"]
+          updated_at: string
+          version_id: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          current_index?: number
+          id?: string
+          profile_id: string
+          started_at?: string
+          status?: Database["public"]["Enums"]["session_status"]
+          updated_at?: string
+          version_id: string
+        }
+        Update: {
+          campaign_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          current_index?: number
+          id?: string
+          profile_id?: string
+          started_at?: string
+          status?: Database["public"]["Enums"]["session_status"]
+          updated_at?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "focus_sessions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "focus_sessions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "focus_sessions_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "focus_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      focus_versions: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          version: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          version?: number
+        }
+        Relationships: []
       }
       invitations: {
         Row: {
@@ -990,6 +1325,95 @@ export type Database = {
           },
         ]
       }
+      super_admin_bootstrap: {
+        Row: {
+          created_at: string
+          email: string
+          note: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          note?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          note?: string
+        }
+        Relationships: []
+      }
+      team_creation_drafts: {
+        Row: {
+          approximate_size: number | null
+          assessment_type: Database["public"]["Enums"]["assessment_type"]
+          created_at: string
+          deadline_at: string | null
+          department: string | null
+          draft_token: string
+          expires_at: string
+          id: string
+          members_can_view_summary: boolean
+          organization_name: string
+          owner_profile_id: string | null
+          participant_limit: number | null
+          results_named: boolean
+          session_name: string | null
+          status: string
+          team_name: string
+          timezone: string | null
+          updated_at: string
+        }
+        Insert: {
+          approximate_size?: number | null
+          assessment_type?: Database["public"]["Enums"]["assessment_type"]
+          created_at?: string
+          deadline_at?: string | null
+          department?: string | null
+          draft_token?: string
+          expires_at?: string
+          id?: string
+          members_can_view_summary?: boolean
+          organization_name?: string
+          owner_profile_id?: string | null
+          participant_limit?: number | null
+          results_named?: boolean
+          session_name?: string | null
+          status?: string
+          team_name?: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approximate_size?: number | null
+          assessment_type?: Database["public"]["Enums"]["assessment_type"]
+          created_at?: string
+          deadline_at?: string | null
+          department?: string | null
+          draft_token?: string
+          expires_at?: string
+          id?: string
+          members_can_view_summary?: boolean
+          organization_name?: string
+          owner_profile_id?: string | null
+          participant_limit?: number | null
+          results_named?: boolean
+          session_name?: string | null
+          status?: string
+          team_name?: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_creation_drafts_owner_profile_id_fkey"
+            columns: ["owner_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_members: {
         Row: {
           created_at: string
@@ -1048,6 +1472,7 @@ export type Database = {
         Row: {
           approx_size: number | null
           archived_at: string | null
+          assessment_type: Database["public"]["Enums"]["assessment_type"]
           client_organization: string | null
           cover_path: string | null
           created_at: string
@@ -1072,6 +1497,7 @@ export type Database = {
         Insert: {
           approx_size?: number | null
           archived_at?: string | null
+          assessment_type?: Database["public"]["Enums"]["assessment_type"]
           client_organization?: string | null
           cover_path?: string | null
           created_at?: string
@@ -1096,6 +1522,7 @@ export type Database = {
         Update: {
           approx_size?: number | null
           archived_at?: string | null
+          assessment_type?: Database["public"]["Enums"]["assessment_type"]
           client_organization?: string | null
           cover_path?: string | null
           created_at?: string
@@ -1139,6 +1566,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_super_admin_bootstrap: { Args: never; Returns: number }
       is_org_admin: { Args: { org: string }; Returns: boolean }
       is_org_member: { Args: { org: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
@@ -1160,10 +1588,12 @@ export type Database = {
         | "CD"
         | "DC"
         | "BAL"
+      assessment_type: "disc" | "focus" | "combined"
       assignment_status: "invited" | "started" | "completed"
       campaign_status: "draft" | "scheduled" | "active" | "closed" | "archived"
       dimension: "D" | "I" | "S" | "C"
       export_kind: "individual_report" | "team_report" | "presentation"
+      focus_question_kind: "single" | "scale"
       invitation_status: "pending" | "accepted" | "revoked" | "expired"
       notification_status: "queued" | "sent" | "failed" | "skipped" | "logged"
       onboarding_intent:
@@ -1320,10 +1750,12 @@ export const Constants = {
         "DC",
         "BAL",
       ],
+      assessment_type: ["disc", "focus", "combined"],
       assignment_status: ["invited", "started", "completed"],
       campaign_status: ["draft", "scheduled", "active", "closed", "archived"],
       dimension: ["D", "I", "S", "C"],
       export_kind: ["individual_report", "team_report", "presentation"],
+      focus_question_kind: ["single", "scale"],
       invitation_status: ["pending", "accepted", "revoked", "expired"],
       notification_status: ["queued", "sent", "failed", "skipped", "logged"],
       onboarding_intent: [

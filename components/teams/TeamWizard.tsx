@@ -57,6 +57,7 @@ export function TeamWizard({
       if (result.status === "idle") {
         setValues((current) => ({
           ...current,
+          assessmentType: (formData.get("assessment_type") as typeof current.assessmentType) ?? "disc",
           teamName: String(formData.get("team_name") ?? ""),
           organizationName: String(formData.get("organization_name") ?? ""),
           sessionName: String(formData.get("session_name") ?? ""),
@@ -139,6 +140,43 @@ export function TeamWizard({
       {step === 0 ? (
         <form action={saveStepOne} className="paper-card flex flex-col gap-5 p-7 sm:p-8" noValidate>
           <input type="hidden" name="draft_id" value={values.id} />
+
+          <fieldset className="flex flex-col gap-2.5">
+            <legend className="mb-1 text-sm font-medium text-ink">Assessment</legend>
+            <div className="grid gap-2.5 sm:grid-cols-3">
+              {(
+                [
+                  { value: "disc", title: "DISC only", detail: "Behavioural style" },
+                  { value: "focus", title: "Focus Pulse only", detail: "Attention & focus" },
+                  { value: "combined", title: "Combined", detail: "DISC + Focus" },
+                ] as const
+              ).map((option) => (
+                <label
+                  key={option.value}
+                  className={cn(
+                    "flex cursor-pointer flex-col gap-0.5 rounded-2xl border p-4 transition-colors",
+                    values.assessmentType === option.value
+                      ? "border-botanical bg-sage/20"
+                      : "border-hairline hover:border-hairline-strong",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="assessment_type"
+                    value={option.value}
+                    defaultChecked={values.assessmentType === option.value}
+                    onChange={() =>
+                      setValues((current) => ({ ...current, assessmentType: option.value }))
+                    }
+                    className="sr-only"
+                  />
+                  <span className="font-display text-base font-semibold text-ink">{option.title}</span>
+                  <span className="text-xs text-slate">{option.detail}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <TextField
               label="Team name"
@@ -287,6 +325,14 @@ export function TeamWizard({
           <dl className="flex flex-col gap-0 rule-t" data-testid="wizard-review">
             {(
               [
+                [
+                  "Assessment",
+                  values.assessmentType === "combined"
+                    ? "Combined DISC + Focus"
+                    : values.assessmentType === "focus"
+                      ? "Focus Pulse only"
+                      : "DISC only",
+                ],
                 ["Team name", values.teamName],
                 ["Organization", values.organizationName],
                 ["Session", values.sessionName || "—"],

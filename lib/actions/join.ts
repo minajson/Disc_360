@@ -164,7 +164,38 @@ export async function joinAndStart(
     .eq("email", input.email)
     .eq("status", "pending");
 
-  // Straight into the assessment.
+  // Straight into the assessment the team is configured for.
+  const { data: team } = await admin
+    .from("teams")
+    .select("assessment_type")
+    .eq("id", context.teamId)
+    .single();
+  const assessmentType = team?.assessment_type ?? "disc";
+
+  if (assessmentType === "focus") {
+    const { data: version } = await admin
+      .from("focus_versions")
+      .select("id")
+      .eq("is_active", true)
+      .single();
+    if (!version) return { status: "error", message: "No active Focus Pulse is configured." };
+    const { data: session, error } = await admin
+      .from("focus_sessions")
+      .insert({ profile_id: userId, version_id: version.id })
+      .select("id")
+      .single();
+    if (error || !session) {
+      return { status: "error", message: "Could not start the pulse — open your dashboard and try again." };
+    }
+    redirect(`/focus/assessment/${session.id}`);
+  }
+
+  if (assessmentType === "combined") {
+    // The controller creates the combined_session and drives DISC → Focus.
+    await admin.from("combined_sessions").insert({ profile_id: userId });
+    redirect(`/combined/assessment`);
+  }
+
   const { data: version } = await admin
     .from("assessment_versions")
     .select("id")

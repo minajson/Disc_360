@@ -25,9 +25,11 @@ export interface TeamDraft {
   resultsNamed: boolean;
   membersCanViewSummary: boolean;
   participantLimit: number | null;
+  assessmentType: "disc" | "focus" | "combined";
 }
 
 const stepOneSchema = z.object({
+  assessment_type: z.enum(["disc", "focus", "combined"]),
   team_name: z.string().trim().min(2, "Give the team a name.").max(120),
   organization_name: z
     .string()
@@ -69,6 +71,7 @@ const EMPTY_DRAFT: TeamDraft = {
   resultsNamed: false,
   membersCanViewSummary: true,
   participantLimit: null,
+  assessmentType: "disc",
 };
 
 interface DraftRow {
@@ -83,6 +86,7 @@ interface DraftRow {
   results_named: boolean;
   members_can_view_summary: boolean;
   participant_limit: number | null;
+  assessment_type: "disc" | "focus" | "combined";
 }
 
 const toDraft = (row: DraftRow): TeamDraft => ({
@@ -98,10 +102,11 @@ const toDraft = (row: DraftRow): TeamDraft => ({
   resultsNamed: row.results_named,
   membersCanViewSummary: row.members_can_view_summary,
   participantLimit: row.participant_limit,
+  assessmentType: row.assessment_type,
 });
 
 const DRAFT_COLUMNS =
-  "id, organization_name, team_name, session_name, department, approximate_size, timezone, deadline_at, results_named, members_can_view_summary, participant_limit";
+  "id, organization_name, team_name, session_name, department, approximate_size, timezone, deadline_at, results_named, members_can_view_summary, participant_limit, assessment_type";
 
 /**
  * The caller's open draft, or an empty one. Only the newest live draft is
@@ -137,6 +142,7 @@ export async function saveDraftStepOne(
   formData: FormData,
 ): Promise<DraftState> {
   const parsed = stepOneSchema.safeParse({
+    assessment_type: formData.get("assessment_type"),
     team_name: formData.get("team_name"),
     organization_name: formData.get("organization_name"),
     session_name: formData.get("session_name"),
@@ -161,6 +167,7 @@ export async function saveDraftStepOne(
       session_name: parsed.data.session_name || null,
       department: parsed.data.department || null,
       approximate_size: parsed.data.approximate_size ?? null,
+      assessment_type: parsed.data.assessment_type,
     })
     .eq("id", draftId)
     // Ownership re-checked in the predicate, not assumed from the client id.

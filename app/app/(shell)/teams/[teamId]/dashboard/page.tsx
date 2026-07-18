@@ -22,11 +22,22 @@ export default async function TeamDashboardPage({
   const [{ data: team }, roster] = await Promise.all([
     supabase
       .from("teams")
-      .select("name, team_code, invite_token, session_name, deadline_at")
+      .select("name, team_code, invite_token, session_name, deadline_at, assessment_type")
       .eq("id", teamId)
       .single(),
     getTeamRoster(teamId),
   ]);
+
+  // Where "results" and "present results" point depends on the team's product.
+  const assessmentType = team?.assessment_type ?? "disc";
+  const summaryHref =
+    assessmentType === "focus"
+      ? `/app/teams/${teamId}/focus`
+      : assessmentType === "combined"
+        ? `/app/teams/${teamId}/combined`
+        : `/app/teams/${teamId}/results`;
+  const summaryLabel =
+    assessmentType === "disc" ? "Export summary" : "Team summary";
 
   const base = getPublicBaseUrl();
   const inviteLink = buildJoinUrl(base, team?.invite_token ?? "");
@@ -94,10 +105,10 @@ export default async function TeamDashboardPage({
           Present results
         </Link>
         <Link
-          href={`/app/teams/${teamId}/results`}
+          href={summaryHref}
           className="rounded-full border border-hairline bg-paper px-4 py-2 font-mono text-xs text-slate transition-colors hover:border-botanical hover:text-botanical"
         >
-          Export summary
+          {summaryLabel}
         </Link>
         <Link
           href={`/app/teams/${teamId}/settings`}
