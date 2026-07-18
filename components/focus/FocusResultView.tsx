@@ -2,6 +2,8 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
+import { FocusLens } from "@/components/visualisations/focus/FocusLens";
+import { deriveDistractionFactors } from "@/lib/visuals/focus-factors";
 import type { FocusScores } from "@/lib/scoring/focus";
 import {
   ENERGY_LABELS,
@@ -32,6 +34,8 @@ interface FocusResultViewProps {
   data: FocusResultData;
   /** Presentation mode: larger type, deck-friendly spacing. */
   presentation?: boolean;
+  /** The combined view renders the Fusion map instead, so it hides the lens. */
+  showLens?: boolean;
 }
 
 /**
@@ -39,7 +43,7 @@ interface FocusResultViewProps {
  * presentation mode. Non-clinical throughout: an attention pattern, not a
  * diagnosis. Charts are bold and readable at projector scale.
  */
-export function FocusResultView({ data, presentation = false }: FocusResultViewProps) {
+export function FocusResultView({ data, presentation = false, showLens = true }: FocusResultViewProps) {
   const pattern = FOCUS_PATTERNS[data.patternCode];
 
   return (
@@ -60,6 +64,20 @@ export function FocusResultView({ data, presentation = false }: FocusResultViewP
           {pattern.summary}
         </p>
       </header>
+
+      {/* Focus Lens hero — the field of attention; meters below stay as the
+          quantitative comparison view */}
+      {showLens ? (
+      <FocusLens
+        scores={data.scores}
+        factors={deriveDistractionFactors({
+          scores: data.scores,
+          primaryLoop: data.primaryLoop,
+          notificationPattern: data.notificationPattern,
+        })}
+        className={cn("mx-auto", presentation ? "max-w-[min(58vh,720px)]" : "max-w-[520px]")}
+      />
+      ) : null}
 
       <FocusMeters scores={data.scores} presentation={presentation} />
 

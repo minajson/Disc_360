@@ -1,6 +1,8 @@
 "use client";
 
 import { cn } from "@/lib/utils/cn";
+import { BehaviourFocusFusion } from "@/components/visualisations/combined/BehaviourFocusFusion";
+import { deriveDistractionFactors } from "@/lib/visuals/focus-factors";
 import { dimensionMeta } from "@/data/dimension-meta";
 import { displayArchetypeCode } from "@/lib/utils/display";
 import { DiscRadarChart } from "@/components/charts/DiscRadarChart";
@@ -45,6 +47,19 @@ export function CombinedResultView({ disc, focus, insights, presentation = false
         </h1>
       </header>
 
+      {/* Behaviour × Focus fusion — one integrated instrument first; the
+          detailed per-lens views follow */}
+      <BehaviourFocusFusion
+        disc={{ scores: disc.scores, primary: disc.primary, secondary: disc.secondary }}
+        focus={focus.scores}
+        factors={deriveDistractionFactors({
+          scores: focus.scores,
+          primaryLoop: focus.primaryLoop,
+          notificationPattern: focus.notificationPattern,
+        })}
+        className={cn("mx-auto", presentation ? "max-w-[min(62vh,760px)]" : "max-w-[560px]")}
+      />
+
       {/* two lenses side by side */}
       <div className="grid gap-8 lg:grid-cols-2">
         <section className="flex flex-col gap-4" aria-label="Behaviour profile">
@@ -65,7 +80,7 @@ export function CombinedResultView({ disc, focus, insights, presentation = false
 
         <section className="flex flex-col gap-4" aria-label="Attention profile">
           <h2 className="font-display text-h3 font-semibold text-ink">Attention</h2>
-          <FocusResultView data={focus} />
+          <FocusResultView data={focus} showLens={false} />
         </section>
       </div>
 

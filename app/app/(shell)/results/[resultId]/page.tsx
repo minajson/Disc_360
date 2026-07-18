@@ -9,7 +9,7 @@ import { Eyebrow } from "@/components/ui/Eyebrow";
 import { DimensionMark } from "@/components/ui/DimensionMark";
 import { ExpandableSection } from "@/components/ui/ExpandableSection";
 import { ReportActionBar } from "@/components/report/ReportActionBar";
-import { DiscRadarChart } from "@/components/charts/DiscRadarChart";
+import { BehaviourCompass } from "@/components/visualisations/disc/BehaviourCompass";
 import { DimensionBarChart } from "@/components/charts/DimensionBarChart";
 import {
   BehavioralBalanceChart,
@@ -97,9 +97,15 @@ export default async function ResultPage({
         autoprint={autoprint === "1"}
       />
 
-      {/* top summary */}
-      <header className="paper-card grid gap-8 p-7 sm:grid-cols-[0.85fr_1.15fr] sm:items-center sm:p-9">
-        <DiscRadarChart scores={scores} className="mx-auto max-w-[280px]" />
+      {/* top summary — Behaviour Compass hero; the radar remains available in
+          the derived-charts section as the secondary quantitative view */}
+      <header className="paper-card grid gap-8 p-7 sm:grid-cols-[1fr_1.05fr] sm:items-center sm:p-9">
+        <BehaviourCompass
+          scores={scores}
+          primary={primary}
+          secondary={secondary}
+          className="mx-auto max-w-[380px]"
+        />
         <div className="flex flex-col gap-4">
           <Eyebrow>Your profile · {displayArchetypeCode(code)}</Eyebrow>
           <h1 className="font-display text-h2 font-semibold">{insight.name}</h1>
