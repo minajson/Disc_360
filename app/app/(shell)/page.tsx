@@ -14,6 +14,12 @@ import { ResultGlyph } from "@/components/charts/ResultGlyph";
 import { ResultQuickActions } from "@/components/report/ResultQuickActions";
 import { ProductCards } from "@/components/presentations/ProductCards";
 import { JoinByCodeForm } from "@/components/teams/JoinByCodeForm";
+import { SessionCard, type SessionProgress } from "@/components/teams/SessionCard";
+import type {
+  AssessmentProduct,
+  PresentationAccess,
+  SessionState,
+} from "@/lib/teams/session";
 import type { ArchetypeCode, Dimension } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -23,7 +29,15 @@ const formatDate = (iso: string) =>
 
 interface TeamMembershipRow {
   role: string;
-  teams: { id: string; name: string; archived_at: string | null } | null;
+  teams: {
+    id: string;
+    name: string;
+    archived_at: string | null;
+    session_mode: string;
+    session_state: string;
+    assessment_type: string;
+    presentation_access: string;
+  } | null;
 }
 
 export default async function AppDashboardPage() {
@@ -48,7 +62,9 @@ export default async function AppDashboardPage() {
         .limit(4),
       supabase
         .from("team_members")
-        .select("role, teams (id, name, archived_at)")
+        .select(
+          "role, teams (id, name, archived_at, session_mode, session_state, assessment_type, presentation_access)",
+        )
         .eq("profile_id", user.id),
       getTeamEntitlement(context),
     ]);
@@ -60,6 +76,73 @@ export default async function AppDashboardPage() {
   const isTeamAdmin = teams.some((team) => team.memberRole === "team_admin");
   const showTeamManagement = isTeamAdmin || entitlement.allowed;
 
+  // Facilitator-led participants get ONE session card — the coach decides
+  // what runs. Facilitators and self-paced users keep the full dashboard.
+  const facilitatedTeam = isTeamAdmin
+    ? null
+    : (teams.find(
+        (team) => team.memberRole !== "team_admin" && team.session_mode === "facilitator_led",
+      ) ?? null);
+
+  let sessionProgress: SessionProgress | null = null;
+  if (facilitatedTeam) {
+    const type = facilitatedTeam.assessment_type as AssessmentProduct;
+    if (type === "focus") {
+      const [{ data: open }, { data: result }] = await Promise.all([
+        supabase
+          .from("focus_sessions")
+          .select("id")
+          .eq("profile_id", user.id)
+          .eq("status", "in_progress")
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("focus_results")
+          .select("id")
+          .eq("profile_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      sessionProgress = {
+        hasOpenSession: Boolean(open),
+        hasResult: Boolean(result),
+        continueHref: open ? `/focus/assessment/${open.id}` : null,
+        resultHref: result ? `/focus/results/${result.id}` : null,
+      };
+    } else if (type === "combined") {
+      const [{ data: open }, { data: result }] = await Promise.all([
+        supabase
+          .from("combined_sessions")
+          .select("id")
+          .eq("profile_id", user.id)
+          .eq("status", "in_progress")
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("combined_results")
+          .select("id")
+          .eq("profile_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      sessionProgress = {
+        hasOpenSession: Boolean(open),
+        hasResult: Boolean(result),
+        continueHref: open ? "/combined/assessment" : null,
+        resultHref: result ? `/combined/results/${result.id}` : null,
+      };
+    } else {
+      sessionProgress = {
+        hasOpenSession: Boolean(openSession),
+        hasResult: Boolean(latest),
+        continueHref: openSession ? `/app/assessments/${openSession.id}` : null,
+        resultHref: latest ? `/app/results/${latest.id}` : null,
+      };
+    }
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-5 py-10 sm:px-8">
       <div className="flex flex-wrap items-end justify-between gap-5">
@@ -69,7 +152,7 @@ export default async function AppDashboardPage() {
             Welcome back, {profile.preferred_name || profile.full_name}.
           </h1>
         </div>
-        {openSession ? (
+        {facilitatedTeam ? null : openSession ? (
           <Link
             href={`/app/assessments/${openSession.id}`}
             className="inline-flex min-h-11 items-center rounded-full bg-botanical px-6 text-sm font-medium text-mineral transition-colors hover:bg-botanical-deep"
@@ -120,12 +203,25 @@ export default async function AppDashboardPage() {
         </section>
       )}
 
-      <section aria-labelledby="products-heading" className="flex flex-col gap-4">
-        <h2 id="products-heading" className="font-display text-h3 font-semibold">
-          Assessments
-        </h2>
-        <ProductCards />
-      </section>
+      {facilitatedTeam && sessionProgress ? (
+        <SessionCard
+          team={{
+            id: facilitatedTeam.id,
+            name: facilitatedTeam.name,
+            assessment_type: facilitatedTeam.assessment_type as AssessmentProduct,
+            session_state: facilitatedTeam.session_state as SessionState,
+            presentation_access: facilitatedTeam.presentation_access as PresentationAccess,
+          }}
+          progress={sessionProgress}
+        />
+      ) : (
+        <section aria-labelledby="products-heading" className="flex flex-col gap-4">
+          <h2 id="products-heading" className="font-display text-h3 font-semibold">
+            Assessments
+          </h2>
+          <ProductCards />
+        </section>
+      )}
 
       <div className="grid gap-5 lg:grid-cols-2">
         {/* history */}
@@ -203,15 +299,17 @@ export default async function AppDashboardPage() {
               <JoinByCodeForm />
             </div>
           )}
-          <Link
-            href="/app/teams/new"
-            className="paper-card flex items-center justify-between px-5 py-3.5 transition-all hover:-translate-y-0.5"
-          >
-            <span className="text-sm font-medium text-ink">Create a team</span>
-            <span className="font-mono text-[11px] text-faint">
-              {entitlement.allowed ? "READY" : "$8 TEAM PLAN"}
-            </span>
-          </Link>
+          {facilitatedTeam ? null : (
+            <Link
+              href="/app/teams/new"
+              className="paper-card flex items-center justify-between px-5 py-3.5 transition-all hover:-translate-y-0.5"
+            >
+              <span className="text-sm font-medium text-ink">Create a team</span>
+              <span className="font-mono text-[11px] text-faint">
+                {entitlement.allowed ? "READY" : "$8 TEAM PLAN"}
+              </span>
+            </Link>
+          )}
         </section>
       </div>
     </div>

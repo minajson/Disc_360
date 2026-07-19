@@ -15,6 +15,9 @@ export interface JoinContext {
   presenterTitle: string | null;
   /** Prefilled when the token was a personal email invitation. */
   invitedEmail: string | null;
+  /** Which assessment this team's session runs (participant-safe). */
+  assessmentType: string | null;
+  sessionMode: string | null;
   blocked: string | null;
 }
 
@@ -71,6 +74,8 @@ export async function getJoinContext(token: string): Promise<JoinContext | null>
     presenterName: row.presenter_name,
     presenterTitle: row.presenter_title,
     invitedEmail: row.invited_email,
+    assessmentType: row.assessment_type,
+    sessionMode: row.session_mode,
     blocked: null,
   };
 }
@@ -87,6 +92,8 @@ function blockedContext(message: string): JoinContext {
     presenterName: null,
     presenterTitle: null,
     invitedEmail: null,
+    assessmentType: null,
+    sessionMode: null,
     blocked: message,
   };
 }

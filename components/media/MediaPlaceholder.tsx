@@ -37,6 +37,8 @@ export interface MediaPlaceholderProps {
    * reduced-motion viewers get the poster with on-demand playback.
    */
   autoplay?: boolean;
+  /** Ambient in-view playback (see FilmMedia.autoplayInView). */
+  autoplayInView?: boolean;
   /** CSS object-position for safe cropping, e.g. "50% 30%". */
   focal?: string;
   /** Distinct small-viewport film sources (see FilmMedia.mobile). */
@@ -79,6 +81,7 @@ export function MediaPlaceholder({
   mp4Src,
   poster,
   autoplay,
+  autoplayInView,
   focal,
   mobileSrc,
   mobileMp4Src,
@@ -172,6 +175,7 @@ export function MediaPlaceholder({
             }
             label={label}
             autoplay={slotAutoplay}
+            autoplayInView={autoplayInView}
             focal={focal}
             fallback={artwork}
           />

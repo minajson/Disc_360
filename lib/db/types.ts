@@ -1122,6 +1122,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          communications_opt_in: boolean
           consented_at: string | null
           country: string | null
           created_at: string
@@ -1141,6 +1142,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          communications_opt_in?: boolean
           consented_at?: string | null
           country?: string | null
           created_at?: string
@@ -1160,6 +1162,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          communications_opt_in?: boolean
           consented_at?: string | null
           country?: string | null
           created_at?: string
@@ -1470,6 +1473,7 @@ export type Database = {
       }
       teams: {
         Row: {
+          active_slide: number | null
           approx_size: number | null
           archived_at: string | null
           assessment_type: Database["public"]["Enums"]["assessment_type"]
@@ -1488,13 +1492,17 @@ export type Database = {
           members_can_view_summary: boolean
           name: string
           organization_id: string
+          presentation_access: Database["public"]["Enums"]["presentation_access"]
           results_named: boolean
+          session_mode: Database["public"]["Enums"]["session_mode"]
           session_name: string | null
+          session_state: Database["public"]["Enums"]["session_state"]
           team_code: string
           timezone: string | null
           updated_at: string
         }
         Insert: {
+          active_slide?: number | null
           approx_size?: number | null
           archived_at?: string | null
           assessment_type?: Database["public"]["Enums"]["assessment_type"]
@@ -1513,13 +1521,17 @@ export type Database = {
           members_can_view_summary?: boolean
           name: string
           organization_id: string
+          presentation_access?: Database["public"]["Enums"]["presentation_access"]
           results_named?: boolean
+          session_mode?: Database["public"]["Enums"]["session_mode"]
           session_name?: string | null
+          session_state?: Database["public"]["Enums"]["session_state"]
           team_code: string
           timezone?: string | null
           updated_at?: string
         }
         Update: {
+          active_slide?: number | null
           approx_size?: number | null
           archived_at?: string | null
           assessment_type?: Database["public"]["Enums"]["assessment_type"]
@@ -1538,8 +1550,11 @@ export type Database = {
           members_can_view_summary?: boolean
           name?: string
           organization_id?: string
+          presentation_access?: Database["public"]["Enums"]["presentation_access"]
           results_named?: boolean
+          session_mode?: Database["public"]["Enums"]["session_mode"]
           session_name?: string | null
+          session_state?: Database["public"]["Enums"]["session_state"]
           team_code?: string
           timezone?: string | null
           updated_at?: string
@@ -1575,6 +1590,7 @@ export type Database = {
       resolve_join_token: {
         Args: { p_token: string }
         Returns: {
+          assessment_type: string
           client_organization: string
           cover_path: string
           deadline_at: string
@@ -1582,6 +1598,7 @@ export type Database = {
           organization_name: string
           presenter_name: string
           presenter_title: string
+          session_mode: string
           session_name: string
           state: string
           team_id: string
@@ -1627,6 +1644,18 @@ export type Database = {
         | "manage_clients"
         | "setup_organization"
       org_member_role: "member" | "coach" | "organization_admin"
+      presentation_access:
+        | "live_only"
+        | "live_and_review"
+        | "review_after_session"
+      session_mode: "self_paced" | "facilitator_led"
+      session_state:
+        | "draft"
+        | "presentation"
+        | "assessment_open"
+        | "assessment_closed"
+        | "results"
+        | "ended"
       session_status: "in_progress" | "completed" | "abandoned"
       team_member_role: "member" | "team_admin"
     }
@@ -1790,6 +1819,20 @@ export const Constants = {
         "setup_organization",
       ],
       org_member_role: ["member", "coach", "organization_admin"],
+      presentation_access: [
+        "live_only",
+        "live_and_review",
+        "review_after_session",
+      ],
+      session_mode: ["self_paced", "facilitator_led"],
+      session_state: [
+        "draft",
+        "presentation",
+        "assessment_open",
+        "assessment_closed",
+        "results",
+        "ended",
+      ],
       session_status: ["in_progress", "completed", "abandoned"],
       team_member_role: ["member", "team_admin"],
     },

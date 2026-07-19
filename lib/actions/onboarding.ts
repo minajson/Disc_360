@@ -54,6 +54,7 @@ async function completeProfile(
       onboarding_intent: intent,
       consented_at: now,
       onboarded_at: now,
+      communications_opt_in: parsed.data.product_updates === "on",
     })
     .eq("id", user.id);
   if (profileError) return { error: "Could not save your profile — please try again." };
@@ -130,6 +131,95 @@ export async function completeTeamCreatorOnboarding(
   redirect("/app/teams/new");
 }
 
+/** Claim a pre-created roster entry by email, otherwise create one. */
+async function attachMembership(
+  teamId: string,
+  userId: string,
+  email: string,
+  fullName: string,
+): Promise<string | null> {
+  const admin = createSupabaseAdminClient();
+  const { data: existing } = await admin
+    .from("team_members")
+    .select("id, profile_id")
+    .eq("team_id", teamId)
+    .eq("email", email)
+    .maybeSingle();
+  if (existing?.profile_id && existing.profile_id !== userId) {
+    return "This roster entry belongs to another account.";
+  }
+  if (existing) {
+    await admin
+      .from("team_members")
+      .update({ profile_id: userId, display_name: fullName })
+      .eq("id", existing.id);
+  } else {
+    await admin.from("team_members").insert({
+      team_id: teamId,
+      profile_id: userId,
+      display_name: fullName,
+      email,
+      role: "member",
+    });
+  }
+  const now = new Date().toISOString();
+  await admin
+    .from("invitations")
+    .update({ status: "accepted", accepted_by: userId, accepted_at: now })
+    .eq("team_id", teamId)
+    .eq("email", email)
+    .eq("status", "pending");
+  return null;
+}
+
+const invitedSchema = z.object({ join_token: z.uuid() });
+
+/**
+ * Onboarding for a participant who arrived through a validated invitation
+ * token (QR / join link → sign-up or Google OAuth). The team is already
+ * resolved — no team code is asked for, ever. Membership lands on exactly
+ * the invited team and the participant continues to that team's session.
+ */
+export async function completeInvitedOnboarding(
+  _prev: OnboardingState,
+  formData: FormData,
+): Promise<OnboardingState> {
+  const parsedToken = invitedSchema.safeParse({ join_token: formData.get("join_token") });
+  if (!parsedToken.success) {
+    return { status: "error", message: "This invitation is no longer valid — ask for a fresh link." };
+  }
+
+  const { getJoinContext } = await import("@/lib/join/context");
+  const context = await getJoinContext(parsedToken.data.join_token);
+  if (!context || context.blocked || !context.teamId) {
+    return {
+      status: "error",
+      message: context?.blocked ?? "This invitation is no longer valid — ask for a fresh link.",
+    };
+  }
+
+  const profileResult = await completeProfile(formData, "join_team");
+  if (profileResult.error) return { status: "error", message: profileResult.error };
+
+  const { user, profile } = await requireUser();
+  if (context.invitedEmail && context.invitedEmail.toLowerCase() !== profile.email.toLowerCase()) {
+    return {
+      status: "error",
+      message: `This invitation was sent to ${context.invitedEmail} — sign in with that address.`,
+    };
+  }
+
+  const attachError = await attachMembership(
+    context.teamId,
+    user.id,
+    profile.email,
+    profile.full_name,
+  );
+  if (attachError) return { status: "error", message: attachError };
+
+  redirect("/app");
+}
+
 const joinSchema = z.object({
   team_code: z
     .string()
@@ -169,32 +259,8 @@ export async function completeJoinOnboarding(
     };
   }
 
-  // Claim a pre-created roster entry by email, otherwise create one.
-  const { data: existing } = await admin
-    .from("team_members")
-    .select("id, profile_id")
-    .eq("team_id", team.id)
-    .eq("email", profile.email)
-    .maybeSingle();
-
-  if (existing?.profile_id && existing.profile_id !== user.id) {
-    return { status: "error", message: "This roster entry belongs to another account." };
-  }
-
-  if (existing) {
-    await admin
-      .from("team_members")
-      .update({ profile_id: user.id, display_name: profile.full_name })
-      .eq("id", existing.id);
-  } else {
-    await admin.from("team_members").insert({
-      team_id: team.id,
-      profile_id: user.id,
-      display_name: profile.full_name,
-      email: profile.email,
-      role: "member",
-    });
-  }
+  const attachError = await attachMembership(team.id, user.id, profile.email, profile.full_name);
+  if (attachError) return { status: "error", message: attachError };
 
   redirect("/app");
 }

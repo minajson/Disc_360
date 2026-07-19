@@ -53,6 +53,11 @@ export interface PresentationPlayerProps {
   qr?: QrConfig;
   /** Softens the closing copy when no scored instrument exists yet. */
   assessmentLive?: boolean;
+  /**
+   * Facilitated sessions: called with the current slide index so live
+   * participant followers track the coach's deck. Fire-and-forget.
+   */
+  syncAction?: (index: number) => Promise<void>;
 }
 
 function formatTime(totalSeconds: number): string {
@@ -71,6 +76,7 @@ export function PresentationPlayer({
   dashboardLabel,
   qr,
   assessmentLive = true,
+  syncAction,
 }: PresentationPlayerProps) {
   const reduced = useReducedMotion() ?? false;
   const slides = deck.slides;
@@ -132,6 +138,12 @@ export function PresentationPlayer({
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
+
+  // Live follower sync: report the slide the room is looking at.
+  useEffect(() => {
+    if (!syncAction) return;
+    syncAction(index).catch(() => undefined);
+  }, [index, syncAction]);
 
   // Auto-hide chrome in fullscreen after 3s of inactivity; any pointer, touch
   // or key activity brings it back. Outside fullscreen the chrome is fixed.

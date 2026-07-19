@@ -7,6 +7,7 @@ import { TextField, authInputClasses } from "@/components/auth/fields";
 import {
   completeCoachOnboarding,
   completeIndividualOnboarding,
+  completeInvitedOnboarding,
   completeJoinOnboarding,
   completeTeamCreatorOnboarding,
   type OnboardingState,
@@ -49,21 +50,37 @@ const intents: { id: Intent; title: string; detail: string }[] = [
 
 const initialState: OnboardingState = { status: "idle", message: "" };
 
+export interface OnboardingInvitation {
+  token: string;
+  teamName: string;
+  presenterName: string | null;
+  presenterTitle: string | null;
+  /** "Today's session" label, e.g. "DISC Behaviour Assessment". */
+  sessionLabel: string | null;
+}
+
 interface OnboardingFlowProps {
   defaultFullName: string;
   defaultEmail: string;
   initialIntent?: string;
+  /** Present when the user arrived through a validated invitation token. */
+  invitation?: OnboardingInvitation | null;
 }
 
 export function OnboardingFlow({
   defaultFullName,
   initialIntent,
+  invitation = null,
 }: OnboardingFlowProps) {
   const [intent, setIntent] = useState<Intent | null>(
     intents.some((option) => option.id === initialIntent)
       ? (initialIntent as Intent)
       : null,
   );
+
+  if (invitation) {
+    return <InvitedFlow invitation={invitation} defaultFullName={defaultFullName} />;
+  }
 
   return (
     <div className="flex w-full max-w-2xl flex-col gap-8">
@@ -149,6 +166,132 @@ export function OnboardingFlow({
               </p>
             </>
           }
+        />
+      ) : null}
+    </div>
+  );
+}
+
+type InvitedPathway = "participant" | "coach" | "organization";
+
+/**
+ * Onboarding when the team is ALREADY resolved from a validated invitation
+ * token: the invitation is summarised up top, the team code is never asked
+ * for, and joining as a participant is the default path. Coach/organization
+ * setup requires explicitly leaving the invitation first.
+ */
+function InvitedFlow({
+  invitation,
+  defaultFullName,
+}: {
+  invitation: OnboardingInvitation;
+  defaultFullName: string;
+}) {
+  const [pathway, setPathway] = useState<InvitedPathway>("participant");
+  const [leaveConfirmed, setLeaveConfirmed] = useState(false);
+
+  const pathways: { id: InvitedPathway; title: string; detail: string }[] = [
+    {
+      id: "participant",
+      title: "Join as participant",
+      detail: `Take part in ${invitation.teamName}'s session.`,
+    },
+    { id: "coach", title: "Set up as coach", detail: "Run sessions for your own client teams." },
+    {
+      id: "organization",
+      title: "Set up an organization",
+      detail: "Roll DISC360 out across departments.",
+    },
+  ];
+  const leavingPathway = pathway !== "participant";
+
+  return (
+    <div className="flex w-full max-w-2xl flex-col gap-8">
+      {/* invitation summary */}
+      <div className="paper-card flex flex-col gap-1.5 border-l-4 border-l-botanical p-6 text-left">
+        <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-teal">
+          You are joining
+        </span>
+        <span className="font-display text-h3 font-semibold text-ink">{invitation.teamName}</span>
+        {invitation.presenterName ? (
+          <span className="text-sm text-slate">
+            Facilitated by {invitation.presenterName}
+            {invitation.presenterTitle ? ` · ${invitation.presenterTitle}` : ""}
+          </span>
+        ) : null}
+        {invitation.sessionLabel ? (
+          <span className="pt-1 text-sm text-slate">
+            Today&rsquo;s session:{" "}
+            <span className="font-medium text-ink">{invitation.sessionLabel}</span>
+          </span>
+        ) : null}
+      </div>
+
+      <div role="radiogroup" aria-label="Account pathway" className="grid gap-3 sm:grid-cols-3">
+        {pathways.map((option) => (
+          <button
+            key={option.id}
+            type="button"
+            role="radio"
+            aria-checked={pathway === option.id}
+            onClick={() => {
+              setPathway(option.id);
+              setLeaveConfirmed(false);
+            }}
+            className={cn(
+              "flex flex-col gap-1 rounded-2xl border bg-paper p-5 text-left transition-all duration-200",
+              pathway === option.id
+                ? "border-botanical shadow-[0_16px_32px_-24px_rgba(23,76,60,0.5)]"
+                : "border-hairline hover:border-hairline-strong",
+            )}
+          >
+            <span className="font-display text-base font-semibold text-ink">{option.title}</span>
+            <span className="text-xs leading-relaxed text-slate">{option.detail}</span>
+          </button>
+        ))}
+      </div>
+
+      {pathway === "participant" ? (
+        <ProfileForm
+          action={completeInvitedOnboarding}
+          submitLabel={`Join ${invitation.teamName}`}
+          defaultFullName={defaultFullName}
+          extraFields={<input type="hidden" name="join_token" value={invitation.token} />}
+        />
+      ) : null}
+
+      {leavingPathway && !leaveConfirmed ? (
+        <div role="alert" className="paper-card flex flex-col gap-3 border-l-4 border-l-disc-i p-6">
+          <p className="text-sm leading-relaxed text-ink">
+            You opened an invitation to join{" "}
+            <span className="font-semibold">{invitation.teamName}</span> as a participant.
+            Continuing as a {pathway === "coach" ? "coach" : "organization administrator"} will
+            leave this invitation.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button type="button" onClick={() => setLeaveConfirmed(true)}>
+              Continue and leave the invitation
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setPathway("participant")}>
+              Stay and join {invitation.teamName}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {pathway === "coach" && leaveConfirmed ? (
+        <ProfileForm
+          action={completeCoachOnboarding}
+          submitLabel="Set up my workspace"
+          defaultFullName={defaultFullName}
+        />
+      ) : null}
+      {pathway === "organization" && leaveConfirmed ? (
+        <ProfileForm
+          action={completeTeamCreatorOnboarding}
+          submitLabel="Continue"
+          defaultFullName={defaultFullName}
+          extraFields={<input type="hidden" name="intent_variant" value="organization" />}
         />
       ) : null}
     </div>

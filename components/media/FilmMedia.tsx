@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useReducedMotion } from "framer-motion";
 
@@ -27,6 +27,7 @@ export function FilmMedia({
   mobile,
   label,
   autoplay,
+  autoplayInView = false,
   focal = "50% 50%",
   fallback,
 }: {
@@ -40,6 +41,12 @@ export function FilmMedia({
   label: string;
   /** From the slot's registry entry — never assumed. */
   autoplay: boolean;
+  /**
+   * Ambient in-view mode: autoplays muted when the section is on screen,
+   * pauses off screen, never shows a play control. Reduced motion or a
+   * blocked autoplay silently show the poster instead.
+   */
+  autoplayInView?: boolean;
   /** CSS object-position for safe cropping, e.g. "50% 30%". */
   focal?: string;
   /** Rendered when no source can be played. */
@@ -48,11 +55,50 @@ export function FilmMedia({
   const reduced = useReducedMotion() ?? false;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
+  const [posterOnly, setPosterOnly] = useState(false);
   // Under reduced motion (or a non-autoplay slot) we hold on the poster until
   // the viewer asks for playback.
-  const [playing, setPlaying] = useState(autoplay && !reduced);
+  const [playing, setPlaying] = useState((autoplay || autoplayInView) && !reduced);
+
+  // In-view ambience: play while visible, pause when scrolled away. A
+  // rejected play() (autoplay policy) downgrades silently to the poster.
+  useEffect(() => {
+    if (!autoplayInView || reduced) return;
+    const video = videoRef.current;
+    if (!video) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry) return;
+        if (entry.isIntersecting) {
+          video.play().catch(() => setPosterOnly(true));
+        } else {
+          video.pause();
+        }
+      },
+      { threshold: 0.25 },
+    );
+    observer.observe(video);
+    return () => observer.disconnect();
+  }, [autoplayInView, reduced, playing]);
 
   if (failed || (!source.webm && !source.mp4)) return <>{fallback}</>;
+
+  // Ambient slots never show a control: reduced motion or blocked autoplay
+  // render the still poster frame, full stop.
+  if (autoplayInView && (reduced || posterOnly)) {
+    return source.poster ? (
+      <Image
+        src={source.poster}
+        alt={label}
+        fill
+        className="object-cover"
+        style={{ objectPosition: focal }}
+        onError={() => setFailed(true)}
+      />
+    ) : (
+      <>{fallback}</>
+    );
+  }
 
   if (!playing) {
     return (
@@ -98,7 +144,7 @@ export function FilmMedia({
       muted
       loop
       playsInline
-      autoPlay
+      autoPlay={!autoplayInView}
       aria-label={label}
       onError={() => setFailed(true)}
     >

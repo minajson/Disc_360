@@ -31,24 +31,27 @@ export default async function JoinTokenPage({
   const { token } = await params;
   const context = await getJoinContext(token);
 
-  // Signed-in visitors join directly — no re-registration.
+  // Signed-in visitors never re-register. A not-yet-onboarded account (e.g.
+  // fresh Google sign-in) carries the invitation into onboarding — consent
+  // comes BEFORE membership, and the team code is never asked for. An
+  // onboarded account joins directly and lands on the session.
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (user && context && !context.blocked) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("onboarded_at")
+      .eq("id", user.id)
+      .single();
+    if (!profile?.onboarded_at) redirect(`/onboarding?join=${token}`);
+
     let result = await acceptInvitationToken(token);
     if (!result.ok && result.error === "This invitation link is not valid.") {
       result = await acceptTeamLink(token);
     }
-    if (result.ok && result.teamId) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarded_at")
-        .eq("id", user.id)
-        .single();
-      redirect(profile?.onboarded_at ? `/app/teams/${result.teamId}` : "/onboarding");
-    }
+    if (result.ok && result.teamId) redirect("/app");
   }
 
   if (!context || context.blocked) {

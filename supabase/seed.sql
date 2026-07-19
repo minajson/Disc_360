@@ -313,3 +313,8 @@ begin
     v_i := v_i + 1;
   end loop;
 end $$;
+
+-- Seeded teams are mid-flight fixtures: like the production backfill, teams
+-- that already have members run with the assessment window open.
+update public.teams set session_state = 'assessment_open'
+where exists (select 1 from public.team_members m where m.team_id = teams.id);

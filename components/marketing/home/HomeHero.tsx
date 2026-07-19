@@ -45,8 +45,8 @@ export function HomeHero() {
           {/* Live Profile — an authentic result resting over the desk area,
               never the faces. Sizes step down on smaller viewports; the
               gentle float lives in .live-profile-card (reduced-motion: static). */}
-          <div className="relative z-10 -mt-12 ml-3 w-40 rotate-[-2.5deg] sm:absolute sm:-bottom-10 sm:-left-6 sm:ml-0 sm:mt-0 sm:w-40 lg:-bottom-11 lg:-left-9 lg:w-44">
-            <div className="live-profile-card p-3.5">
+          <div className="relative z-10 -mt-12 ml-3 w-40 rotate-[-2.5deg] sm:absolute sm:-bottom-6 sm:-left-1 sm:ml-0 sm:mt-0 sm:w-40 lg:-bottom-7 lg:left-0 lg:w-44">
+            <div className="live-profile-card p-3.5" style={{ "--color-faint": "var(--color-slate)" } as React.CSSProperties}>
               <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-teal">
                 Live profile
               </span>
@@ -60,10 +60,10 @@ export function HomeHero() {
                   ["Supporting", "Analytical"],
                 ].map(([label, value]) => (
                   <div key={label} className="flex items-baseline justify-between gap-3">
-                    <dt className="font-mono text-[8.5px] uppercase tracking-[0.12em] text-faint">
+                    <dt className="font-mono text-[9px] uppercase tracking-[0.12em] text-slate">
                       {label}
                     </dt>
-                    <dd className="text-[11px] font-medium text-ink">{value}</dd>
+                    <dd className="text-[11px] font-semibold text-ink">{value}</dd>
                   </div>
                 ))}
               </dl>

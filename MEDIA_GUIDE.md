@@ -83,7 +83,7 @@ cropping.
 | Dimensions | 1600×900 |
 | Formats | WebM (VP9) + MP4 (H.264) + JPEG poster |
 | Size target | ≤ 3 MB per file · poster ≤ 200 KB |
-| Video | 20–40 s · autoplay no · audio no · muted playback, playsInline, WebM + MP4 fallback, poster, static under reduced motion |
+| Video | 20–40 s · autoplay yes · audio no · muted playback, playsInline, WebM + MP4 fallback, poster, static under reduced motion |
 | Direction | Team retrospective conversation, candid workplace documentary style |
 | Replace | public/media/case-01.webm + case-01.jpg → <CaseStudyFilmPlaceholder src poster> |
 

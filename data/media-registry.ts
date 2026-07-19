@@ -106,7 +106,7 @@ export const mediaRegistry: MediaEntry[] = [
     suggestedContent: "Team retrospective conversation, candid workplace documentary style",
     replacementPath: "public/media/case-01.webm + case-01.jpg → <CaseStudyFilmPlaceholder src poster>",
     status: "ready",
-    video: { duration: "20–40 s", autoplay: false, audio: false },
+    video: { duration: "20–40 s", autoplay: true, audio: false },
   },
   {
     id: "MEDIA-TEAMS-COLLAB-01",

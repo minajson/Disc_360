@@ -164,13 +164,18 @@ export async function joinAndStart(
     .eq("email", input.email)
     .eq("status", "pending");
 
-  // Straight into the assessment the team is configured for.
+  // Where the participant lands is the coach's call: only an OPEN assessment
+  // window drops them straight into the runner; any other session state lands
+  // on the participant home, which shows exactly the current session card.
   const { data: team } = await admin
     .from("teams")
-    .select("assessment_type")
+    .select("assessment_type, session_state, session_mode")
     .eq("id", context.teamId)
     .single();
   const assessmentType = team?.assessment_type ?? "disc";
+  const sessionOpen =
+    team?.session_mode !== "facilitator_led" || team?.session_state === "assessment_open";
+  if (!sessionOpen) redirect("/app");
 
   if (assessmentType === "focus") {
     const { data: version } = await admin

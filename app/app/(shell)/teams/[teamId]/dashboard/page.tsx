@@ -7,6 +7,12 @@ import { getTeamRoster } from "@/lib/teams/roster";
 import { sendReminderToPending } from "@/lib/actions/teams";
 import { InviteParticipantsPanel } from "@/components/teams/InviteParticipantsPanel";
 import { buildJoinUrl, getPublicBaseUrl } from "@/lib/utils/site-url";
+import {
+  ASSESSMENT_LABELS,
+  SESSION_STATE_LABELS,
+  type AssessmentProduct,
+  type SessionState,
+} from "@/lib/teams/session";
 import { AutoRefresh } from "@/components/teams/AutoRefresh";
 import { ParticipantTable } from "@/components/teams/ParticipantTable";
 import { AddMemberForm, ImportCsvForm } from "@/components/teams/MemberForms";
@@ -24,7 +30,7 @@ export default async function TeamDashboardPage({
   const [{ data: team, error: teamError }, roster] = await Promise.all([
     supabase
       .from("teams")
-      .select("name, team_code, invite_token, session_name, deadline_at, assessment_type")
+      .select("name, team_code, invite_token, session_name, deadline_at, assessment_type, session_state, session_mode")
       .eq("id", teamId)
       .maybeSingle(),
     getTeamRoster(teamId),
@@ -72,6 +78,22 @@ export default async function TeamDashboardPage({
     <>
       <AutoRefresh />
 
+      {/* selected assessment + session state — the coach's control surface */}
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="rounded-full bg-botanical px-4 py-1.5 text-sm font-medium text-mineral">
+          {ASSESSMENT_LABELS[(team.assessment_type ?? "disc") as AssessmentProduct]}
+        </span>
+        <span className="rounded-full border border-hairline bg-paper px-3.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-slate">
+          {SESSION_STATE_LABELS[(team.session_state ?? "draft") as SessionState]}
+        </span>
+        <Link
+          href={`/app/teams/${teamId}/settings`}
+          className="font-mono text-[11px] uppercase tracking-[0.14em] text-teal hover:underline"
+        >
+          Session setup →
+        </Link>
+      </div>
+
       {team.session_name || team.deadline_at ? (
         <p className="font-mono text-xs text-faint">
           {team.session_name ?? "Assessment session"}
@@ -97,6 +119,8 @@ export default async function TeamDashboardPage({
         teamCode={team.team_code}
         joinUrl={inviteLink}
         isLocal={base.isLocal}
+        teamId={teamId}
+        assessmentLabel={ASSESSMENT_LABELS[(team.assessment_type ?? "disc") as AssessmentProduct]}
       />
 
       {/* controls */}

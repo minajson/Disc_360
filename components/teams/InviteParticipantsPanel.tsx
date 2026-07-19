@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { cn } from "@/lib/utils/cn";
+import { qrFilename } from "@/lib/teams/session";
 
 interface InviteParticipantsPanelProps {
   teamName: string;
@@ -12,6 +13,10 @@ interface InviteParticipantsPanelProps {
   /** True when the configured base URL is unreachable from other devices. */
   isLocal: boolean;
   compact?: boolean;
+  /** Enables "Open full-screen QR" (projection view). */
+  teamId?: string;
+  /** The session's selected assessment, shown beside the invite. */
+  assessmentLabel?: string;
 }
 
 export function InviteParticipantsPanel({
@@ -20,6 +25,8 @@ export function InviteParticipantsPanel({
   joinUrl,
   isLocal,
   compact = false,
+  teamId,
+  assessmentLabel,
 }: InviteParticipantsPanelProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const qrWrapRef = useRef<HTMLDivElement>(null);
@@ -44,19 +51,30 @@ export function InviteParticipantsPanel({
     const xml = new XMLSerializer().serializeToString(svg);
     const image = new window.Image();
     image.onload = () => {
+      // 1600² presentation-ready PNG: 1408px QR centred in a 96px white
+      // quiet zone, exported as a real image/png Blob so every viewer
+      // (Preview, PowerPoint, Keynote, phone galleries) opens it directly.
+      const SIZE = 1600;
+      const QUIET = 96;
       const canvas = document.createElement("canvas");
-      canvas.width = 1024;
-      canvas.height = 1024;
+      canvas.width = SIZE;
+      canvas.height = SIZE;
       const context = canvas.getContext("2d");
       if (!context) return;
       context.fillStyle = "#FFFFFF";
-      context.fillRect(0, 0, 1024, 1024);
-      context.drawImage(image, 64, 64, 896, 896);
-      const link = document.createElement("a");
-      link.download = `disc360-join-${teamCode}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-      flash("QR code downloaded.");
+      context.fillRect(0, 0, SIZE, SIZE);
+      context.imageSmoothingEnabled = false;
+      context.drawImage(image, QUIET, QUIET, SIZE - QUIET * 2, SIZE - QUIET * 2);
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.download = qrFilename(teamName);
+        link.href = url;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        flash("QR code downloaded.");
+      }, "image/png");
     };
     image.src = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(xml)))}`;
   };
@@ -99,6 +117,9 @@ export function InviteParticipantsPanel({
               Invite participants
             </span>
             <span className="font-display text-lg font-semibold text-ink">{teamName}</span>
+            {assessmentLabel ? (
+              <span className="text-xs font-medium text-botanical">{assessmentLabel}</span>
+            ) : null}
             <span className="font-mono text-xs text-slate">
               Join code <span className="font-semibold text-ink">{teamCode}</span>
             </span>
@@ -112,6 +133,11 @@ export function InviteParticipantsPanel({
             <button type="button" onClick={downloadQr} className={chip}>
               Download QR code
             </button>
+            {teamId ? (
+              <Link href={`/app/teams/${teamId}/qr`} target="_blank" className={chip}>
+                Open full-screen QR
+              </Link>
+            ) : null}
             <button type="button" onClick={() => copy(teamCode, "Team code")} className={chip}>
               Copy team code
             </button>

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/guards";
+import { getJoinContext } from "@/lib/join/context";
+import { ASSESSMENT_LABELS, type AssessmentProduct } from "@/lib/teams/session";
 import { BrandMark } from "@/components/marketing/BrandMark";
 import { AssessmentTransitionScene } from "@/components/media/AssessmentTransitionScene";
 import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
@@ -10,12 +12,29 @@ export const metadata: Metadata = { title: "Welcome" };
 export default async function OnboardingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ intent?: string }>;
+  searchParams: Promise<{ intent?: string; join?: string }>;
 }) {
   const { profile } = await requireUser();
   if (profile.onboarded_at) redirect("/app");
 
-  const { intent } = await searchParams;
+  const { intent, join } = await searchParams;
+
+  // Arrived through a validated invitation (QR / join link → auth): resolve
+  // the token again server-side and onboard into that exact team — the team
+  // code is never asked for on this path.
+  const joinContext = join ? await getJoinContext(join) : null;
+  const invitation =
+    joinContext && !joinContext.blocked && joinContext.teamId
+      ? {
+          token: join!,
+          teamName: joinContext.teamName,
+          presenterName: joinContext.presenterName,
+          presenterTitle: joinContext.presenterTitle,
+          sessionLabel: joinContext.assessmentType
+            ? ASSESSMENT_LABELS[joinContext.assessmentType as AssessmentProduct]
+            : null,
+        }
+      : null;
   const mappedIntent =
     intent === "team" ? "create_team" : intent === "coach" ? "manage_clients" : intent;
 
@@ -30,6 +49,7 @@ export default async function OnboardingPage({
           defaultFullName={profile.full_name}
           defaultEmail={profile.email}
           initialIntent={mappedIntent}
+          invitation={invitation}
         />
       </main>
     </div>

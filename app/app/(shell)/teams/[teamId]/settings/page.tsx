@@ -6,6 +6,13 @@ import {
   TeamSettingsForm,
 } from "@/components/teams/TeamSettingsForm";
 import { InviteParticipantsPanel } from "@/components/teams/InviteParticipantsPanel";
+import { SessionSetupCard } from "@/components/teams/SessionSetupCard";
+import type {
+  AssessmentProduct,
+  PresentationAccess,
+  SessionMode,
+  SessionState,
+} from "@/lib/teams/session";
 import { buildJoinUrl, getPublicBaseUrl } from "@/lib/utils/site-url";
 
 export const metadata: Metadata = { title: "Team settings" };
@@ -20,7 +27,7 @@ export default async function TeamSettingsPage({
 
   const { data: team } = await supabase
     .from("teams")
-    .select("id, name, description, department, timezone, logo_url, cover_path, results_named, members_can_view_summary, deadline_at, team_code, invite_token")
+    .select("id, name, description, department, timezone, logo_url, cover_path, results_named, members_can_view_summary, deadline_at, team_code, invite_token, assessment_type, session_mode, session_state, presentation_access")
     .eq("id", teamId)
     .maybeSingle();
   if (!team) notFound();
@@ -29,6 +36,15 @@ export default async function TeamSettingsPage({
 
   return (
     <>
+      <SessionSetupCard
+        teamId={teamId}
+        current={{
+          assessment_type: team.assessment_type as AssessmentProduct,
+          session_mode: team.session_mode as SessionMode,
+          session_state: team.session_state as SessionState,
+          presentation_access: team.presentation_access as PresentationAccess,
+        }}
+      />
       <TeamSettingsForm team={team} />
       <InviteParticipantsPanel
         teamName={team.name}

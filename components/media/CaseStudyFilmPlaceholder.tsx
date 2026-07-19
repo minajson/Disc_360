@@ -14,8 +14,9 @@ type CaseStudyProps = Pick<
 /**
  * Case-study film slot with overlay support for quotes.
  * Replacement: 16:9 film, 1600×900, workplace documentary style, warm and
- * candid, no staged stock poses. WebM + MP4 fallback + poster; this slot does
- * NOT autoplay (registry) — it holds on the poster until played, always muted.
+ * candid, no staged stock poses. WebM + MP4 fallback + poster. Plays as a
+ * muted ambient loop while the section is in view, pauses off-screen, and
+ * never shows a control — reduced motion or blocked autoplay show the poster.
  * Specs: MEDIA_GUIDE.md → MEDIA-CASESTUDY-FILM-01.
  */
 export function CaseStudyFilmPlaceholder({
@@ -30,6 +31,7 @@ export function CaseStudyFilmPlaceholder({
       ratio="16/9"
       kind="film"
       dimensions="1600×900"
+      autoplayInView
       {...props}
     >
       {children}
