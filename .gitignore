@@ -52,3 +52,8 @@ next-env.d.ts
 
 # Legacy JSON mock store — removed; never reintroduce.
 .mockdb/
+
+# Raw media masters (processed outputs in public/ are committed; regenerate
+# via scripts/process-media.mjs). The brand mark master IS committed.
+/assets-src/media/
+/assets-src/brand/mark.png

@@ -12,7 +12,7 @@ import { mediaRegistry, type MediaEntry, type MediaGroup } from "../../data/medi
 const GROUP_TITLES: Record<MediaGroup, string> = {
   marketing: "Marketing site",
   product: "Product (per-account uploads & previews)",
-  brand: "Brand identity (all TEMPORARY until final identity lands)",
+  brand: "Brand identity (production mark + generated derivatives)",
 };
 
 /** The four scene contracts — animated now, replaceable with rendered 3D later. */

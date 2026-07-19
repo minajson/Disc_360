@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { CaseStudyFilmPlaceholder } from "@/components/media/CaseStudyFilmPlaceholder";
 
@@ -6,11 +7,19 @@ const scenarios = [
     quote:
       "The quadrant map ended a year-long argument in twenty minutes. Our 'communication problem' was two high-Dominant leads and a silent Stable majority.",
     attribution: "Engineering director, 40-person org",
+    portrait: "/media/testimonial-01.webp",
   },
   {
     quote:
       "I run every leadership offsite on the presentation mode now. Teams see themselves on the screen and the conversation starts itself.",
     attribution: "Independent leadership coach",
+    portrait: "/media/testimonial-02.webp",
+  },
+  {
+    quote:
+      "Onboarding conversations changed shape. New joiners tell us how they work before the first deadline teaches us the hard way.",
+    attribution: "People operations lead",
+    portrait: "/media/testimonial-03.webp",
   },
 ];
 
@@ -25,7 +34,11 @@ export function CaseStudiesSection() {
       />
 
       <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-        <CaseStudyFilmPlaceholder />
+        <CaseStudyFilmPlaceholder
+          src="/media/case-01.webm"
+          mp4Src="/media/case-01.mp4"
+          poster="/media/case-01-poster.jpg"
+        />
         <div className="flex flex-col gap-5">
           {scenarios.map((scenario) => (
             <figure key={scenario.attribution} className="paper-card flex flex-1 flex-col gap-4 p-7">
@@ -35,8 +48,17 @@ export function CaseStudiesSection() {
               <blockquote className="font-display text-lg leading-snug text-ink">
                 {scenario.quote}
               </blockquote>
-              <figcaption className="mt-auto font-mono text-[11px] uppercase tracking-[0.16em] text-faint">
-                {scenario.attribution} · illustrative
+              <figcaption className="mt-auto flex items-center gap-3">
+                <Image
+                  src={scenario.portrait}
+                  alt=""
+                  width={80}
+                  height={80}
+                  className="size-10 rounded-full border border-hairline object-cover"
+                />
+                <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-faint">
+                  {scenario.attribution} · illustrative
+                </span>
               </figcaption>
             </figure>
           ))}

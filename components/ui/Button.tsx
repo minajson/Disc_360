@@ -1,3 +1,4 @@
+import { twMerge } from "tailwind-merge";
 import { cn } from "@/lib/utils/cn";
 
 export type ButtonVariant = "primary" | "outline" | "ghost" | "ink";
@@ -8,7 +9,10 @@ export const buttonClasses = (
   size: ButtonSize = "md",
   className?: string,
 ) =>
-  cn(
+  // twMerge: a caller's className must WIN over the variant's utilities —
+  // otherwise conflicting text/bg classes fall to stylesheet order (the
+  // white-on-white "For coaches" pill was exactly that).
+  twMerge(cn(
     "inline-flex items-center justify-center gap-2 rounded-full font-medium tracking-tight transition-all duration-200 ease-[var(--ease-meridian)] select-none",
     "disabled:pointer-events-none disabled:opacity-40",
     size === "md" && "min-h-11 px-6 text-sm",
@@ -21,7 +25,7 @@ export const buttonClasses = (
     variant === "ink" &&
       "bg-ink text-mineral hover:bg-ink/90 active:scale-[0.99]",
     className,
-  );
+  ));
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;

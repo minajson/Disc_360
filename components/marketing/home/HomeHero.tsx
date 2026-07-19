@@ -33,7 +33,15 @@ export function HomeHero() {
 
         {/* layered editorial composition */}
         <div className="relative mx-auto w-full max-w-[520px] lg:max-w-none">
-          <HeroFilmPlaceholder className="lg:translate-x-6" />
+          <HeroFilmPlaceholder
+            className="lg:translate-x-6"
+            src="/media/hero.webm"
+            mp4Src="/media/hero.mp4"
+            poster="/media/hero-poster.jpg"
+            mobileSrc="/media/hero-mobile.webm"
+            mobileMp4Src="/media/hero-mobile.mp4"
+            mobilePoster="/media/hero-mobile-poster.jpg"
+          />
           {/* overlapping report fragment */}
           <div className="paper-card absolute -bottom-10 -left-3 w-44 rotate-[-3deg] p-4 sm:w-52 sm:-left-8">
             <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-faint">

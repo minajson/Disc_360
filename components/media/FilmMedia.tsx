@@ -24,12 +24,19 @@ export interface FilmSource {
 
 export function FilmMedia({
   source,
+  mobile,
   label,
   autoplay,
   focal = "50% 50%",
   fallback,
 }: {
   source: FilmSource;
+  /**
+   * Distinct small-viewport sources (e.g. the hero's 4:5 crop). Selected via
+   * `<source media>` so only the matching files load — one video element,
+   * no hidden duplicate downloads.
+   */
+  mobile?: FilmSource;
   label: string;
   /** From the slot's registry entry — never assumed. */
   autoplay: boolean;
@@ -95,6 +102,12 @@ export function FilmMedia({
       aria-label={label}
       onError={() => setFailed(true)}
     >
+      {mobile?.webm ? (
+        <source src={mobile.webm} type="video/webm" media="(max-width: 639px)" />
+      ) : null}
+      {mobile?.mp4 ? (
+        <source src={mobile.mp4} type="video/mp4" media="(max-width: 639px)" />
+      ) : null}
       {source.webm ? <source src={source.webm} type="video/webm" /> : null}
       {source.mp4 ? <source src={source.mp4} type="video/mp4" /> : null}
     </video>

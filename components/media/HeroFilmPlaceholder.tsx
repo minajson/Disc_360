@@ -36,17 +36,24 @@ export function HeroFilmPlaceholder({
   ...props
 }: HeroFilmProps) {
   const mobile = variant === "mobile";
+  // With both source sets, one instance serves every viewport: the browser
+  // picks per `<source media>`, and the frame's aspect follows suit.
+  const responsive = Boolean(!mobile && (mobileSrc || mobileMp4Src));
   return (
     <MediaPlaceholder
       mediaId="MEDIA-HOME-HERO-01"
       label="Leadership team collaborating in warm natural light"
       ratio={mobile ? "4/5" : "3/2"}
+      ratioClassName={responsive ? "aspect-[4/5] sm:aspect-[3/2]" : undefined}
       kind="film"
       dimensions={mobile ? "1080×1350" : "1920×1280"}
       mask="organic"
       src={mobile ? (mobileSrc ?? src) : src}
       mp4Src={mobile ? (mobileMp4Src ?? mp4Src) : mp4Src}
       poster={mobile ? (mobilePoster ?? poster) : poster}
+      mobileSrc={responsive ? mobileSrc : undefined}
+      mobileMp4Src={responsive ? mobileMp4Src : undefined}
+      mobilePoster={responsive ? mobilePoster : undefined}
       {...props}
     />
   );

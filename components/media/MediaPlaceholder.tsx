@@ -39,6 +39,16 @@ export interface MediaPlaceholderProps {
   autoplay?: boolean;
   /** CSS object-position for safe cropping, e.g. "50% 30%". */
   focal?: string;
+  /** Distinct small-viewport film sources (see FilmMedia.mobile). */
+  mobileSrc?: string;
+  mobileMp4Src?: string;
+  mobilePoster?: string;
+  /**
+   * Responsive aspect override (e.g. "aspect-[4/5] sm:aspect-[3/2]") for
+   * slots whose desktop and mobile crops differ. Replaces the static ratio
+   * class; `ratio` stays the documented shape.
+   */
+  ratioClassName?: string;
   mask?: "none" | "organic" | "arch";
   className?: string;
   /** Overlay content (captions, quotes) rendered above the media. */
@@ -70,6 +80,10 @@ export function MediaPlaceholder({
   poster,
   autoplay,
   focal,
+  mobileSrc,
+  mobileMp4Src,
+  mobilePoster,
+  ratioClassName,
   mask = "none",
   className,
   children,
@@ -140,7 +154,7 @@ export function MediaPlaceholder({
     <figure
       className={cn(
         "relative w-full overflow-hidden",
-        ratioClass[ratio],
+        ratioClassName ?? ratioClass[ratio],
         mask === "organic" && "mask-organic",
         mask === "arch" && "mask-arch",
         mask === "none" && "rounded-editorial",
@@ -151,6 +165,11 @@ export function MediaPlaceholder({
         kind === "film" ? (
           <FilmMedia
             source={{ webm: src, mp4: mp4Src, poster }}
+            mobile={
+              mobileSrc || mobileMp4Src
+                ? { webm: mobileSrc, mp4: mobileMp4Src, poster: mobilePoster }
+                : undefined
+            }
             label={label}
             autoplay={slotAutoplay}
             focal={focal}

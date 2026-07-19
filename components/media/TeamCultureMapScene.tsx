@@ -88,11 +88,7 @@ export function TeamCultureMapScene({ className }: { className?: string }) {
           fillOpacity={0.85}
           stroke="var(--color-paper)"
           strokeWidth={2}
-          animate={
-            tier === "reduced"
-              ? undefined
-              : { cy: [dot.y, dot.y - 5, dot.y] }
-          }
+          animate={tier === "reduced" ? undefined : { y: [0, -5, 0] }}
           transition={{
             duration: 5 + (index % 5),
             repeat: Infinity,

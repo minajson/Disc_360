@@ -28,7 +28,7 @@ cropping.
 | | |
 |---|---|
 | Type | video |
-| Status | placeholder |
+| Status | ready |
 | Route | / |
 | Section | Hero |
 | Ratio | 3:2 / 4:5 |
@@ -75,7 +75,7 @@ cropping.
 | | |
 |---|---|
 | Type | video |
-| Status | placeholder |
+| Status | ready |
 | Route | / (testimonials) |
 | Section | Case studies |
 | Ratio | 16:9 |
@@ -121,7 +121,7 @@ cropping.
 | | |
 |---|---|
 | Type | avatar |
-| Status | placeholder |
+| Status | ready |
 | Route | / (testimonials) |
 | Section | Quotes |
 | Ratio | 1:1 |
@@ -209,14 +209,14 @@ cropping.
 | Direction | Polished screenshot of the individual report (live components render today) |
 | Replace | public/media/report-preview.webp (optional swap for the live preview) |
 
-## Brand identity (all TEMPORARY until final identity lands) (8)
+## Brand identity (production mark + generated derivatives) (8)
 
 ### MEDIA-BRAND-LOGO-01 — Header/footer wordmark
 
 | | |
 |---|---|
 | Type | logo |
-| Status | placeholder |
+| Status | ready |
 | Route | global |
 | Section | Primary horizontal logo |
 | Ratio | 4:1 |
@@ -232,13 +232,13 @@ cropping.
 | | |
 |---|---|
 | Type | icon |
-| Status | placeholder |
+| Status | ready |
 | Route | global |
 | Section | Standalone square icon |
 | Ratio | 1:1 |
 | Dimensions | 512×512 |
 | Formats | SVG (inline component) |
-| Size target | ≤ 15 KB |
+| Size target | ≤ 60 KB (raster-embedded SVG) |
 | Background | transparent required |
 | Direction | Final DISC360 icon |
 | Replace | components/brand/BrandIcon.tsx (swap SVG internals once) |
@@ -248,7 +248,7 @@ cropping.
 | | |
 |---|---|
 | Type | logo |
-| Status | placeholder |
+| Status | ready |
 | Route | botanical/ink bands |
 | Section | Light-background variant |
 | Ratio | 4:1 |
@@ -264,7 +264,7 @@ cropping.
 | | |
 |---|---|
 | Type | logo |
-| Status | placeholder |
+| Status | ready |
 | Route | print/exports |
 | Section | Dark-on-light variant |
 | Ratio | 4:1 |
@@ -280,7 +280,7 @@ cropping.
 | | |
 |---|---|
 | Type | logo |
-| Status | placeholder |
+| Status | ready |
 | Route | embossing/partners |
 | Section | Monochrome variant |
 | Ratio | 4:1 |
@@ -296,7 +296,7 @@ cropping.
 | | |
 |---|---|
 | Type | icon |
-| Status | placeholder |
+| Status | ready |
 | Route | global (browser tab) |
 | Section | Favicon |
 | Ratio | 1:1 |
@@ -312,13 +312,13 @@ cropping.
 | | |
 |---|---|
 | Type | icon |
-| Status | placeholder |
+| Status | ready |
 | Route | PWA/mobile |
 | Section | App icon |
 | Ratio | 1:1 |
 | Dimensions | 1024×1024 |
 | Formats | PNG |
-| Size target | ≤ 150 KB |
+| Size target | ≤ 250 KB |
 | Direction | Final icon on solid ivory or botanical background |
 | Replace | public/brand/app-icon.png |
 
@@ -327,7 +327,7 @@ cropping.
 | | |
 |---|---|
 | Type | image |
-| Status | placeholder |
+| Status | ready |
 | Route | global (link sharing) |
 | Section | Social sharing image |
 | Ratio | 1.91:1 |

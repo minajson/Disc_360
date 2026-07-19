@@ -82,11 +82,9 @@ export function DiscSpectrumScene({ className }: { className?: string }) {
           ry={84}
           fill={`var(--color-disc-${node.dim.toLowerCase()}-soft)`}
           filter="url(#spectrum-soften)"
-          animate={
-            tier === "reduced"
-              ? undefined
-              : { cy: [node.y, node.y - 10, node.y], cx: [node.x, node.x + 6, node.x] }
-          }
+          // Animate transforms, not cx/cy: attribute animation briefly emits
+          // undefined on hydration (console errors on every page view).
+          animate={tier === "reduced" ? undefined : { y: [0, -10, 0], x: [0, 6, 0] }}
           transition={{
             duration: 9 + index * 1.4,
             repeat: Infinity,
@@ -117,11 +115,13 @@ export function DiscSpectrumScene({ className }: { className?: string }) {
             <motion.circle
               cx={node.x}
               cy={node.y}
+              r={10}
               fill={`var(--color-disc-${node.dim.toLowerCase()})`}
               stroke="var(--color-paper)"
               strokeWidth={3}
-              animate={{ r: active ? 15 : 10 }}
+              animate={{ scale: active ? 1.5 : 1 }}
               transition={{ duration: 0.25, ease: [0.32, 0.94, 0.6, 1] }}
+              style={{ transformOrigin: `${node.x}px ${node.y}px` }}
             />
             <text
               x={node.x + node.labelDx}

@@ -54,7 +54,7 @@ export const mediaRegistry: MediaEntry[] = [
     suggestedContent:
       "Diverse professional leadership team in conversation, warm natural light, subtle camera drift, no visible brand logos",
     replacementPath: "public/media/hero.webm + hero-poster.jpg → <HeroFilmPlaceholder src poster>",
-    status: "placeholder",
+    status: "ready",
     video: { duration: "10–20 s loop", autoplay: true, audio: false },
   },
   {
@@ -102,7 +102,7 @@ export const mediaRegistry: MediaEntry[] = [
     sizeTarget: "≤ 3 MB per file · poster ≤ 200 KB",
     suggestedContent: "Team retrospective conversation, candid workplace documentary style",
     replacementPath: "public/media/case-01.webm + case-01.jpg → <CaseStudyFilmPlaceholder src poster>",
-    status: "placeholder",
+    status: "ready",
     video: { duration: "20–40 s", autoplay: false, audio: false },
   },
   {
@@ -148,7 +148,7 @@ export const mediaRegistry: MediaEntry[] = [
     sizeTarget: "≤ 80 KB",
     suggestedContent: "Professional headshot of quoted customer (with permission)",
     replacementPath: "public/media/testimonial-01.webp → CaseStudiesSection quote figure",
-    status: "placeholder",
+    status: "ready",
   },
 
   /* ── product ───────────────────────────────────────────────────── */
@@ -229,7 +229,7 @@ export const mediaRegistry: MediaEntry[] = [
     status: "ready",
   },
 
-  /* ── brand identity (all TEMPORARY) ────────────────────────────── */
+  /* ── brand identity (production mark; derivatives via scripts/process-media.mjs) ── */
   {
     id: "MEDIA-BRAND-LOGO-01",
     type: "logo",
@@ -243,7 +243,7 @@ export const mediaRegistry: MediaEntry[] = [
     sizeTarget: "≤ 20 KB",
     suggestedContent: "Final DISC360 horizontal wordmark",
     replacementPath: "components/brand/BrandLogo.tsx (swap SVG internals once)",
-    status: "placeholder",
+    status: "ready",
     transparent: true,
   },
   {
@@ -256,10 +256,10 @@ export const mediaRegistry: MediaEntry[] = [
     dimensions: "512×512",
     ratio: "1:1",
     formats: "SVG (inline component)",
-    sizeTarget: "≤ 15 KB",
+    sizeTarget: "≤ 60 KB (raster-embedded SVG)",
     suggestedContent: "Final DISC360 icon",
     replacementPath: "components/brand/BrandIcon.tsx (swap SVG internals once)",
-    status: "placeholder",
+    status: "ready",
     transparent: true,
   },
   {
@@ -275,7 +275,7 @@ export const mediaRegistry: MediaEntry[] = [
     sizeTarget: "≤ 20 KB",
     suggestedContent: "Light (mineral) wordmark variant",
     replacementPath: "BrandLogo tone=\"light\"",
-    status: "placeholder",
+    status: "ready",
     transparent: true,
   },
   {
@@ -291,7 +291,7 @@ export const mediaRegistry: MediaEntry[] = [
     sizeTarget: "≤ 20 KB",
     suggestedContent: "Deep botanical wordmark variant",
     replacementPath: "BrandLogo tone=\"dark\"",
-    status: "placeholder",
+    status: "ready",
     transparent: true,
   },
   {
@@ -307,7 +307,7 @@ export const mediaRegistry: MediaEntry[] = [
     sizeTarget: "≤ 20 KB",
     suggestedContent: "Monochrome wordmark (currentColor)",
     replacementPath: "BrandLogo tone=\"mono\"",
-    status: "placeholder",
+    status: "ready",
     transparent: true,
   },
   {
@@ -323,7 +323,7 @@ export const mediaRegistry: MediaEntry[] = [
     sizeTarget: "≤ 10 KB",
     suggestedContent: "Final icon reduced for favicon",
     replacementPath: "public/brand/favicon.svg (+ app/icon route)",
-    status: "placeholder",
+    status: "ready",
     transparent: true,
   },
   {
@@ -336,10 +336,10 @@ export const mediaRegistry: MediaEntry[] = [
     dimensions: "1024×1024",
     ratio: "1:1",
     formats: "PNG",
-    sizeTarget: "≤ 150 KB",
+    sizeTarget: "≤ 250 KB",
     suggestedContent: "Final icon on solid ivory or botanical background",
     replacementPath: "public/brand/app-icon.png",
-    status: "placeholder",
+    status: "ready",
   },
   {
     id: "MEDIA-BRAND-SOCIAL-01",
@@ -354,7 +354,7 @@ export const mediaRegistry: MediaEntry[] = [
     sizeTarget: "≤ 300 KB",
     suggestedContent: "Brand card: wordmark + tagline on ivory with DISC spectrum accent",
     replacementPath: "public/brand/og-image.png (wired in app/layout metadata)",
-    status: "placeholder",
+    status: "ready",
   },
 ];
 
