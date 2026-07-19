@@ -14,6 +14,17 @@ const nextConfig: NextConfig = {
   // under `next dev` — production builds never include it — but demos are
   // sometimes run against the dev server, so it is disabled outright.
   devIndicators: false,
+  // The Vercel Toolbar injects for logged-in team members on deployments —
+  // never for visitors, but it must not appear while presenting either.
+  // x-vercel-skip-toolbar is Vercel's documented opt-out; sent on every route.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [{ key: "x-vercel-skip-toolbar", value: "1" }],
+      },
+    ];
+  },
   // Team logos are served from Supabase storage. Without the host allow-listed
   // here, any team WITH a logo would crash its layout's <Image> in production.
   images: {
