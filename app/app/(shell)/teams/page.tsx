@@ -17,7 +17,12 @@ interface TeamRow {
   } | null;
 }
 
-export default async function TeamsIndexPage() {
+export default async function TeamsIndexPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ denied?: string }>;
+}) {
+  const { denied } = await searchParams;
   const { supabase, user } = await requireOnboarded();
 
   const { data: memberships } = await supabase
@@ -31,6 +36,13 @@ export default async function TeamsIndexPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-5 py-12 sm:px-8">
+      {denied ? (
+        <p role="alert" className="rounded-xl bg-sand/60 px-4 py-3 text-sm text-ink">
+          {denied === "admin"
+            ? "You don't have admin access to that team. Ask the team's facilitator to promote you, or open one of your own teams below."
+            : "You're not a member of that team, so its pages aren't available to you."}
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-2">
           <Eyebrow>Teams</Eyebrow>

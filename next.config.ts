@@ -14,6 +14,24 @@ const nextConfig: NextConfig = {
   // under `next dev` — production builds never include it — but demos are
   // sometimes run against the dev server, so it is disabled outright.
   devIndicators: false,
+  // Team logos are served from Supabase storage. Without the host allow-listed
+  // here, any team WITH a logo would crash its layout's <Image> in production.
+  images: {
+    remotePatterns: [
+      ...(process.env.NEXT_PUBLIC_SUPABASE_URL
+        ? [
+            {
+              protocol: new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).protocol.replace(":", "") as
+                | "http"
+                | "https",
+              hostname: new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname,
+              port: new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).port,
+              pathname: "/storage/v1/object/public/**",
+            },
+          ]
+        : []),
+    ],
+  },
 };
 
 export default nextConfig;

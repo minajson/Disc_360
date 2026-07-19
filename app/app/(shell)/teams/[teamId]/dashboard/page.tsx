@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { requireTeamAdmin } from "@/lib/auth/guards";
+import { logRouteDiagnostic } from "@/lib/observability/diagnostics";
 import { getTeamRoster } from "@/lib/teams/roster";
 import { sendReminderToPending } from "@/lib/actions/teams";
 import { InviteParticipantsPanel } from "@/components/teams/InviteParticipantsPanel";
@@ -17,19 +19,34 @@ export default async function TeamDashboardPage({
   params: Promise<{ teamId: string }>;
 }) {
   const { teamId } = await params;
-  const { supabase } = await requireTeamAdmin(teamId);
+  const { supabase, user } = await requireTeamAdmin(teamId);
 
-  const [{ data: team }, roster] = await Promise.all([
+  const [{ data: team, error: teamError }, roster] = await Promise.all([
     supabase
       .from("teams")
       .select("name, team_code, invite_token, session_name, deadline_at, assessment_type")
       .eq("id", teamId)
-      .single(),
+      .maybeSingle(),
     getTeamRoster(teamId),
   ]);
 
+  if (teamError) {
+    logRouteDiagnostic({
+      route: "/app/teams/[teamId]/dashboard",
+      teamId,
+      userId: user.id,
+      step: "team-query",
+      code: teamError.code,
+      message: teamError.message,
+    });
+    throw new Error("TEAM_DASHBOARD_DATA");
+  }
+  // The guard passed, so the id is real for this admin — a null row here
+  // means the team was deleted/archived out from under the link.
+  if (!team) notFound();
+
   // Where "results" and "present results" point depends on the team's product.
-  const assessmentType = team?.assessment_type ?? "disc";
+  const assessmentType = team.assessment_type ?? "disc";
   const summaryHref =
     assessmentType === "focus"
       ? `/app/teams/${teamId}/focus`
@@ -40,7 +57,7 @@ export default async function TeamDashboardPage({
     assessmentType === "disc" ? "Export summary" : "Team summary";
 
   const base = getPublicBaseUrl();
-  const inviteLink = buildJoinUrl(base, team?.invite_token ?? "");
+  const inviteLink = buildJoinUrl(base, team.invite_token);
   const { metrics } = roster;
 
   const metricCards = [
@@ -55,7 +72,7 @@ export default async function TeamDashboardPage({
     <>
       <AutoRefresh />
 
-      {team?.session_name || team?.deadline_at ? (
+      {team.session_name || team.deadline_at ? (
         <p className="font-mono text-xs text-faint">
           {team.session_name ?? "Assessment session"}
           {team.deadline_at
@@ -76,8 +93,8 @@ export default async function TeamDashboardPage({
 
       {/* invite participants */}
       <InviteParticipantsPanel
-        teamName={team?.name ?? "Team"}
-        teamCode={team?.team_code ?? ""}
+        teamName={team.name}
+        teamCode={team.team_code}
         joinUrl={inviteLink}
         isLocal={base.isLocal}
       />

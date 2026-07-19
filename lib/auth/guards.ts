@@ -2,6 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/db/server";
+import { logRouteDiagnostic } from "@/lib/observability/diagnostics";
 
 export interface ProfileRow {
   id: string;
@@ -68,20 +69,45 @@ export async function requireOnboarded(): Promise<AuthContext> {
  */
 export async function requireTeamAdmin(teamId: string): Promise<AuthContext> {
   const context = await requireOnboarded();
-  const { data: isAdmin } = await context.supabase.rpc("is_team_admin", {
+  const { data: isAdmin, error } = await context.supabase.rpc("is_team_admin", {
     team: teamId,
   });
-  if (!isAdmin) redirect("/app/teams");
+  if (error) {
+    // An RPC failure is a database problem, not "not an admin" — record it so
+    // an infrastructure fault never masquerades as an authorization decision.
+    logRouteDiagnostic({
+      route: "guard:requireTeamAdmin",
+      teamId,
+      userId: context.user.id,
+      step: "is_team_admin-rpc",
+      code: error.code,
+      message: error.message,
+    });
+  }
+  // A member without admin rights gets a visible denied state on the teams
+  // list rather than a silent bounce.
+  if (!isAdmin) redirect("/app/teams?denied=admin");
   return context;
 }
 
 /** Team member OR admin scope. */
 export async function requireTeamAccess(teamId: string): Promise<AuthContext> {
   const context = await requireOnboarded();
-  const [{ data: isMember }, { data: isAdmin }] = await Promise.all([
+  const [memberRes, adminRes] = await Promise.all([
     context.supabase.rpc("is_team_member", { team: teamId }),
     context.supabase.rpc("is_team_admin", { team: teamId }),
   ]);
-  if (!isMember && !isAdmin) redirect("/app/teams");
+  const rpcError = memberRes.error ?? adminRes.error;
+  if (rpcError) {
+    logRouteDiagnostic({
+      route: "guard:requireTeamAccess",
+      teamId,
+      userId: context.user.id,
+      step: "membership-rpc",
+      code: rpcError.code,
+      message: rpcError.message,
+    });
+  }
+  if (!memberRes.data && !adminRes.data) redirect("/app/teams?denied=member");
   return context;
 }
