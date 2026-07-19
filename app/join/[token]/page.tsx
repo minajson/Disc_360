@@ -53,7 +53,7 @@ export default async function JoinTokenPage({
 
   if (!context || context.blocked) {
     return (
-      <JoinShell>
+      <JoinShell token={token}>
         <div className="paper-card mx-auto flex w-full max-w-md flex-col items-center gap-5 p-10 text-center">
           <h1 className="font-display text-h3 font-semibold">
             This link can&rsquo;t be used
@@ -71,7 +71,7 @@ export default async function JoinTokenPage({
   const cover = mediaUrl(context.coverPath);
 
   return (
-    <JoinShell>
+    <JoinShell token={token}>
       <div className="mx-auto grid w-full max-w-5xl gap-10 lg:grid-cols-[1fr_0.95fr] lg:items-start">
         {/* team identity */}
         <div className="flex flex-col gap-6">
@@ -121,12 +121,16 @@ export default async function JoinTokenPage({
   );
 }
 
-function JoinShell({ children }: { children: React.ReactNode }) {
+function JoinShell({ token, children }: { token?: string; children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="mx-auto flex h-[72px] w-full max-w-6xl items-center justify-between px-5 sm:px-8">
         <BrandLogo />
-        <Link href="/sign-in" className="text-sm text-slate hover:text-ink">
+        {/* The pending invitation must survive sign-in (incl. Google OAuth). */}
+        <Link
+          href={token ? `/sign-in?next=/join/${token}` : "/sign-in"}
+          className="text-sm text-slate hover:text-ink"
+        >
           Have an account? Sign in
         </Link>
       </header>

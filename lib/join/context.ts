@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
-import { createSupabaseAdminClient } from "@/lib/db/admin";
+import { createSupabaseAnonClient } from "@/lib/db/anon";
+import { logRouteDiagnostic } from "@/lib/observability/diagnostics";
 
 export interface JoinContext {
   teamId: string;
@@ -17,73 +18,60 @@ export interface JoinContext {
   blocked: string | null;
 }
 
+/** State → participant-facing message. Each failure mode reads differently. */
+export const JOIN_STATE_MESSAGES: Record<string, string> = {
+  revoked: "This invitation was revoked by the team administrator.",
+  expired: "This invitation has expired — ask your administrator to resend it.",
+  team_inactive: "This team is no longer active.",
+  join_disabled: "Joining is currently disabled for this team.",
+  service_failure:
+    "We couldn't check this invitation just now. Please try again in a moment.",
+};
+
 /**
  * Resolves a join token (team invite link OR personal invitation) into the
- * public-safe context for the join page. Service role justified: the token
- * is the authorization; nothing member- or result-related is returned.
+ * public-safe context for the join page — via the resolve_join_token
+ * SECURITY DEFINER RPC on the ANON client. The token is the authorization;
+ * the RPC validates existence, expiry, revocation and team status inside the
+ * database and exposes nothing member- or result-related. No service-role
+ * dependency: a misconfigured admin key can no longer break public joining.
  */
 export async function getJoinContext(token: string): Promise<JoinContext | null> {
   if (!z.uuid().safeParse(token).success) return null;
-  const admin = createSupabaseAdminClient();
+  const anon = createSupabaseAnonClient();
 
-  let invitedEmail: string | null = null;
-
-  let { data: team } = await admin
-    .from("teams")
-    .select(
-      "id, name, session_name, client_organization, cover_path, deadline_at, join_enabled, archived_at, created_by, organizations (name)",
-    )
-    .eq("invite_token", token)
-    .maybeSingle();
-
-  if (!team) {
-    const { data: invitation } = await admin
-      .from("invitations")
-      .select("email, status, expires_at, teams (id, name, session_name, client_organization, cover_path, deadline_at, join_enabled, archived_at, created_by, organizations (name))")
-      .eq("token", token)
-      .maybeSingle();
-    if (!invitation) return null;
-    if (invitation.status === "revoked") {
-      return blockedContext("This invitation was revoked by the team administrator.");
-    }
-    if (invitation.status === "pending" && new Date(invitation.expires_at) < new Date()) {
-      return blockedContext("This invitation has expired — ask your administrator to resend it.");
-    }
-    invitedEmail = invitation.email;
-    team = Array.isArray(invitation.teams) ? invitation.teams[0] : invitation.teams;
-    if (!team) return null;
+  const { data, error } = await anon.rpc("resolve_join_token", { p_token: token });
+  if (error) {
+    // Temporary data-service failure — distinguish it from a bad link.
+    logRouteDiagnostic({
+      route: "/join/[token]",
+      step: "resolve_join_token-rpc",
+      code: error.code,
+      message: error.message,
+    });
+    return blockedContext(JOIN_STATE_MESSAGES.service_failure!);
   }
 
-  const organization = Array.isArray(team.organizations)
-    ? team.organizations[0]
-    : team.organizations;
-
-  let blocked: string | null = null;
-  if (team.archived_at) blocked = "This team is no longer active.";
-  else if (!team.join_enabled) blocked = "Joining is currently disabled for this team.";
-
-  // Presenter identity (team creator's coach profile, when present).
-  const [{ data: creatorProfile }, { data: coachProfile }] = await Promise.all([
-    admin.from("profiles").select("full_name").eq("id", team.created_by).maybeSingle(),
-    admin
-      .from("coach_profiles")
-      .select("title")
-      .eq("profile_id", team.created_by)
-      .maybeSingle(),
-  ]);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || row.state === "not_found") return null;
+  if (row.state !== "ok") {
+    return blockedContext(
+      JOIN_STATE_MESSAGES[row.state] ?? JOIN_STATE_MESSAGES.service_failure!,
+    );
+  }
 
   return {
-    teamId: team.id,
-    teamName: team.name,
-    organizationName: organization?.name ?? null,
-    sessionName: team.session_name,
-    clientOrganization: team.client_organization,
-    coverPath: team.cover_path,
-    deadlineAt: team.deadline_at,
-    presenterName: creatorProfile?.full_name ?? null,
-    presenterTitle: coachProfile?.title ?? null,
-    invitedEmail,
-    blocked,
+    teamId: row.team_id!,
+    teamName: row.team_name!,
+    organizationName: row.organization_name,
+    sessionName: row.session_name,
+    clientOrganization: row.client_organization,
+    coverPath: row.cover_path,
+    deadlineAt: row.deadline_at,
+    presenterName: row.presenter_name,
+    presenterTitle: row.presenter_title,
+    invitedEmail: row.invited_email,
+    blocked: null,
   };
 }
 

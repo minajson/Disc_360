@@ -2,7 +2,10 @@
 
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
+import { redirect } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/db/admin";
+import { createSupabaseAnonClient } from "@/lib/db/anon";
+import { logRouteDiagnostic } from "@/lib/observability/diagnostics";
 
 export interface AcceptResult {
   ok: boolean;
@@ -96,24 +99,55 @@ export async function acceptInvitationToken(token: string): Promise<AcceptResult
 }
 
 /**
- * Join via the short human team code (e.g. ATLAS-1002).
- * Service role justified as above — the code is the authorization.
+ * Join via the short human team code (e.g. ATLAS-1002). Resolution runs
+ * through the resolve_team_code SECURITY DEFINER RPC on the anon client —
+ * the code is the authorization, normalization (trim + case) happens in the
+ * database, and every failure mode reads differently to the participant.
  */
 export async function acceptTeamCode(code: string): Promise<AcceptResult> {
   const normalized = code.trim().toUpperCase();
   if (normalized.length < 4 || normalized.length > 24) {
     return { ok: false, error: "That doesn't look like a team code." };
   }
-  const admin = createSupabaseAdminClient();
-  const { data: team } = await admin
-    .from("teams")
-    .select("invite_token")
-    .eq("team_code", normalized)
-    .maybeSingle();
-  if (!team) {
+  const anon = createSupabaseAnonClient();
+  const { data, error } = await anon.rpc("resolve_team_code", { p_code: code });
+  if (error) {
+    logRouteDiagnostic({
+      route: "action:acceptTeamCode",
+      step: "resolve_team_code-rpc",
+      code: error.code,
+      message: error.message,
+    });
+    return {
+      ok: false,
+      error: "We couldn't check that code just now. Please try again in a moment.",
+    };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || row.state === "not_found") {
     return { ok: false, error: "That team code doesn't match an active team." };
   }
-  return acceptTeamLink(team.invite_token);
+  if (row.state === "team_inactive") {
+    return { ok: false, error: "That team is no longer active." };
+  }
+  if (row.state === "join_disabled") {
+    return { ok: false, error: "Joining is currently disabled for that team." };
+  }
+  return acceptTeamLink(row.invite_token!);
+}
+
+/**
+ * Form-facing wrapper: joins by code and NAVIGATES server-side on success.
+ * A server-action redirect is the reliable way to land on the team page —
+ * client-side router.push after an action's returned value proved droppable.
+ * Failures return normally so the form can show the distinguished message.
+ */
+export async function joinTeamByCode(code: string): Promise<AcceptResult> {
+  const result = await acceptTeamCode(code);
+  if (result.ok && result.teamId) {
+    redirect(`/app/teams/${result.teamId}`);
+  }
+  return result;
 }
 
 /**

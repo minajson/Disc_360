@@ -1,29 +1,26 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/auth/fields";
-import { acceptTeamCode } from "@/lib/actions/invitations";
+import { joinTeamByCode } from "@/lib/actions/invitations";
 
 export function JoinByCodeForm() {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  // On success the action redirects server-side (the reliable navigation
+  // path for server actions); only failures return here.
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+    setPending(true);
     const code = String(new FormData(event.currentTarget).get("team_code") ?? "");
-    startTransition(async () => {
-      const result = await acceptTeamCode(code);
-      if (result.ok && result.teamId) {
-        router.push(`/app/teams/${result.teamId}`);
-        router.refresh();
-      } else {
-        setError(result.error ?? "Could not join with that code.");
-      }
-    });
+    const result = await joinTeamByCode(code);
+    if (!result.ok) {
+      setError(result.error ?? "Could not join with that code.");
+      setPending(false);
+    }
   };
 
   return (

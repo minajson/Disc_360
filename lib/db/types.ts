@@ -1572,6 +1572,30 @@ export type Database = {
       is_super_admin: { Args: never; Returns: boolean }
       is_team_admin: { Args: { team: string }; Returns: boolean }
       is_team_member: { Args: { team: string }; Returns: boolean }
+      resolve_join_token: {
+        Args: { p_token: string }
+        Returns: {
+          client_organization: string
+          cover_path: string
+          deadline_at: string
+          invited_email: string
+          organization_name: string
+          presenter_name: string
+          presenter_title: string
+          session_name: string
+          state: string
+          team_id: string
+          team_name: string
+        }[]
+      }
+      resolve_team_code: {
+        Args: { p_code: string }
+        Returns: {
+          invite_token: string
+          state: string
+          team_name: string
+        }[]
+      }
     }
     Enums: {
       archetype_code:
