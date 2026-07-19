@@ -3,7 +3,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
 import { dimensionMeta } from "@/data/dimension-meta";
-import { arcPath, curvedConnector, polarPoint } from "@/lib/visuals/geometry";
+import { arcPath, curvedConnector, polarPoint, wrapLabel } from "@/lib/visuals/geometry";
 import { DIMENSION_KEY, DIMENSIONS, type Dimension, type DiscScores } from "@/lib/types";
 import type { FocusScores } from "@/lib/scoring/focus";
 import type { DistractionFactor } from "@/lib/visuals/focus-factors";
@@ -46,23 +46,6 @@ const GAUGE_SWEEP_MAX = 150;
 /* outer pull layer */
 const ORBIT_R = 190;
 const TRIGGER_ANGLES = [-45, 115, 175];
-
-function wrapLabel(label: string): string[] {
-  const words = label.split(" ");
-  if (label.length <= 13 || words.length === 1) return [label];
-  let line = "";
-  const lines: string[] = [];
-  for (const word of words) {
-    if ((line + " " + word).trim().length > 13 && line) {
-      lines.push(line.trim());
-      line = word;
-    } else {
-      line = (line + " " + word).trim();
-    }
-  }
-  if (line) lines.push(line);
-  return lines.slice(0, 2);
-}
 
 export interface FusionDiscData {
   scores: DiscScores;

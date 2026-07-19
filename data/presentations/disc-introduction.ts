@@ -45,7 +45,7 @@ const slides: PresentationSlide[] = [
     eyebrow: "Four preferences",
     title: "Four ways of showing up",
     body: "No dimension is better than another — each describes a different, valuable preference.",
-    visualType: "fourDimensions",
+    visualType: "compass",
     dimensions: [
       { code: "D", label: "Direct and decisive" },
       { code: "I", label: "Expressive and engaging" },
@@ -102,7 +102,7 @@ const slides: PresentationSlide[] = [
     eyebrow: "Blends",
     title: "People are not one letter",
     body: "Most people show a combination of behavioural preferences. Context, role and pressure can change how those preferences appear.",
-    visualType: "chart",
+    visualType: "compass",
     dimensions: [
       { code: "D", label: "Dominant", note: "72" },
       { code: "I", label: "Influence", note: "48" },

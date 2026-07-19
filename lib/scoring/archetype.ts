@@ -24,7 +24,8 @@ export const BALANCED_SPREAD = 12;
 export const PURE_GAP = 15;
 export const DIAGONAL_WINDOW = 8;
 
-const OPPOSITE: Record<Dimension, Dimension> = {
+/** Behavioural opposites — D↔S and I↔C never pair in an archetype. */
+export const OPPOSITE: Record<Dimension, Dimension> = {
   D: "S",
   S: "D",
   I: "C",

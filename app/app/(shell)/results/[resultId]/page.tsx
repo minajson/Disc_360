@@ -9,6 +9,7 @@ import { Eyebrow } from "@/components/ui/Eyebrow";
 import { DimensionMark } from "@/components/ui/DimensionMark";
 import { ExpandableSection } from "@/components/ui/ExpandableSection";
 import { ReportActionBar } from "@/components/report/ReportActionBar";
+import { ProfileExplanation } from "@/components/report/ProfileExplanation";
 import { BehaviourCompass } from "@/components/visualisations/disc/BehaviourCompass";
 import { DimensionBarChart } from "@/components/charts/DimensionBarChart";
 import {
@@ -66,7 +67,7 @@ export default async function ResultPage({
   const { data: result } = await supabase
     .from("assessment_results")
     .select(
-      "id, share_token, score_d, score_i, score_s, score_c, archetype_code, primary_dimension, secondary_dimension, created_at, result_insights (insight_snapshot)",
+      "id, share_token, score_d, score_i, score_s, score_c, archetype_code, primary_dimension, secondary_dimension, raw_most, raw_least, net, created_at, result_insights (insight_snapshot)",
     )
     .eq("id", resultId)
     .maybeSingle();
@@ -129,6 +130,19 @@ export default async function ResultPage({
           <CommunicationPreferenceChart scores={scores} />
         </div>
       </div>
+
+      {/* full scoring transparency — the WHY behind the profile */}
+      <Section title="Why this profile">
+        <ProfileExplanation
+          rawMost={result.raw_most as unknown as DiscScores}
+          rawLeast={result.raw_least as unknown as DiscScores}
+          net={result.net as unknown as DiscScores}
+          normalized={scores}
+          primary={primary}
+          secondary={secondary}
+          archetypeCode={code}
+        />
+      </Section>
 
       <div id="report-sections" className="flex scroll-mt-28 flex-col gap-4">
         <Section title="Strengths">

@@ -31,7 +31,7 @@ const slides: PresentationSlide[] = [
     eyebrow: "The resource",
     title: "Attention is a limited resource",
     body: "Modern work asks the brain to switch constantly between messages, meetings, tasks and notifications.",
-    visualType: "spectrum",
+    visualType: "ripple",
     words: ["Messages", "Meetings", "Tasks", "Notifications", "Deadlines", "Context switches"],
     facilitatorPrompt: "One clear signal, many interruptions. Let the surrounding noise feel busy but calm.",
     audienceQuestion: "How many times a day do you think you switch context?",
@@ -45,7 +45,7 @@ const slides: PresentationSlide[] = [
     eyebrow: "Before we decide",
     title: "The autopilot loop",
     body: "Some digital behaviours happen before we consciously decide to act.",
-    visualType: "timeline",
+    visualType: "cycle",
     steps: [
       { label: "Cue" },
       { label: "Check" },
@@ -77,7 +77,7 @@ const slides: PresentationSlide[] = [
     section: "The cost of a check",
     eyebrow: "Recovery",
     title: "A two-second check can create a much longer recovery",
-    visualType: "timeline",
+    visualType: "recoveryCurve",
     steps: [
       { label: "Focused" },
       { label: "Interrupted" },

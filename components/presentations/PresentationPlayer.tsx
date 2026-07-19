@@ -30,6 +30,8 @@ interface QrConfig {
   joinUrl: string;
   isLocal: boolean;
   teamCode?: string;
+  /** Shown above "Scan to begin" — usually the team name. */
+  label?: string;
 }
 
 export interface PresentationPlayerProps {
@@ -78,6 +80,9 @@ export function PresentationPlayer({
   const [showNotes, setShowNotes] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Fullscreen chrome auto-hides after inactivity, reappears on any activity.
+  const [chromeHidden, setChromeHidden] = useState(false);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pending, startTransition] = useTransition();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -117,10 +122,40 @@ export function PresentationPlayer({
   }, []);
 
   useEffect(() => {
-    const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    const onFsChange = () => {
+      const fullscreen = Boolean(document.fullscreenElement);
+      setIsFullscreen(fullscreen);
+      // Leaving fullscreen always restores the chrome (event callback, so no
+      // synchronous set-state-in-effect).
+      if (!fullscreen) setChromeHidden(false);
+    };
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
+
+  // Auto-hide chrome in fullscreen after 3s of inactivity; any pointer, touch
+  // or key activity brings it back. Outside fullscreen the chrome is fixed.
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const schedule = () => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      hideTimer.current = setTimeout(() => setChromeHidden(true), 3000);
+    };
+    const poke = () => {
+      setChromeHidden(false);
+      schedule();
+    };
+    schedule();
+    window.addEventListener("pointermove", poke);
+    window.addEventListener("touchstart", poke);
+    window.addEventListener("keydown", poke);
+    return () => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      window.removeEventListener("pointermove", poke);
+      window.removeEventListener("touchstart", poke);
+      window.removeEventListener("keydown", poke);
+    };
+  }, [isFullscreen]);
 
   // Keyboard: arrows / space / escape / n (notes) / f (fullscreen) / q (QR).
   useEffect(() => {
@@ -168,7 +203,10 @@ export function PresentationPlayer({
     <div
       ref={containerRef}
       data-testid="deck-root"
-      className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-canvas"
+      className={cn(
+        "relative flex h-dvh w-full flex-col overflow-hidden bg-canvas",
+        isFullscreen && "pres-fullscreen",
+      )}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
@@ -182,9 +220,16 @@ export function PresentationPlayer({
         />
       </div>
 
-      {/* top bar */}
-      <header className="relative z-20 flex items-center justify-between px-[clamp(1rem,3vw,2.5rem)] py-3">
-        <span className="font-mono text-xs text-faint">{deck.title}</span>
+      {/* top bar — overlays and auto-hides in fullscreen */}
+      <header
+        className={cn(
+          "z-20 flex flex-wrap items-center justify-between gap-y-1 px-[clamp(1rem,3vw,2.5rem)] py-3 pt-[max(0.75rem,env(safe-area-inset-top))] transition-opacity duration-300",
+          isFullscreen ? "absolute inset-x-0 top-0 bg-gradient-to-b from-canvas/95 to-transparent" : "relative",
+          isFullscreen && chromeHidden && "pointer-events-none opacity-0",
+        )}
+        aria-hidden={isFullscreen && chromeHidden ? true : undefined}
+      >
+        <span className="min-w-0 truncate font-mono text-xs text-faint">{deck.title}</span>
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs tabular-nums text-slate" aria-live="polite">
             {index + 1} / {total}
@@ -216,15 +261,15 @@ export function PresentationPlayer({
         </div>
       </header>
 
-      {/* stage */}
-      <div className="relative z-10 min-h-0 flex-1">
+      {/* stage → 16:9 canvas in landscape, scrollable column on phones */}
+      <div className="pres-stage relative z-10 min-h-0 flex-1">
         <motion.div
           key={slide.id}
           variants={st.variants}
           initial="hidden"
           animate="visible"
           transition={st.transition}
-          className="h-full w-full"
+          className="pres-canvas"
         >
           <SlideVisual slide={slide} reduced={reduced}>
             {slide.visualType === "closing" ? (
@@ -256,8 +301,15 @@ export function PresentationPlayer({
         </motion.div>
       </div>
 
-      {/* bottom controls */}
-      <footer className="relative z-20 flex items-center justify-between gap-3 px-[clamp(1rem,3vw,2.5rem)] py-4">
+      {/* bottom controls — overlay and auto-hide in fullscreen */}
+      <footer
+        className={cn(
+          "z-20 flex items-center justify-between gap-3 px-[clamp(1rem,3vw,2.5rem)] py-4 pb-[max(1rem,env(safe-area-inset-bottom))] transition-opacity duration-300",
+          isFullscreen ? "absolute inset-x-0 bottom-0 bg-gradient-to-t from-canvas/95 to-transparent" : "relative",
+          isFullscreen && chromeHidden && "pointer-events-none opacity-0",
+        )}
+        aria-hidden={isFullscreen && chromeHidden ? true : undefined}
+      >
         <div className="flex items-center gap-2">
           <button type="button" onClick={goPrev} disabled={index === 0} aria-label="Previous slide" className={ctrlBtn}>
             <Chevron dir="left" />
@@ -350,24 +402,49 @@ export function PresentationPlayer({
         </aside>
       ) : null}
 
-      {/* participant join QR overlay (team sessions) */}
+      {/* participant join QR overlay (team sessions) — sized to read from the
+          back of a room, white quiet zone, readable fallback URL */}
       {qr && showQr ? (
         <div
           role="dialog"
-          aria-label="Participant join QR"
-          className="absolute inset-0 z-40 flex items-center justify-center bg-ink/50 p-6"
+          aria-label="Scan to begin"
+          className="absolute inset-0 z-40 grid place-items-center bg-ink/60 p-4"
           onClick={() => setShowQr(false)}
         >
-          <div className="paper-card flex flex-col items-center gap-4 p-8" onClick={(e) => e.stopPropagation()}>
-            <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-teal">Scan to join</span>
-            <QRCodeSVG value={qr.joinUrl} size={280} fgColor="#17201D" bgColor="#FFFFFF" marginSize={1} />
-            {qr.teamCode ? (
-              <span className="font-mono text-sm text-slate">
-                or team code <span className="font-semibold text-ink">{qr.teamCode}</span>
+          <div
+            className="paper-card flex max-h-[94dvh] w-[min(94vw,36rem)] flex-col items-center gap-[clamp(0.6rem,1.8vh,1.1rem)] overflow-y-auto p-[clamp(1.25rem,3.5vh,2.25rem)] text-center"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {qr.label ? (
+              <span className="font-mono text-[clamp(0.7rem,1.6vh,0.85rem)] uppercase tracking-[0.22em] text-teal">
+                {qr.label}
               </span>
             ) : null}
+            <h2 className="font-display text-[clamp(1.5rem,4.2vh,2.6rem)] font-semibold leading-tight text-ink">
+              Scan to begin
+            </h2>
+            <div className="w-[min(74vw,52dvh)] rounded-2xl border border-hairline bg-white p-[clamp(0.85rem,2.2vh,1.5rem)]">
+              <QRCodeSVG
+                value={qr.joinUrl}
+                size={512}
+                fgColor="#17201D"
+                bgColor="#FFFFFF"
+                marginSize={0}
+                className="h-auto w-full"
+                role="img"
+                aria-label="QR code linking to the assessment join page"
+              />
+            </div>
+            <p className="max-w-full break-all font-mono text-[clamp(0.85rem,2vh,1.1rem)] text-slate">
+              {qr.joinUrl.replace(/^https?:\/\//, "")}
+            </p>
+            {qr.teamCode ? (
+              <p className="text-[clamp(0.85rem,2vh,1.05rem)] text-slate">
+                or enter code <span className="font-mono font-semibold text-ink">{qr.teamCode}</span>
+              </p>
+            ) : null}
             {qr.isLocal ? (
-              <p role="alert" className="max-w-xs rounded-xl bg-disc-i-soft px-4 py-2.5 text-center text-xs leading-relaxed text-disc-i">
+              <p role="alert" className="max-w-sm rounded-xl bg-disc-i-soft px-4 py-2.5 text-center text-xs leading-relaxed text-disc-i">
                 Local development only — this QR cannot be opened from another device until a public URL is configured.
               </p>
             ) : null}

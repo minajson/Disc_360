@@ -13,27 +13,35 @@ import { DIMENSION_KEY, DIMENSIONS, type Dimension, type DiscScores } from "@/li
  * whose outward reach grows with each dimension's score, a needle pointing at
  * the weighted blend of all four, and a hub carrying the primary style. The
  * blend needle is what makes mixed profiles legible at a glance — DI points
- * between Dominant and Influence, a balanced profile shows a calm ring
- * instead of a needle.
+ * between Dominant and Influence; a balanced profile shows a calm ring and a
+ * BALANCED badge instead of a needle.
  *
- * ViewBox-based SVG: scales fluidly from a 300px card to a projected slide
- * with no fixed pixel canvas. All motion collapses under reduced-motion.
+ * Typography discipline: the hub never stacks free-floating text. The primary
+ * letter is the only baseline-positioned glyph; secondary/balanced states are
+ * rect-backed pill badges with explicit geometry, so nothing can collide on
+ * any browser's baseline metrics. ViewBox-based SVG throughout — crisp at
+ * card, retina and projector scale. All motion collapses under reduced-motion.
+ *
+ * `variant="concept"` renders the neutral instructional form used on the
+ * introduction decks: four equal segments, no needle, no personal data.
  */
 
 const VB = 440;
 const C = VB / 2;
 const INNER_R = 88;
-/** Band thickness range — the score-driven "petal" reach. */
 const BAND_MIN = 22;
 const BAND_MAX = 74;
 /** Quadrant centre angles: D north-east, I south-east, S south-west, A north-west. */
 const QUADRANT_ANGLE: Record<Dimension, number> = { D: -45, I: 45, S: 135, C: -135 };
-const QUADRANT_SWEEP = 78; // per segment, leaving 12° breathing gaps
+const QUADRANT_SWEEP = 78;
+const HUB_R = 54;
 
 interface BehaviourCompassProps {
   scores: DiscScores;
   primary: Dimension;
   secondary?: Dimension | null;
+  /** "concept": the deck's neutral form — equal bands, no needle, no data. */
+  variant?: "profile" | "concept";
   /** Show the numeric score under each label. */
   showScores?: boolean;
   className?: string;
@@ -43,13 +51,15 @@ export function BehaviourCompass({
   scores,
   primary,
   secondary = null,
+  variant = "profile",
   showScores = true,
   className,
 }: BehaviourCompassProps) {
   const reduced = useReducedMotion() ?? false;
+  const concept = variant === "concept";
 
   const bandFor = (dim: Dimension) => {
-    const score = scores[DIMENSION_KEY[dim]];
+    const score = concept ? 55 : scores[DIMENSION_KEY[dim]];
     const thickness = BAND_MIN + (score / 100) * (BAND_MAX - BAND_MIN);
     return { score, thickness, rMid: INNER_R + thickness / 2 };
   };
@@ -60,7 +70,18 @@ export function BehaviourCompass({
       weight: scores[DIMENSION_KEY[dim]],
     })),
   );
-  const balanced = blend.magnitude < 8;
+  const balanced = !concept && blend.magnitude < 8;
+  const showNeedle = !concept && !balanced;
+
+  const bandOpacity = (dim: Dimension) => {
+    if (concept) return 0.82;
+    // A balanced profile weights all four equally — a single saturated band
+    // would visually contradict the BALANCED reading.
+    if (balanced) return 0.6;
+    if (dim === primary) return 0.95;
+    if (dim === secondary) return 0.58;
+    return 0.24;
+  };
 
   const needlePath = () => {
     const a = blend.angleDeg;
@@ -71,20 +92,34 @@ export function BehaviourCompass({
     return `M ${tip.x} ${tip.y} L ${right.x} ${right.y} L ${tail.x} ${tail.y} L ${left.x} ${left.y} Z`;
   };
 
-  const summary = DIMENSIONS.map(
-    (dim) => `${dimensionMeta[dim].label} ${scores[DIMENSION_KEY[dim]]}`,
-  ).join(", ");
+  // Hub badge (secondary style, or BALANCED) — a measured pill, never stacked
+  // text, so baseline metrics can't produce overlap on any renderer.
+  const badgeText = balanced ? "BALANCED" : secondary ? `+ ${dimensionMeta[secondary].displayCode}` : null;
+  const showHubLetter = !balanced;
+  const badgeColor = balanced
+    ? "var(--color-teal)"
+    : secondary
+      ? `var(--color-${dimensionMeta[secondary].colorVar})`
+      : "";
+  const badgeWidth = badgeText ? badgeText.length * 7 + 18 : 0;
+  const badgeCy = balanced ? C : C + 30;
+  // The primary letter sits higher when a badge shares the hub.
+  const letterBaselineY = badgeText ? C + 6 : C + 16;
+
+  const summary = concept
+    ? `Behaviour compass showing the four DISC dimensions: ${DIMENSIONS.map((d) => dimensionMeta[d].label).join(", ")}.`
+    : `Behaviour compass. ${DIMENSIONS.map((dim) => `${dimensionMeta[dim].label} ${scores[DIMENSION_KEY[dim]]}`).join(", ")}. Primary style ${dimensionMeta[primary].label}${secondary ? `, secondary ${dimensionMeta[secondary].label}` : balanced ? ", balanced profile" : ""}.`;
 
   return (
     <svg
       viewBox={`0 0 ${VB} ${VB}`}
       role="img"
-      aria-label={`Behaviour compass. ${summary}. Primary style ${dimensionMeta[primary].label}${secondary ? `, secondary ${dimensionMeta[secondary].label}` : ""}.`}
+      aria-label={summary}
       className={cn("h-auto w-full", className)}
     >
       <title>Behaviour Compass</title>
 
-      {/* orientation ring — a quiet dotted track behind everything */}
+      {/* orientation ring */}
       <circle
         cx={C}
         cy={C}
@@ -100,9 +135,7 @@ export function BehaviourCompass({
       {DIMENSIONS.map((dim, index) => {
         const { thickness, rMid } = bandFor(dim);
         const centre = QUADRANT_ANGLE[dim];
-        const isPrimary = dim === primary;
-        const isSecondary = dim === secondary;
-        const opacity = isPrimary ? 0.95 : isSecondary ? 0.58 : 0.24;
+        const opacity = bandOpacity(dim);
         return (
           <motion.path
             key={dim}
@@ -135,9 +168,8 @@ export function BehaviourCompass({
             />
             <text
               x={pos.x}
-              y={pos.y}
+              y={pos.y + 5.5}
               textAnchor="middle"
-              dominantBaseline="central"
               fontSize={15}
               fontWeight={600}
               fill="var(--color-mineral)"
@@ -148,7 +180,7 @@ export function BehaviourCompass({
         );
       })}
 
-      {/* quadrant labels — inside the viewBox, never clipped */}
+      {/* quadrant labels */}
       {DIMENSIONS.map((dim) => {
         const pos = polarPoint(C, C, INNER_R + BAND_MAX + 32, QUADRANT_ANGLE[dim]);
         const { score } = bandFor(dim);
@@ -156,19 +188,18 @@ export function BehaviourCompass({
           <text
             key={`label-${dim}`}
             x={pos.x}
-            y={pos.y}
+            y={pos.y + 6}
             textAnchor="middle"
-            dominantBaseline="central"
             fontSize={19}
             fontWeight={600}
             fill="var(--color-ink)"
           >
             {dimensionMeta[dim].label}
-            {showScores ? (
+            {!concept && showScores ? (
               <tspan
                 x={pos.x}
-                dy={22}
-                fontSize={15}
+                dy={21}
+                fontSize={14}
                 fontWeight={400}
                 fill="var(--color-slate)"
                 style={{ fontFamily: "var(--font-mono)" }}
@@ -180,19 +211,20 @@ export function BehaviourCompass({
         );
       })}
 
-      {/* blend needle, or the balance ring for even profiles */}
+      {/* blend needle, or the balance ring */}
       {balanced ? (
         <circle
           cx={C}
           cy={C}
-          r={INNER_R - 22}
+          r={INNER_R - 20}
           fill="none"
           stroke="var(--color-teal)"
           strokeWidth={2.5}
           strokeDasharray="3 8"
           strokeLinecap="round"
         />
-      ) : (
+      ) : null}
+      {showNeedle ? (
         <motion.path
           d={needlePath()}
           fill="var(--color-botanical-deep)"
@@ -201,55 +233,82 @@ export function BehaviourCompass({
           transition={{ type: "spring", stiffness: 60, damping: 12, delay: reduced ? 0 : 0.35 }}
           style={{ transformOrigin: `${C}px ${C}px` }}
         />
-      )}
+      ) : null}
 
       {/* hub */}
       <circle
         cx={C}
         cy={C}
-        r={56}
+        r={HUB_R}
         fill="var(--color-paper)"
         stroke="var(--color-hairline)"
         strokeWidth={1.5}
       />
-      <text
-        x={C}
-        y={secondary || balanced ? C - 8 : C}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize={44}
-        fontWeight={600}
-        fill={`var(--color-${dimensionMeta[primary].colorVar})`}
-        style={{ fontFamily: "var(--font-display)" }}
-      >
-        {dimensionMeta[primary].displayCode}
-      </text>
-      {secondary ? (
-        <text
-          x={C}
-          y={C + 26}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize={16}
-          fill="var(--color-slate)"
-          style={{ fontFamily: "var(--font-mono)" }}
-        >
-          + {dimensionMeta[secondary].displayCode}
-        </text>
-      ) : null}
-      {balanced ? (
-        <text
-          x={C}
-          y={C + 26}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fontSize={13}
-          fill="var(--color-teal)"
-          style={{ fontFamily: "var(--font-mono)", letterSpacing: "0.12em" }}
-        >
-          BALANCED
-        </text>
-      ) : null}
+
+      {concept ? (
+        // Concept hub: the four display letters as a neutral 2×2 mark.
+        <g style={{ fontFamily: "var(--font-display)" }}>
+          {DIMENSIONS.map((dim) => {
+            const dx = dim === "D" || dim === "C" ? -15 : 15;
+            const dy = dim === "D" || dim === "I" ? -8 : 24;
+            return (
+              <text
+                key={`hub-${dim}`}
+                x={C + dx}
+                y={C + dy}
+                textAnchor="middle"
+                fontSize={22}
+                fontWeight={600}
+                fill={`var(--color-${dimensionMeta[dim].colorVar})`}
+              >
+                {dimensionMeta[dim].displayCode}
+              </text>
+            );
+          })}
+        </g>
+      ) : (
+        <>
+          {/* Single baseline-positioned glyph — nothing else shares its line. */}
+          {showHubLetter ? (
+          <text
+            x={C}
+            y={letterBaselineY}
+            textAnchor="middle"
+            fontSize={44}
+            fontWeight={600}
+            fill={`var(--color-${dimensionMeta[primary].colorVar})`}
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            {dimensionMeta[primary].displayCode}
+          </text>
+          ) : null}
+          {badgeText ? (
+            <g>
+              <rect
+                x={C - badgeWidth / 2}
+                y={badgeCy - 11}
+                width={badgeWidth}
+                height={22}
+                rx={11}
+                fill="var(--color-mineral)"
+                stroke={badgeColor}
+                strokeWidth={1.25}
+              />
+              <text
+                x={C}
+                y={badgeCy + 4}
+                textAnchor="middle"
+                fontSize={balanced ? 10.5 : 12.5}
+                fontWeight={600}
+                fill={badgeColor}
+                style={{ fontFamily: "var(--font-mono)", letterSpacing: balanced ? "0.08em" : undefined }}
+              >
+                {badgeText}
+              </text>
+            </g>
+          ) : null}
+        </>
+      )}
     </svg>
   );
 }

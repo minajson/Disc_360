@@ -6,6 +6,8 @@ import {
   clampScore,
   curvedConnector,
   polarPoint,
+  smoothPath,
+  wrapLabel,
 } from "./geometry.ts";
 import { deriveDistractionFactors } from "./focus-factors.ts";
 
@@ -126,4 +128,29 @@ test("notification strength mirrors the scorer's weighting order", () => {
   assert.ok(strengthFor("immediate") > strengthFor("finishes"));
   assert.ok(strengthFor("finishes") > strengthFor("batches"));
   assert.ok(strengthFor("batches") > strengthFor("off"));
+});
+/* ── smooth path ────────────────────────────────────────────────── */
+
+test("smoothPath threads one cubic segment per interval and starts at the first point", () => {
+  const points = [
+    { x: 0, y: 100 },
+    { x: 50, y: 20 },
+    { x: 100, y: 80 },
+    { x: 150, y: 40 },
+  ];
+  const path = smoothPath(points);
+  assert.match(path, /^M 0(\.0+)? 100(\.0+)?/);
+  assert.equal((path.match(/C /g) ?? []).length, points.length - 1);
+  assert.match(path, /150(\.0+)? 40(\.0+)?$/);
+});
+
+test("smoothPath handles degenerate inputs", () => {
+  assert.equal(smoothPath([]), "");
+  assert.match(smoothPath([{ x: 5, y: 5 }]), /^M 5 5$/);
+});
+
+test("wrapLabel splits long labels into at most two lines", () => {
+  assert.deepEqual(wrapLabel("Mental load"), ["Mental load"]);
+  assert.deepEqual(wrapLabel("Social feeds & news"), ["Social feeds", "& news"]);
+  assert.equal(wrapLabel("one two three four five six seven").length, 2);
 });

@@ -190,8 +190,8 @@ test("facilitator presents the team introduction and can show the join QR", asyn
   // The deck plays and offers a Show QR control (team sessions only).
   expect(await counter(page)).toBe("1 / 10");
   await page.getByRole("button", { name: "Show QR" }).click();
-  await expect(page.getByRole("dialog", { name: /Participant join QR/i })).toBeVisible();
-  await expect(page.getByText(/Scan to join/i)).toBeVisible();
+  await expect(page.getByRole("dialog", { name: /Scan to begin/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Scan to begin" })).toBeVisible();
   await page.keyboard.press("Escape"); // closes the QR overlay first
 
   // The closing slide offers a return to the facilitator dashboard.

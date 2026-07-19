@@ -14,7 +14,7 @@ test.use({ viewport: { width: 1600, height: 1000 } });
 async function signIn(page: Page, email: string) {
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill("disc360-demo");
+  await page.getByLabel("Password", { exact: true }).fill("disc360-demo");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/app");
 }

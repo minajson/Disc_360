@@ -28,6 +28,10 @@ const VALID_VISUALS = new Set([
   "quote",
   "instructions",
   "closing",
+  "compass",
+  "ripple",
+  "cycle",
+  "recoveryCurve",
 ]);
 
 const wordCount = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
@@ -139,8 +143,11 @@ test("instructions and comparison slides carry the structured data they render",
       if (slide.visualType === "instructions") {
         assert.ok((slide.instructions?.length ?? 0) >= 1, `${slide.id} has instructions`);
       }
-      if (slide.visualType === "timeline") {
-        assert.ok((slide.steps?.length ?? 0) >= 2, `${slide.id} has timeline steps`);
+      if (["timeline", "cycle", "recoveryCurve"].includes(slide.visualType)) {
+        assert.ok((slide.steps?.length ?? 0) >= 2, `${slide.id} has ordered steps`);
+      }
+      if (slide.visualType === "ripple") {
+        assert.ok((slide.words?.length ?? 0) >= 3, `${slide.id} has interruption markers`);
       }
       if (slide.visualType === "comparison") {
         const hasData =

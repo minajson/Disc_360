@@ -20,6 +20,6 @@ export default defineConfig({
     timeout: 60_000,
     // Shared join links/QRs must point at the server under test. SITE_URL is
     // the runtime override — NEXT_PUBLIC_SITE_URL is frozen at build time.
-    env: { SITE_URL: "http://localhost:3100" },
+    env: { SITE_URL: "http://localhost:3100", NEXT_DIST_DIR: ".next-test" },
   },
 });

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/db/browser";
 import { onboardingDestination, parseIntent } from "@/lib/auth/intent";
 import { Button } from "@/components/ui/Button";
-import { TextField } from "@/components/auth/fields";
+import { PasswordField, TextField } from "@/components/auth/fields";
 
 export function SignUpForm() {
   const router = useRouter();
@@ -93,11 +93,10 @@ export function SignUpForm() {
         autoComplete="email"
         required
       />
-      <TextField
+      <PasswordField
         label="Password"
         id="password"
         name="password"
-        type="password"
         autoComplete="new-password"
         required
         minLength={10}

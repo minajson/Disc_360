@@ -53,7 +53,7 @@ async function signInBootstrapAccount(page: Page): Promise<void> {
   // 1. Try signing in — an earlier run in this file may already have created it.
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill(BOOTSTRAP_EMAIL);
-  await page.getByLabel("Password").fill(TEST_PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(
     onboardingChoice.or(signedInAsAdmin).or(wrongCredentials).first(),
@@ -64,7 +64,7 @@ async function signInBootstrapAccount(page: Page): Promise<void> {
     await page.goto("/sign-up");
     await page.getByLabel("Full name").fill("Mina Jumbo");
     await page.getByLabel("Email").fill(BOOTSTRAP_EMAIL);
-    await page.getByLabel("Password").fill(TEST_PASSWORD);
+    await page.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(onboardingChoice).toBeVisible({ timeout: 20_000 });
   }
@@ -133,7 +133,7 @@ test("a normal user is redirected away from every admin route", async ({ page })
   // solo@disc360.dev is a seeded free individual — not a super admin.
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill("solo@disc360.dev");
-  await page.getByLabel("Password").fill("disc360-demo");
+  await page.getByLabel("Password", { exact: true }).fill("disc360-demo");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/app");
 

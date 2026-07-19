@@ -82,7 +82,7 @@ test("capture 24: updated assessment screen (v2 scenarios)", async ({ page }) =>
   await page.goto("/sign-up");
   await page.getByLabel("Full name").fill("Scenario Shot");
   await page.getByLabel("Email").fill(`pw-shot-${Date.now()}@disc360.dev`);
-  await page.getByLabel("Password").fill("disc360-playwright");
+  await page.getByLabel("Password", { exact: true }).fill("disc360-playwright");
   await page.getByRole("button", { name: "Create account" }).click();
   await page.waitForURL("**/onboarding**");
   await page.getByRole("radio", { name: /Understand myself/i }).click();

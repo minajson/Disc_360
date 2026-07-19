@@ -101,3 +101,55 @@ export function curvedConnector(
 export function clampScore(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
+
+/**
+ * A smooth curve through every point — Catmull-Rom converted to cubic
+ * Béziers. This is how rhythms, pulses, pathways and flowing timelines are
+ * drawn: one continuous organic path instead of point-to-point segments.
+ * `tension` 0 = straight-ish, 1 = very loose; the house default sits between.
+ */
+export function smoothPath(points: Point[], tension = 0.55): string {
+  if (points.length === 0) return "";
+  if (points.length === 1) return `M ${points[0]!.x} ${points[0]!.y}`;
+
+  const path: string[] = [`M ${points[0]!.x.toFixed(2)} ${points[0]!.y.toFixed(2)}`];
+  const k = tension / 3;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i]!;
+    const p1 = points[i]!;
+    const p2 = points[i + 1]!;
+    const p3 = points[i + 2] ?? p2;
+
+    const c1x = p1.x + (p2.x - p0.x) * k;
+    const c1y = p1.y + (p2.y - p0.y) * k;
+    const c2x = p2.x - (p3.x - p1.x) * k;
+    const c2y = p2.y - (p3.y - p1.y) * k;
+
+    path.push(
+      `C ${c1x.toFixed(2)} ${c1y.toFixed(2)} ${c2x.toFixed(2)} ${c2y.toFixed(2)} ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`,
+    );
+  }
+  return path.join(" ");
+}
+
+/**
+ * Word-wrap a short label into at most two lines of ~`max` characters — the
+ * shared treatment for SVG labels, which cannot soft-wrap on their own.
+ */
+export function wrapLabel(label: string, max = 13): string[] {
+  const words = label.split(" ");
+  if (label.length <= max || words.length === 1) return [label];
+  let line = "";
+  const lines: string[] = [];
+  for (const word of words) {
+    if ((line + " " + word).trim().length > max && line) {
+      lines.push(line.trim());
+      line = word;
+    } else {
+      line = (line + " " + word).trim();
+    }
+  }
+  if (line) lines.push(line);
+  return lines.slice(0, 2);
+}

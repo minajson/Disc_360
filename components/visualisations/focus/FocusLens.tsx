@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
-import { curvedConnector, polarPoint } from "@/lib/visuals/geometry";
+import { curvedConnector, polarPoint, wrapLabel } from "@/lib/visuals/geometry";
 import type { FocusScores } from "@/lib/scoring/focus";
 import type { DistractionFactor } from "@/lib/visuals/focus-factors";
 
@@ -36,24 +36,6 @@ const FIELD_MAX = 98;
 const RINGS = [138, 166, 194];
 /** Marker angles — staggered to keep labels apart. */
 const FACTOR_ANGLES = [-38, 63, 152, -118];
-
-/** Word-wrap a label into at most two short lines. */
-function wrapLabel(label: string): string[] {
-  const words = label.split(" ");
-  if (label.length <= 13 || words.length === 1) return [label];
-  let line = "";
-  const lines: string[] = [];
-  for (const word of words) {
-    if ((line + " " + word).trim().length > 13 && line) {
-      lines.push(line.trim());
-      line = word;
-    } else {
-      line = (line + " " + word).trim();
-    }
-  }
-  if (line) lines.push(line);
-  return lines.slice(0, 2);
-}
 
 interface FocusLensProps {
   scores: FocusScores;

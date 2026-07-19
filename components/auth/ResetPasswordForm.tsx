@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/db/browser";
 import { notifyPasswordChanged } from "@/lib/actions/settings";
 import { Button } from "@/components/ui/Button";
-import { TextField } from "@/components/auth/fields";
+import { PasswordField } from "@/components/auth/fields";
 
 export function ResetPasswordForm() {
   const router = useRouter();
@@ -46,20 +46,18 @@ export function ResetPasswordForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-      <TextField
+      <PasswordField
         label="New password"
         id="password"
         name="password"
-        type="password"
         autoComplete="new-password"
         required
         minLength={10}
       />
-      <TextField
+      <PasswordField
         label="Confirm new password"
         id="confirm"
         name="confirm"
-        type="password"
         autoComplete="new-password"
         required
         minLength={10}

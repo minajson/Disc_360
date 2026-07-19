@@ -18,12 +18,16 @@ export type SlideVisualType =
   | "hero" // opening: oversized headline over an ambient field
   | "spectrum" // the four-point behavioural field / calm word reveal
   | "fourDimensions" // D/I/S/A as four regions
-  | "timeline" // an ordered sequence (autopilot loop, interruption cost)
+  | "timeline" // an ordered sequence, drawn as a flowing curved path
   | "comparison" // two or more columns side by side (two lenses, strength→shadow)
   | "chart" // an elegant data visual (energy rhythm curve)
   | "quote" // a single high-contrast statement
   | "instructions" // how-to-answer (the one screen allowed more text)
-  | "closing"; // final screen with the start CTA
+  | "closing" // final screen with the start CTA
+  | "compass" // the Behaviour Compass (concept, or example blend via dimension notes)
+  | "ripple" // one clear signal surrounded by interruptions (words = markers)
+  | "cycle" // a circular repeating pathway (steps = stages)
+  | "recoveryCurve"; // the interruption-cost trajectory (steps = 4 stage labels)
 
 /** One of the four dimensions, in display letters (Analytical = "A"). */
 export type DisplayDimension = "D" | "I" | "S" | "A";

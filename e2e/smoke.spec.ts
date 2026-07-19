@@ -14,7 +14,7 @@ const PRODUCT_TEAM = "30000000-0000-4000-8000-000000000001";
 async function signIn(page: Page, email: string) {
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill("disc360-demo");
+  await page.getByLabel("Password", { exact: true }).fill("disc360-demo");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/app");
 }
@@ -23,7 +23,7 @@ async function signUpIndividual(page: Page, name: string, email: string) {
   await page.goto("/sign-up");
   await page.getByLabel("Full name").fill(name);
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill("disc360-playwright");
+  await page.getByLabel("Password", { exact: true }).fill("disc360-playwright");
   await page.getByRole("button", { name: "Create account" }).click();
   await page.waitForURL("**/onboarding**");
   await page.getByRole("radio", { name: /Understand myself/i }).click();

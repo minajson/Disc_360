@@ -173,3 +173,73 @@ body {
     break-inside: avoid;
   }
 }
+
+/* ── presentation slide engine ─────────────────────────────────────
+   Two rendering modes sharing one DOM:
+
+   · portrait / small screens — the canvas is a plain scrollable column and
+     the type scale tracks the viewport (vw), so phones read a stacked page,
+     never a shrunken 16:9 slide.
+
+   · canvas mode (landscape ≥900×520) — the stage becomes a size container,
+     the canvas letterboxes to a strict 16:9 that always fits the viewport,
+     and the type scale tracks the CANVAS (cqw) — so an ultrawide screen gets
+     a huge slide with proportionate type instead of viewport-sized text on a
+     smaller card. Slides never scroll in canvas mode; content is authored to
+     fit (enforced by the deck content tests).
+
+   All slide typography and spacing reads these variables — components never
+   hard-code viewport units, which is what lets one SlideVisual serve both
+   modes and every future deck. */
+
+.pres-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  --pres-display: clamp(2rem, 8.5vw, 3.4rem);
+  --pres-title: clamp(1.7rem, 7vw, 2.75rem);
+  --pres-heading: clamp(1.5rem, 6vw, 2.3rem);
+  --pres-statement: clamp(1.3rem, 5vw, 1.9rem);
+  --pres-body: clamp(1.05rem, 4.2vw, 1.4rem);
+  --pres-caption: clamp(0.95rem, 3.4vw, 1.15rem);
+  --pres-eyebrow: clamp(0.7rem, 2.8vw, 0.85rem);
+  --pres-gap: clamp(1rem, 3.2vh, 1.9rem);
+  --pres-pad: clamp(1.25rem, 5vw, 2rem);
+}
+
+@media (min-width: 900px) and (min-height: 520px) and (orientation: landscape) {
+  .pres-stage {
+    display: grid;
+    place-items: center;
+    container-type: size;
+    padding: clamp(0.5rem, 1.5vh, 1.25rem);
+  }
+  .pres-canvas {
+    width: min(100cqw, calc(100cqh * 16 / 9));
+    height: min(100cqh, calc(100cqw * 9 / 16));
+    overflow: hidden;
+    border-radius: 1.25rem;
+    background: var(--color-canvas);
+    box-shadow: 0 24px 80px -32px rgb(23 32 29 / 0.35);
+    container-type: size;
+    --pres-display: clamp(2.1rem, 7.2cqw, 11.5rem);
+    --pres-title: clamp(1.9rem, 5.1cqw, 8rem);
+    --pres-heading: clamp(1.7rem, 4.2cqw, 6.5rem);
+    --pres-statement: clamp(1.5rem, 3.2cqw, 5rem);
+    --pres-body: clamp(1.2rem, 2.35cqw, 3.5rem);
+    --pres-caption: clamp(1rem, 1.7cqw, 2.4rem);
+    --pres-eyebrow: clamp(0.7rem, 1.15cqw, 1.6rem);
+    --pres-gap: clamp(0.75rem, 3cqh, 3rem);
+    --pres-pad: clamp(1.5rem, 5cqw, 6rem);
+  }
+  /* Fullscreen: edge-to-edge slide, chrome overlays and auto-hides. */
+  .pres-fullscreen .pres-stage {
+    padding: 0;
+  }
+  .pres-fullscreen .pres-canvas {
+    border-radius: 0;
+    box-shadow: none;
+  }
+}

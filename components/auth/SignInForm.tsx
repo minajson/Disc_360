@@ -11,7 +11,7 @@ import {
   safeNextOr,
 } from "@/lib/auth/intent";
 import { Button } from "@/components/ui/Button";
-import { TextField } from "@/components/auth/fields";
+import { PasswordField, TextField } from "@/components/auth/fields";
 
 export function SignInForm() {
   const router = useRouter();
@@ -67,11 +67,10 @@ export function SignInForm() {
         required
       />
       <div className="flex flex-col gap-1.5">
-        <TextField
+        <PasswordField
           label="Password"
           id="password"
           name="password"
-          type="password"
           autoComplete="current-password"
           required
         />

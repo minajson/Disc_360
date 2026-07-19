@@ -54,6 +54,7 @@ export default async function TeamIntroductionPage({ params, searchParams }: Pag
         joinUrl: buildJoinUrl(base, team.invite_token),
         isLocal: base.isLocal,
         teamCode: team.team_code,
+        label: team.name,
       }}
     />
   );

@@ -13,7 +13,7 @@ const PHOTO_FIXTURE = path.join(__dirname, "fixtures", "coach-photo.png");
 async function signIn(page: Page, email: string) {
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill("disc360-demo");
+  await page.getByLabel("Password", { exact: true }).fill("disc360-demo");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/app");
 }
@@ -31,7 +31,7 @@ test("D: coach onboarding, profile with photo upload, persistence after reload",
   await page.goto("/sign-up");
   await page.getByLabel("Full name").fill("Casey Facilitator");
   await page.getByLabel("Email").fill(`pw-coach-${Date.now()}@disc360.dev`);
-  await page.getByLabel("Password").fill("disc360-playwright");
+  await page.getByLabel("Password", { exact: true }).fill("disc360-playwright");
   await page.getByRole("button", { name: "Create account" }).click();
   await page.waitForURL("**/onboarding**");
   await page.getByRole("radio", { name: /Manage coaching clients/i }).click();
