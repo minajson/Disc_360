@@ -3,7 +3,7 @@ import {
   type MediaPlaceholderProps,
 } from "@/components/media/MediaPlaceholder";
 
-type PortraitProps = Pick<MediaPlaceholderProps, "src" | "className"> & {
+type PortraitProps = Pick<MediaPlaceholderProps, "src" | "focal" | "className"> & {
   label?: string;
 };
 

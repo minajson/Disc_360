@@ -98,7 +98,7 @@ export default async function MediaGuidePage() {
           <p className="max-w-2xl text-sm text-slate">
             Every media slot in DISC360 with its spec and replacement path.
             {" "}{counts.placeholder} placeholder · {counts.ready} ready · {counts.missing} missing.
-            Mirrored in MEDIA_AUDIT.md.
+            Mirrored in the generated MEDIA_GUIDE.md.
           </p>
         </div>
 
@@ -133,6 +133,10 @@ export default async function MediaGuidePage() {
                 <dd className="text-ink">{entry.dimensions}</dd>
                 <dt className="text-faint">Ratio</dt>
                 <dd className="text-ink">{entry.ratio}</dd>
+                <dt className="text-faint">Formats</dt>
+                <dd className="text-ink">{entry.formats}</dd>
+                <dt className="text-faint">Budget</dt>
+                <dd className="text-ink">{entry.sizeTarget}</dd>
                 {entry.video ? (
                   <>
                     <dt className="text-faint">Video</dt>
