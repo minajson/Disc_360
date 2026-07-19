@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOnboarded } from "@/lib/auth/guards";
+import { requireProductAllowed } from "@/lib/teams/session-guard";
 import { computeResult } from "@/lib/scoring/compute-result";
 import { insightMap } from "@/data/insight-maps";
 import {
@@ -18,7 +19,9 @@ import type { Question } from "@/lib/types";
 
 /** Resume the open session or create a new one, then go to the runner. */
 export async function startAssessment(): Promise<void> {
-  const { supabase, user } = await requireOnboarded();
+  // Backend lock: facilitator-led participants can only start the
+  // assessment their facilitator selected, while its window is open.
+  const { supabase, user } = await requireProductAllowed("disc");
 
   const { data: existing } = await supabase
     .from("assessment_sessions")

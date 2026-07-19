@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireOnboarded } from "@/lib/auth/guards";
+import { requireProductAllowed } from "@/lib/teams/session-guard";
 
 /**
  * Combined assessment orchestration.
@@ -14,6 +15,9 @@ import { requireOnboarded } from "@/lib/auth/guards";
 
 /** Start (or resume) the combined flow, then hand off to the controller. */
 export async function startCombinedAssessment(): Promise<void> {
+  // Backend lock: facilitator-led participants can only start the
+  // assessment their facilitator selected, while its window is open.
+  await requireProductAllowed("combined");
   const { supabase, user } = await requireOnboarded();
 
   const { data: existing } = await supabase

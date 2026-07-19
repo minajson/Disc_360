@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOnboarded } from "@/lib/auth/guards";
+import { requireProductAllowed } from "@/lib/teams/session-guard";
 import { computeFocusResult, type FocusAnswerInput } from "@/lib/scoring/focus";
 
 /**
@@ -14,7 +15,9 @@ import { computeFocusResult, type FocusAnswerInput } from "@/lib/scoring/focus";
 
 /** Resume the open Focus session or start a new one, then go to the runner. */
 export async function startFocusAssessment(): Promise<void> {
-  const { supabase, user } = await requireOnboarded();
+  // Backend lock: facilitator-led participants can only start the
+  // assessment their facilitator selected, while its window is open.
+  const { supabase, user } = await requireProductAllowed("focus");
 
   const { data: existing } = await supabase
     .from("focus_sessions")

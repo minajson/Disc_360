@@ -1485,6 +1485,7 @@ export type Database = {
           department: string | null
           description: string
           engagement_starts_at: string | null
+          facilitator_name: string | null
           id: string
           invite_token: string
           join_enabled: boolean
@@ -1514,6 +1515,7 @@ export type Database = {
           department?: string | null
           description?: string
           engagement_starts_at?: string | null
+          facilitator_name?: string | null
           id?: string
           invite_token?: string
           join_enabled?: boolean
@@ -1543,6 +1545,7 @@ export type Database = {
           department?: string | null
           description?: string
           engagement_starts_at?: string | null
+          facilitator_name?: string | null
           id?: string
           invite_token?: string
           join_enabled?: boolean

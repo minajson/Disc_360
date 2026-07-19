@@ -63,14 +63,16 @@ function makeTeam(opts: {
   state: string;
   access?: string;
   slide?: number | null;
+  facilitator?: string;
 }): { id: string; token: string } {
   const row = sql(
     `with created as (
        insert into teams (organization_id, name, description, team_code, created_by,
-                          assessment_type, session_mode, session_state, presentation_access, active_slide)
+                          assessment_type, session_mode, session_state, presentation_access, active_slide, facilitator_name)
        values ('${orgId}', 'Facil ${opts.code}', 'facilitated fixture', '${opts.code}', '${creatorId}',
                '${opts.assessment}', 'facilitator_led', '${opts.state}',
-               '${opts.access ?? "live_and_review"}', ${opts.slide ?? "null"})
+               '${opts.access ?? "live_and_review"}', ${opts.slide ?? "null"},
+               ${opts.facilitator ? `'${opts.facilitator}'` : "null"})
        returning id, invite_token
      ) select id || '|' || invite_token from created`,
   );
@@ -121,7 +123,7 @@ test.afterAll(async () => {
 test("1+4: invitation onboarding shows the summary, hides the team code, and consent joins the resolved team", async ({
   page,
 }) => {
-  const team = makeTeam({ code: "FCL-1001", assessment: "disc", state: "draft" });
+  const team = makeTeam({ code: "FCL-1001", assessment: "disc", state: "draft", facilitator: "Amara External" });
   const email = "facil-invitee@disc360.dev";
   await createUser(email);
 
@@ -133,6 +135,8 @@ test("1+4: invitation onboarding shows the summary, hides the team code, and con
   await expect(page.getByText("You are joining")).toBeVisible();
   await expect(page.getByText("Facil FCL-1001", { exact: true })).toBeVisible();
   await expect(page.getByText("DISC Behaviour Assessment")).toBeVisible();
+  // The DISPLAYED facilitator is the configured name, not the signed-in owner.
+  await expect(page.getByText("Facilitated by Amara External")).toBeVisible();
   await expect(page.getByRole("radio", { name: /Join as participant/ })).toBeVisible();
   await expect(page.getByLabel("Team code")).toHaveCount(0);
 
@@ -324,4 +328,41 @@ test("14: the full-screen QR page projects on desktop and phone", async ({ brows
   await expect(m.getByRole("heading", { name: "Join Engineering Core" })).toBeVisible();
   await desktop.close();
   await phone.close();
+});
+
+test("15: the backend rejects assessments the facilitator did not select", async ({ page }) => {
+  const team = makeTeam({ code: "FCL-5001", assessment: "disc", state: "assessment_open" });
+  const email = "facil-locked@disc360.dev";
+  const uid = await createUser(email);
+  onboardProfile(uid, email, "Locked Member");
+  addMember(team.id, uid, email, "Locked Member");
+
+  await signIn(page, email);
+
+  // Deep-link straight to the Focus product and try to start it.
+  await page.goto("/focus");
+  const focusStart = page.getByRole("button", { name: /Start|Begin|assessment/i }).first();
+  if (await focusStart.isVisible().catch(() => false)) {
+    await focusStart.click();
+    await page.waitForURL("**/app", { timeout: 15000 });
+  }
+  const focusSessions = sql(`select count(*) from focus_sessions where profile_id='${uid}'`);
+  expect(focusSessions).toBe("0");
+
+  // Combined too.
+  await page.goto("/combined");
+  const combinedStart = page.getByRole("button", { name: /Start|Begin|assessment/i }).first();
+  if (await combinedStart.isVisible().catch(() => false)) {
+    await combinedStart.click();
+    await page.waitForURL("**/app", { timeout: 15000 });
+  }
+  const combinedSessions = sql(`select count(*) from combined_sessions where profile_id='${uid}'`);
+  expect(combinedSessions).toBe("0");
+
+  // The selected assessment still starts normally.
+  await page.goto("/app");
+  await page.getByRole("button", { name: "Begin assessment" }).click();
+  await page.waitForURL("**/app/assessments/**", { timeout: 15000 });
+  const discSessions = sql(`select count(*) from assessment_sessions where profile_id='${uid}'`);
+  expect(discSessions).toBe("1");
 });

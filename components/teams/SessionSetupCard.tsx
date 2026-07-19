@@ -3,6 +3,7 @@
 import { useActionState, useState, useTransition } from "react";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/Button";
+import { TextField } from "@/components/auth/fields";
 import {
   setSessionState,
   updateSessionSetup,
@@ -99,6 +100,7 @@ export function SessionSetupCard({
     session_mode: SessionMode;
     session_state: SessionState;
     presentation_access: PresentationAccess;
+    facilitator_name: string | null;
   };
 }) {
   const [assessment, setAssessment] = useState<AssessmentProduct>(current.assessment_type);
@@ -146,6 +148,17 @@ export function SessionSetupCard({
           value={access}
           onChange={setAccess}
         />
+
+        {/* Who is in the room may differ from who is signed in. */}
+        <div className="max-w-sm">
+          <TextField
+            label="Facilitator's name (shown to participants)"
+            id="facilitator_name"
+            name="facilitator_name"
+            defaultValue={current.facilitator_name ?? ""}
+            placeholder="Defaults to the team owner"
+          />
+        </div>
 
         {state.status === "needs_confirmation" ? (
           <div role="alert" className="flex flex-col gap-3 rounded-2xl border-l-4 border-l-disc-i bg-sand/50 p-4">

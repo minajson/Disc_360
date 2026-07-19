@@ -13,11 +13,13 @@ export function FullscreenQr({
   teamCode,
   joinUrl,
   displayUrl,
+  facilitatorName,
 }: {
   teamName: string;
   teamCode: string;
   joinUrl: string;
   displayUrl: string;
+  facilitatorName?: string | null;
 }) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-white px-6 py-10 text-center print:min-h-0 print:gap-5">
@@ -26,6 +28,9 @@ export function FullscreenQr({
       </span>
 
       <h1 className="font-display text-h2 font-semibold text-ink">Join {teamName}</h1>
+      {facilitatorName ? (
+        <p className="-mt-3 text-base text-slate">Facilitated by {facilitatorName}</p>
+      ) : null}
 
       <div className="rounded-3xl border border-hairline bg-white p-[3.5vmin] shadow-[0_24px_64px_-40px_rgba(23,32,29,0.4)] print:border-0 print:shadow-none">
         <QRCodeSVG

@@ -24,7 +24,7 @@ export default async function TeamQrPage({
 
   const { data: team } = await supabase
     .from("teams")
-    .select("name, team_code, invite_token")
+    .select("name, team_code, invite_token, facilitator_name")
     .eq("id", teamId)
     .maybeSingle();
   if (!team) notFound();
@@ -36,6 +36,7 @@ export default async function TeamQrPage({
       teamCode={team.team_code}
       joinUrl={buildJoinUrl(base, team.invite_token)}
       displayUrl={displayJoinUrl(base, team.invite_token)}
+      facilitatorName={team.facilitator_name}
     />
   );
 }

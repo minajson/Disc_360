@@ -20,6 +20,7 @@ const setupSchema = z.object({
   assessment_type: z.enum(["disc", "focus", "combined"]),
   session_mode: z.enum(["self_paced", "facilitator_led"]),
   presentation_access: z.enum(["live_only", "live_and_review", "review_after_session"]),
+  facilitator_name: z.string().max(120).optional().or(z.literal("")),
   confirm_change: z.string().optional(),
 });
 
@@ -59,6 +60,7 @@ export async function updateSessionSetup(
     assessment_type: formData.get("assessment_type"),
     session_mode: formData.get("session_mode"),
     presentation_access: formData.get("presentation_access"),
+    facilitator_name: formData.get("facilitator_name") ?? "",
     confirm_change: formData.get("confirm_change") ?? undefined,
   });
   if (!parsed.success) {
@@ -90,6 +92,7 @@ export async function updateSessionSetup(
       assessment_type: input.assessment_type,
       session_mode: input.session_mode as SessionMode,
       presentation_access: input.presentation_access as PresentationAccess,
+      facilitator_name: input.facilitator_name?.trim() || null,
     })
     .eq("id", teamId);
   if (error) return { status: "error", message: "Could not save session setup — try again." };
