@@ -2,6 +2,7 @@ import { dimensionMeta } from "@/data/dimension-meta";
 import { displayArchetypeCode } from "@/lib/utils/display";
 import {
   BALANCED_SPREAD,
+  contrastingTendency,
   DIAGONAL_WINDOW,
   OPPOSITE,
   PURE_GAP,
@@ -42,6 +43,7 @@ export function ProfileExplanation({
   questionCount = 24,
 }: ProfileExplanationProps) {
   const ranked = rankDimensions(normalized);
+  const contrasting = contrastingTendency(normalized);
   const score = (dim: Dimension) => normalized[DIMENSION_KEY[dim]];
   const [first, second, third] = ranked as [Dimension, Dimension, Dimension];
   const spread = score(first) - score(ranked[3]!);
@@ -101,6 +103,10 @@ export function ProfileExplanation({
                         <span className="ml-1.5 font-mono text-[10px] uppercase text-teal">primary</span>
                       ) : dim === secondary ? (
                         <span className="ml-1.5 font-mono text-[10px] uppercase text-faint">secondary</span>
+                      ) : dim === contrasting ? (
+                        <span className="ml-1.5 font-mono text-[10px] uppercase text-faint">
+                          strong contrasting tendency
+                        </span>
                       ) : null}
                     </span>
                   </td>

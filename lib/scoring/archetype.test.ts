@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { deriveArchetype, rankDimensions } from "./archetype.ts";
+import { contrastingTendency, deriveArchetype, rankDimensions } from "./archetype.ts";
 import type { DiscScores } from "../types/index.ts";
 
 const scores = (d: number, i: number, s: number, c: number): DiscScores => ({
@@ -70,4 +70,26 @@ test("diagonal with distant third falls back to pure primary", () => {
   const result = deriveArchetype(scores(80, 58, 70, 20));
   assert.equal(result.code, "D");
   assert.equal(result.secondary, null);
+});
+
+test("contrastingTendency: suppressed opposite within reach is surfaced", () => {
+  // S 56 leads, D 54 is its opposite two behind, A 48 substitutes → SA.
+  // The report must still be able to name the strong D tendency.
+  const result = deriveArchetype(scores(54, 30, 56, 48));
+  assert.equal(result.code, "SC");
+  assert.equal(contrastingTendency(scores(54, 30, 56, 48)), "D");
+});
+
+test("contrastingTendency: pure fallback still names the opposite", () => {
+  // D pure because the third dimension is beyond the window — D 80 / S 70.
+  assert.equal(contrastingTendency(scores(80, 58, 70, 20)), "S");
+});
+
+test("contrastingTendency: null when second is not the opposite", () => {
+  assert.equal(contrastingTendency(scores(80, 70, 30, 20)), null);
+});
+
+test("contrastingTendency: null when balanced or decisively pure", () => {
+  assert.equal(contrastingTendency(scores(52, 50, 48, 50)), null);
+  assert.equal(contrastingTendency(scores(90, 40, 60, 30)), null);
 });

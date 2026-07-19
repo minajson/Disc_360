@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireOnboarded } from "@/lib/auth/guards";
 import { insightMap, type ArchetypeInsight } from "@/data/insight-maps";
 import { dimensionMeta } from "@/data/dimension-meta";
+import { contrastingTendency } from "@/lib/scoring/archetype";
 import { displayArchetypeCode } from "@/lib/utils/display";
 import { buildSharedReportUrl, getPublicBaseUrl } from "@/lib/utils/site-url";
 import { Eyebrow } from "@/components/ui/Eyebrow";
@@ -32,6 +33,65 @@ function Points({ items, color = "var(--color-teal)" }: { items: string[]; color
         </li>
       ))}
     </ul>
+  );
+}
+
+const CONTRAST_CHIP: Record<Dimension, string> = {
+  D: "border-disc-d/40 text-disc-d",
+  I: "border-disc-i/40 text-disc-i",
+  S: "border-disc-s/40 text-disc-s",
+  C: "border-disc-c/40 text-disc-c",
+};
+
+/**
+ * The interpretive hierarchy of the profile: primary style, the strong
+ * contrasting tendency the blend code cannot express (the opposite-pair rule
+ * suppressed it), the supporting dimension, and the formal blend. Values are
+ * the participant's actual scores — the engine is untouched; this makes its
+ * reading visible.
+ */
+function ProfileHierarchy({
+  scores,
+  primary,
+  secondary,
+  contrasting,
+  code,
+}: {
+  scores: DiscScores;
+  primary: Dimension;
+  secondary: Dimension | null;
+  contrasting: Dimension | null;
+  code: ArchetypeCode;
+}) {
+  const score = (dim: Dimension) =>
+    scores[dim.toLowerCase() as keyof DiscScores];
+  const rows: { label: string; dim?: Dimension; value?: string }[] = [
+    { label: "Primary behavioural style", dim: primary },
+    ...(contrasting ? [{ label: "Strong contrasting tendency", dim: contrasting }] : []),
+    ...(secondary ? [{ label: "Supporting profile dimension", dim: secondary }] : []),
+    { label: "Formal blend", value: displayArchetypeCode(code) },
+  ];
+  return (
+    <dl className="flex flex-col divide-y divide-hairline/70 border-y border-hairline/70">
+      {rows.map((row) => (
+        <div key={row.label} className="flex items-baseline justify-between gap-4 py-2">
+          <dt className="font-mono text-[11px] uppercase tracking-[0.14em] text-faint">
+            {row.label}
+          </dt>
+          <dd className="text-sm font-medium text-ink">
+            {row.dim ? (
+              <>
+                {dimensionMeta[row.dim].label}
+                <span className="text-faint"> — </span>
+                <span className="font-mono tabular-nums">{score(row.dim)}</span>
+              </>
+            ) : (
+              <span className="font-mono">{row.value}</span>
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -82,6 +142,7 @@ export default async function ResultPage({
   const code = result.archetype_code as ArchetypeCode;
   const primary = result.primary_dimension as Dimension;
   const secondary = (result.secondary_dimension as Dimension | null) ?? null;
+  const contrasting = contrastingTendency(scores);
   const snapshotRow = Array.isArray(result.result_insights)
     ? result.result_insights[0]
     : result.result_insights;
@@ -105,6 +166,7 @@ export default async function ResultPage({
           scores={scores}
           primary={primary}
           secondary={secondary}
+          balanced={code === "BAL"}
           className="mx-auto max-w-[380px]"
         />
         <div className="flex flex-col gap-4">
@@ -113,7 +175,23 @@ export default async function ResultPage({
           <div className="flex flex-wrap gap-2">
             <DimensionMark dimension={primary} />
             {secondary ? <DimensionMark dimension={secondary} /> : null}
+            {contrasting ? (
+              <span
+                className={`inline-flex items-center rounded-full border bg-transparent px-3 py-1 text-xs font-medium ${CONTRAST_CHIP[contrasting]}`}
+              >
+                Strong {dimensionMeta[contrasting].displayCode} tendency
+              </span>
+            ) : null}
           </div>
+          {code !== "BAL" ? (
+            <ProfileHierarchy
+              scores={scores}
+              primary={primary}
+              secondary={secondary}
+              contrasting={contrasting}
+              code={code}
+            />
+          ) : null}
           <p className="text-sm leading-relaxed text-slate">{twoSentenceSummary}</p>
           <DimensionBarChart scores={scores} />
         </div>

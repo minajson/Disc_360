@@ -40,6 +40,12 @@ interface BehaviourCompassProps {
   scores: DiscScores;
   primary: Dimension;
   secondary?: Dimension | null;
+  /**
+   * The engine's Balanced determination (archetype BAL). Must come from the
+   * scoring engine, never inferred here: a profile like S 56 / D 54 has a
+   * near-zero blend vector (opposites cancel) yet is NOT balanced.
+   */
+  balanced?: boolean;
   /** "concept": the deck's neutral form — equal bands, no needle, no data. */
   variant?: "profile" | "concept";
   /** Show the numeric score under each label. */
@@ -51,6 +57,7 @@ export function BehaviourCompass({
   scores,
   primary,
   secondary = null,
+  balanced: balancedProp = false,
   variant = "profile",
   showScores = true,
   className,
@@ -64,13 +71,16 @@ export function BehaviourCompass({
     return { score, thickness, rMid: INNER_R + thickness / 2 };
   };
 
-  const blend = blendDirection(
-    DIMENSIONS.map((dim) => ({
-      angleDeg: QUADRANT_ANGLE[dim],
-      weight: scores[DIMENSION_KEY[dim]],
-    })),
-  );
-  const balanced = !concept && blend.magnitude < 8;
+  // Needle: the archetype blend — primary pulled toward the secondary by
+  // their score weights. The all-four vector sum is wrong here: behavioural
+  // opposites cancel it out exactly when profiles are most interesting.
+  const needleAngle = secondary
+    ? blendDirection([
+        { angleDeg: QUADRANT_ANGLE[primary], weight: scores[DIMENSION_KEY[primary]] },
+        { angleDeg: QUADRANT_ANGLE[secondary], weight: scores[DIMENSION_KEY[secondary]] },
+      ]).angleDeg
+    : QUADRANT_ANGLE[primary];
+  const balanced = !concept && balancedProp;
   const showNeedle = !concept && !balanced;
 
   const bandOpacity = (dim: Dimension) => {
@@ -84,7 +94,7 @@ export function BehaviourCompass({
   };
 
   const needlePath = () => {
-    const a = blend.angleDeg;
+    const a = needleAngle;
     const tip = polarPoint(C, C, INNER_R - 12, a);
     const left = polarPoint(C, C, 26, a - 13);
     const right = polarPoint(C, C, 26, a + 13);

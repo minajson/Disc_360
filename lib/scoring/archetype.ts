@@ -73,6 +73,25 @@ export function rankDimensions(normalized: DiscScores): Dimension[] {
   });
 }
 
+/**
+ * The "strong contrasting tendency": the second-ranked dimension when it is
+ * the primary's behavioural opposite and close enough that the opposite-pair
+ * rule had to arbitrate (i.e. the profile is neither balanced nor decisively
+ * pure). This is the score the archetype code cannot express — an SA profile
+ * with D two points behind S is fully described only as "S primary, strong D
+ * tendency, A supporting". Reports surface it; scoring is unchanged.
+ */
+export function contrastingTendency(normalized: DiscScores): Dimension | null {
+  const ranked = rankDimensions(normalized);
+  const [first, second] = ranked as [Dimension, Dimension];
+  const score = (dim: Dimension) => normalized[DIMENSION_KEY[dim]];
+
+  if (score(first) - score(ranked[3] as Dimension) <= BALANCED_SPREAD) return null;
+  if (OPPOSITE[first] !== second) return null;
+  if (score(first) - score(second) >= PURE_GAP) return null;
+  return second;
+}
+
 export function deriveArchetype(normalized: DiscScores): ArchetypeDerivation {
   const ranked = rankDimensions(normalized);
   const [first, second, third] = ranked as [Dimension, Dimension, Dimension];
