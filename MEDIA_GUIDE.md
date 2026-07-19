@@ -55,20 +55,21 @@ cropping.
 | Direction | 15–30 second screen capture of the two-stage MOST/LEAST assessment flow, calm pacing |
 | Replace | public/media/demo.webm + demo-poster.jpg → how-it-works page DemoVideo slot |
 
-### MEDIA-COACH-PORTRAIT-01 — Coach/about anchor portrait
+### MEDIA-COACH-PORTRAIT-01 — Coach living portrait (photo also accepted)
 
 | | |
 |---|---|
-| Type | image |
-| Status | placeholder |
-| Route | /coaches · /about |
+| Type | video |
+| Status | ready |
+| Route | / (coaches band) · /coaches · /about |
 | Section | Editorial portrait |
 | Ratio | 4:5 |
-| Dimensions | 1200×1500 |
-| Formats | WebP or JPEG |
-| Size target | ≤ 250 KB |
-| Direction | Professional coach portrait, warm natural light, uncluttered background |
-| Replace | public/media/coach-01.webp → <LeadershipPortraitPlaceholder src> |
+| Dimensions | 800×1000 (display ≤ 320 px) or 1200×1500 photo |
+| Formats | WebM (VP9) + MP4 (H.264) + JPEG poster · or WebP/JPEG photo |
+| Size target | ≤ 1 MB per file · poster ≤ 100 KB |
+| Video | 5–15 s loop · autoplay yes · audio no · muted playback, playsInline, WebM + MP4 fallback, poster, static under reduced motion |
+| Direction | Head-and-shoulders coach portrait, face ~60% of frame, calm confident expression, warm natural light |
+| Replace | public/media/coach-01.webm + coach-01.mp4 + coach-01-poster.jpg → <LeadershipPortraitPlaceholder src mp4Src poster> |
 
 ### MEDIA-CASESTUDY-FILM-01 — Documentary-style proof film
 

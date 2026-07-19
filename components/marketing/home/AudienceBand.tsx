@@ -1,5 +1,5 @@
 import { LinkButton } from "@/components/ui/LinkButton";
-import { LeadershipPortraitPlaceholder } from "@/components/media/LeadershipPortraitPlaceholder";
+import { CoachPortrait } from "@/components/marketing/home/CoachPortrait";
 
 const capabilities = [
   "Client workspaces with role-based access",
@@ -11,7 +11,7 @@ export function AudienceBand() {
   return (
     <section className="botanical-band">
       <div className="mx-auto grid w-full max-w-7xl items-center gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[0.8fr_1.2fr] lg:py-24">
-        <LeadershipPortraitPlaceholder className="mx-auto w-full max-w-xs" />
+        <CoachPortrait className="mx-auto w-full max-w-xs" />
         <div className="flex flex-col items-start gap-7">
           <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-sage">
             For coaches and organizations

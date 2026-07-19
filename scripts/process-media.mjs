@@ -47,6 +47,22 @@ if (existsSync(`${MEDIA}/case-02.mp4.mp4`)) {
 }
 film({ source: `${SRC}/media/case-01-source.mp4`, base: `${MEDIA}/case-01`, w: 1600, h: 900, maxSeconds: 40, webmCrf: 46, x264Crf: 31 });
 
+/* ── 2b · coach living portrait: 4:5 1200×1500, face-safe upward crop ──── */
+if (existsSync(`${MEDIA}/coach-01.mp4`) && !existsSync(`${SRC}/media/coach-01-source.mp4`)) {
+  renameSync(`${MEDIA}/coach-01.mp4`, `${SRC}/media/coach-01-source.mp4`);
+}
+if (existsSync(`${SRC}/media/coach-01-source.mp4`)) {
+  // Head-and-shoulders crop measured against this source (1080×1340): the
+  // face spans ~60% of the frame with safe forehead/chin margins. Output is
+  // sized to the display slot (max ~320 CSS px → 800×1000 retina) so the
+  // upscale stays modest.
+  const crop = "crop=488:610:421:44,scale=800:1000";
+  ffmpeg(["-i", `${SRC}/media/coach-01-source.mp4`, "-t", "20", "-vf", crop, "-an", "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "44", "-row-mt", "1", `${MEDIA}/coach-01.webm`]);
+  ffmpeg(["-i", `${SRC}/media/coach-01-source.mp4`, "-t", "20", "-vf", crop, "-an", "-c:v", "libx264", "-crf", "30", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart", `${MEDIA}/coach-01.mp4`]);
+  ffmpeg(["-ss", "1", "-i", `${MEDIA}/coach-01.mp4`, "-frames:v", "1", "-q:v", "4", `${MEDIA}/coach-01-poster.jpg`]);
+  console.log(`coach-01: webm ${mb(`${MEDIA}/coach-01.webm`)}MB · mp4 ${mb(`${MEDIA}/coach-01.mp4`)}MB · poster ${kb(`${MEDIA}/coach-01-poster.jpg`)}KB`);
+}
+
 /* ── 3 · testimonial portraits: 400×400 WebP ≤80KB ─────────────────────── */
 for (const n of ["01", "02", "03"]) {
   const src = `${MEDIA}/testimonial-${n}.webp.png`;

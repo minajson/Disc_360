@@ -42,16 +42,37 @@ export function HomeHero() {
             mobileMp4Src="/media/hero-mobile.mp4"
             mobilePoster="/media/hero-mobile-poster.jpg"
           />
-          {/* overlapping report fragment */}
-          <div className="paper-card absolute -bottom-10 -left-3 w-44 rotate-[-3deg] p-4 sm:w-52 sm:-left-8">
-            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-faint">
-              Live profile
-            </span>
-            <DiscRadarChart
-              scores={{ d: 74, i: 62, s: 34, c: 48 }}
-              showScores={false}
-              className="mt-1"
-            />
+          {/* Live Profile — an authentic result resting over the desk area,
+              never the faces. Sizes step down on smaller viewports; the
+              gentle float lives in .live-profile-card (reduced-motion: static). */}
+          <div className="relative z-10 -mt-12 ml-3 w-40 rotate-[-2.5deg] sm:absolute sm:-bottom-10 sm:-left-6 sm:ml-0 sm:mt-0 sm:w-40 lg:-bottom-11 lg:-left-9 lg:w-44">
+            <div className="live-profile-card p-3.5">
+              <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-teal">
+                Live profile
+              </span>
+              <p className="mt-0.5 font-display text-[15px] font-semibold leading-tight text-ink">
+                Stable + Analytical
+              </p>
+              <dl className="mt-1.5 flex flex-col gap-0.5 border-y border-hairline/60 py-1.5">
+                {[
+                  ["Primary", "Stable"],
+                  ["Contrast", "Dominant"],
+                  ["Supporting", "Analytical"],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex items-baseline justify-between gap-3">
+                    <dt className="font-mono text-[8.5px] uppercase tracking-[0.12em] text-faint">
+                      {label}
+                    </dt>
+                    <dd className="text-[11px] font-medium text-ink">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <DiscRadarChart
+                scores={{ d: 54, i: 42, s: 56, c: 48 }}
+                showScores
+                className="mt-1.5"
+              />
+            </div>
           </div>
         </div>
       </div>
