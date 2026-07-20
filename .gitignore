@@ -57,3 +57,4 @@ next-env.d.ts
 # via scripts/process-media.mjs). The brand mark master IS committed.
 /assets-src/media/
 /assets-src/brand/mark.png
+/.playwright-mcp/
