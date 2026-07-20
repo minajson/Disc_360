@@ -41,18 +41,34 @@ export default async function CombinedAssessmentController() {
   if (!(await completed("assessment_sessions", combined.disc_session_id))) {
     let discId = combined.disc_session_id;
     if (!discId) {
-      const { data: version } = await supabase
-        .from("assessment_versions")
-        .select("id")
-        .eq("is_active", true)
-        .single();
-      if (!version) redirect("/combined");
-      const { data: session } = await supabase
+      // Adopt an existing open attempt in the SAME scope first — one active
+      // attempt per (user, team) is a database constraint, and continuing
+      // that attempt is what the participant expects.
+      let adoptQuery = supabase
         .from("assessment_sessions")
-        .insert({ profile_id: user.id, version_id: version!.id, team_id: combined.team_id })
         .select("id")
-        .single();
-      discId = session?.id ?? null;
+        .eq("profile_id", user.id)
+        .eq("status", "in_progress");
+      adoptQuery = combined.team_id
+        ? adoptQuery.eq("team_id", combined.team_id)
+        : adoptQuery.is("team_id", null);
+      const { data: adoptable } = await adoptQuery.limit(1).maybeSingle();
+      if (adoptable) {
+        discId = adoptable.id;
+      } else {
+        const { data: version } = await supabase
+          .from("assessment_versions")
+          .select("id")
+          .eq("is_active", true)
+          .single();
+        if (!version) redirect("/combined");
+        const { data: session } = await supabase
+          .from("assessment_sessions")
+          .insert({ profile_id: user.id, version_id: version!.id, team_id: combined.team_id })
+          .select("id")
+          .single();
+        discId = session?.id ?? null;
+      }
       if (!discId) redirect("/combined");
       await supabase.from("combined_sessions").update({ disc_session_id: discId }).eq("id", combined.id);
     }
@@ -63,18 +79,31 @@ export default async function CombinedAssessmentController() {
   if (!(await completed("focus_sessions", combined.focus_session_id))) {
     let focusId = combined.focus_session_id;
     if (!focusId) {
-      const { data: version } = await supabase
-        .from("focus_versions")
-        .select("id")
-        .eq("is_active", true)
-        .single();
-      if (!version) redirect("/combined");
-      const { data: session } = await supabase
+      let adoptQuery = supabase
         .from("focus_sessions")
-        .insert({ profile_id: user.id, version_id: version!.id, team_id: combined.team_id })
         .select("id")
-        .single();
-      focusId = session?.id ?? null;
+        .eq("profile_id", user.id)
+        .eq("status", "in_progress");
+      adoptQuery = combined.team_id
+        ? adoptQuery.eq("team_id", combined.team_id)
+        : adoptQuery.is("team_id", null);
+      const { data: adoptable } = await adoptQuery.limit(1).maybeSingle();
+      if (adoptable) {
+        focusId = adoptable.id;
+      } else {
+        const { data: version } = await supabase
+          .from("focus_versions")
+          .select("id")
+          .eq("is_active", true)
+          .single();
+        if (!version) redirect("/combined");
+        const { data: session } = await supabase
+          .from("focus_sessions")
+          .insert({ profile_id: user.id, version_id: version!.id, team_id: combined.team_id })
+          .select("id")
+          .single();
+        focusId = session?.id ?? null;
+      }
       if (!focusId) redirect("/combined");
       await supabase.from("combined_sessions").update({ focus_session_id: focusId }).eq("id", combined.id);
     }

@@ -137,6 +137,12 @@ test("QR join opens the Focus assessment for a Focus team", async ({ page, brows
   // Facilitator creates a Focus team and grabs the join link.
   await signUpIndividual(page, "QR Facilitator", `pw-qrfac-${Date.now()}@disc360.dev`);
   await createTeam(page, "focus", "QR Focus");
+  // New teams start in draft: the facilitator explicitly opens the
+  // assessment window before participants can begin (session controls).
+  await page.goto(page.url().replace(/\/dashboard.*/, "/settings"));
+  await page.getByRole("button", { name: "Open assessment" }).click();
+  await expect(page.getByText("Assessment open")).toBeVisible({ timeout: 10_000 });
+  await page.goto(page.url().replace(/\/settings.*/, "/dashboard"));
   const joinHref = await page
     .getByRole("link", { name: "Open participant join page" })
     .getAttribute("href");
@@ -157,7 +163,9 @@ test("QR join opens the Focus assessment for a Focus team", async ({ page, brows
   await participant.waitForURL("**/focus/assessment/**", { timeout: 30_000 });
   await expect(participant.getByText("Question 1 of 6")).toBeVisible();
   await completeFocus(participant);
-  await participant.waitForURL("**/focus/results/**", { timeout: 20_000 });
+  // Facilitated participants wait for release; submission lands on the card.
+  await participant.waitForURL(/\/app(\?|$)/, { timeout: 20_000 });
+  await expect(participant.getByText("Assessment submitted")).toBeVisible();
   await participantContext.close();
 
   // The facilitator's Focus summary now reflects the participant's completion
