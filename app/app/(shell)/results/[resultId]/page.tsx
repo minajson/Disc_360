@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireOnboarded } from "@/lib/auth/guards";
+import { requireResultReleased } from "@/lib/teams/session-guard";
 import { insightMap, type ArchetypeInsight } from "@/data/insight-maps";
 import { dimensionMeta } from "@/data/dimension-meta";
 import { contrastingTendency } from "@/lib/scoring/archetype";
@@ -123,6 +124,8 @@ export default async function ResultPage({
   const { resultId } = await params;
   const { autoprint } = await searchParams;
   const { supabase } = await requireOnboarded();
+  // Facilitator-led release gate: held results bounce to the session card.
+  await requireResultReleased("disc");
 
   const { data: result } = await supabase
     .from("assessment_results")

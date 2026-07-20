@@ -318,3 +318,21 @@ end $$;
 -- that already have members run with the assessment window open.
 update public.teams set session_state = 'assessment_open'
 where exists (select 1 from public.team_members m where m.team_id = teams.id);
+
+-- Team-scope the seeded attempts (00018): each seeded participant belongs to
+-- exactly one team, and their fixture attempts were taken for that team.
+update public.assessment_sessions s
+set team_id = m.team_id
+from (
+  select profile_id, min(team_id::text)::uuid as team_id
+  from public.team_members
+  where profile_id is not null
+  group by profile_id
+  having count(distinct team_id) = 1
+) m
+where m.profile_id = s.profile_id and s.team_id is null;
+
+update public.assessment_results r
+set team_id = s.team_id
+from public.assessment_sessions s
+where r.session_id = s.id and r.team_id is null;

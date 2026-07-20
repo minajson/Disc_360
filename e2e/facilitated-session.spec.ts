@@ -366,3 +366,170 @@ test("15: the backend rejects assessments the facilitator did not select", async
   const discSessions = sql(`select count(*) from assessment_sessions where profile_id='${uid}'`);
   expect(discSessions).toBe("1");
 });
+
+test("16: combined facilitated flow — DISC then Focus, wait for release, then view result", async ({
+  page,
+}) => {
+  test.slow();
+  const team = makeTeam({ code: "FCL-6001", assessment: "combined", state: "assessment_open" });
+  const email = "facil-combined-run@disc360.dev";
+  const uid = await createUser(email);
+  onboardProfile(uid, email, "Combined Runner");
+  addMember(team.id, uid, email, "Combined Runner");
+
+  await signIn(page, email);
+  await page.goto("/app");
+  await expect(page.getByRole("heading", { name: "Combined DISC + Focus" })).toBeVisible();
+  await page.getByRole("button", { name: "Begin assessment" }).click();
+
+  // Stage 1: the 24 DISC scenarios.
+  await page.waitForURL("**/app/assessments/**", { timeout: 20000 });
+  for (let scenario = 0; scenario < 24; scenario++) {
+    await expect(page.getByText(`Scenario ${scenario + 1} of 24`)).toBeVisible({ timeout: 15000 });
+    const options = page.getByRole("group").getByRole("button");
+    await options.first().click();
+    await options.nth(1).click();
+  }
+  await page.getByRole("button", { name: "Submit assessment" }).click();
+
+  // Stage 2: the Focus questions (controller hands over automatically).
+  await page.waitForURL("**/focus/assessment/**", { timeout: 30000 });
+  for (let i = 0; i < 6; i++) {
+    await page.getByText(new RegExp(`Question ${i + 1} of 6`)).waitFor({ timeout: 15000 });
+    const isScale = await page.getByRole("button", { name: "6", exact: true }).isVisible().catch(() => false);
+    if (isScale) await page.getByRole("button", { name: "6", exact: true }).click();
+    else await page.getByRole("group").getByRole("button").first().click();
+  }
+  await page.getByRole("button", { name: /See my Focus profile|Submit/i }).click();
+
+  // Results are HELD: the participant lands on the waiting card, and even a
+  // deep link to the combined result bounces back.
+  await page.waitForURL("**/app", { timeout: 30000 });
+  await expect(page.getByText("Assessment submitted")).toBeVisible();
+  const combinedId = sql(
+    `select id from combined_sessions where profile_id='${uid}' order by created_at desc limit 1`,
+  );
+  await page.goto(`/combined/results/${combinedId}`);
+  await page.waitForURL("**/app", { timeout: 15000 });
+
+  // Facilitator releases → the card flips and the result opens.
+  sql(`update teams set session_state='results' where id='${team.id}'`);
+  await page.goto("/app");
+  await expect(page.getByText("Your result is ready")).toBeVisible();
+  await page.getByRole("link", { name: "View result" }).click();
+  await page.waitForURL("**/combined/results/**", { timeout: 20000 });
+  await expect(page.getByText(/Behaviour|Focus/i).first()).toBeVisible();
+
+  sql(`delete from combined_sessions where profile_id='${uid}'`);
+  sql(`delete from focus_results where profile_id='${uid}'`);
+  sql(`delete from focus_sessions where profile_id='${uid}'`);
+});
+
+test("17: two teams, two participants — attempts and reports are fully isolated", async ({
+  browser,
+}) => {
+  test.slow();
+  const alpha = makeTeam({ code: "FCL-7A01", assessment: "disc", state: "assessment_open" });
+  const beta = makeTeam({ code: "FCL-7B01", assessment: "disc", state: "assessment_open" });
+  const emailA = "facil-alpha@disc360.dev";
+  const emailB = "facil-beta@disc360.dev";
+  const uidA = await createUser(emailA);
+  const uidB = await createUser(emailB);
+  onboardProfile(uidA, emailA, "Alpha Person");
+  onboardProfile(uidB, emailB, "Beta Person");
+  addMember(alpha.id, uidA, emailA, "Alpha Person");
+  addMember(beta.id, uidB, emailB, "Beta Person");
+  // Participant A ALSO belongs to Beta — attempts must stay distinct per team.
+  addMember(beta.id, uidA, emailA, "Alpha Person");
+
+  // Real distinct auth users in separate browser contexts.
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const pageA = await ctxA.newPage();
+  const pageB = await ctxB.newPage();
+
+  // A completes DISC in Alpha (bound to Alpha explicitly via the card CTA).
+  await signIn(pageA, emailA);
+  await pageA.goto("/app");
+  await pageA.getByRole("button", { name: "Begin assessment" }).first().click();
+  await pageA.waitForURL("**/app/assessments/**", { timeout: 20000 });
+  for (let scenario = 0; scenario < 24; scenario++) {
+    await expect(pageA.getByText(`Scenario ${scenario + 1} of 24`)).toBeVisible({ timeout: 15000 });
+    const options = pageA.getByRole("group").getByRole("button");
+    await options.first().click();
+    await options.nth(1).click();
+  }
+  await pageA.getByRole("button", { name: "Submit assessment" }).click();
+  await pageA.waitForURL("**/app**", { timeout: 30000 });
+
+  // A's attempt/result is bound to exactly ONE team.
+  const aAttemptTeams = sql(
+    `select coalesce(team_id::text,'null') from assessment_sessions where profile_id='${uidA}'`,
+  ).split("\n");
+  expect(aAttemptTeams.filter((t) => t !== "null").length).toBe(1);
+  const aResultTeam = sql(`select team_id from assessment_results where profile_id='${uidA}'`);
+  expect([alpha.id, beta.id]).toContain(aResultTeam);
+
+  // B in Beta can start independently (multi-user launch defect regression).
+  await signIn(pageB, emailB);
+  await pageB.goto("/app");
+  await expect(pageB.getByRole("heading", { name: "DISC Behaviour Assessment" })).toBeVisible();
+  await pageB.getByRole("button", { name: "Begin assessment" }).click();
+  await pageB.waitForURL("**/app/assessments/**", { timeout: 20000 });
+  await expect(pageB.getByText("Scenario 1 of 24")).toBeVisible();
+  const bAttempt = sql(
+    `select team_id from assessment_sessions where profile_id='${uidB}' and status='in_progress'`,
+  );
+  expect(bAttempt).toBe(beta.id);
+
+  // Report isolation: the completed Alpha result appears ONLY in the team it
+  // was taken for — the other roster shows zero completed.
+  const aTeam = aResultTeam;
+  const otherTeam = aTeam === alpha.id ? beta.id : alpha.id;
+  const inTeam = sql(
+    `select count(*) from assessment_results where profile_id='${uidA}' and team_id='${aTeam}'`,
+  );
+  const inOther = sql(
+    `select count(*) from assessment_results where profile_id='${uidA}' and team_id='${otherTeam}'`,
+  );
+  expect(inTeam).toBe("1");
+  expect(inOther).toBe("0");
+
+  // The admin dashboards reflect the same isolation.
+  const admin = await browser.newContext();
+  const pageAdmin = await admin.newPage();
+  await signIn(pageAdmin, "demo@disc360.dev", "disc360-demo");
+  await pageAdmin.goto(`/app/teams/${otherTeam}/dashboard`);
+  await expect(pageAdmin.getByText("Completed").locator("..").getByText("0")).toBeVisible();
+
+  await ctxA.close();
+  await ctxB.close();
+  await admin.close();
+});
+
+test("18: denial reasons are explicit, never silent", async ({ page }) => {
+  const team = makeTeam({ code: "FCL-8001", assessment: "disc", state: "draft" });
+  const email = "facil-denied@disc360.dev";
+  const uid = await createUser(email);
+  onboardProfile(uid, email, "Denied Member");
+  addMember(team.id, uid, email, "Denied Member");
+
+  await signIn(page, email);
+  // Direct deep-link to the DISC product start while the session is draft.
+  await page.goto("/disc");
+  const start = page.getByRole("button", { name: /Start|Begin|assessment/i }).first();
+  if (await start.isVisible().catch(() => false)) {
+    await start.click();
+    await page.waitForURL("**/app?notice=session_not_open", { timeout: 15000 });
+    await expect(
+      page.getByText("The assessment has not been opened by the facilitator yet."),
+    ).toBeVisible();
+  }
+  // Wrong product while facilitated: explicit reason too.
+  await page.goto("/focus");
+  const focusStart = page.getByRole("button", { name: /Start|Begin|assessment/i }).first();
+  if (await focusStart.isVisible().catch(() => false)) {
+    await focusStart.click();
+    await page.waitForURL(/notice=(wrong_assessment|session_not_open)/, { timeout: 15000 });
+  }
+});

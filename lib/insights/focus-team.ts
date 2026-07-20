@@ -89,7 +89,9 @@ export async function getFocusTeamSummary(
   const { data: results } = profileIds.length
     ? await admin
         .from("focus_results")
+        // Team isolation: only results taken for this team.
         .select("profile_id, automaticity, distraction, mental_load, recovery, pattern_code, primary_loop, notification_pattern, energy_pattern, preferred_reset")
+        .eq("team_id", teamId)
         .in("profile_id", profileIds)
     : { data: [] as never[] };
 

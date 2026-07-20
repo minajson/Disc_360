@@ -186,7 +186,7 @@ export async function joinAndStart(
     if (!version) return { status: "error", message: "No active Focus Pulse is configured." };
     const { data: session, error } = await admin
       .from("focus_sessions")
-      .insert({ profile_id: userId, version_id: version.id })
+      .insert({ profile_id: userId, version_id: version.id, team_id: context.teamId })
       .select("id")
       .single();
     if (error || !session) {
@@ -197,7 +197,9 @@ export async function joinAndStart(
 
   if (assessmentType === "combined") {
     // The controller creates the combined_session and drives DISC → Focus.
-    await admin.from("combined_sessions").insert({ profile_id: userId });
+    await admin
+      .from("combined_sessions")
+      .insert({ profile_id: userId, team_id: context.teamId });
     redirect(`/combined/assessment`);
   }
 
@@ -210,7 +212,7 @@ export async function joinAndStart(
 
   const { data: session, error: sessionError } = await admin
     .from("assessment_sessions")
-    .insert({ profile_id: userId, version_id: version.id })
+    .insert({ profile_id: userId, version_id: version.id, team_id: context.teamId })
     .select("id")
     .single();
   if (sessionError || !session) {

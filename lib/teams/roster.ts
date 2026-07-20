@@ -90,7 +90,10 @@ export async function getTeamRoster(teamId: string): Promise<TeamRoster> {
       profileIds.length
         ? admin
             .from("assessment_results")
+            // Team isolation: ONLY results taken for this team. A member's
+            // results from other teams or individual runs never appear here.
             .select("id, profile_id, archetype_code, primary_dimension, secondary_dimension, created_at")
+            .eq("team_id", teamId)
             .in("profile_id", profileIds)
             .order("created_at", { ascending: false })
         : Promise.resolve({ data: [] as never[], error: null }),
@@ -98,6 +101,7 @@ export async function getTeamRoster(teamId: string): Promise<TeamRoster> {
         ? admin
             .from("assessment_sessions")
             .select("profile_id, status")
+            .eq("team_id", teamId)
             .in("profile_id", profileIds)
             .eq("status", "in_progress")
         : Promise.resolve({ data: [] as never[], error: null }),

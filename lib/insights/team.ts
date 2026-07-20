@@ -160,7 +160,9 @@ export async function getTeamIntelligence(
   const { data: results } = profileIds.length
     ? await admin
         .from("assessment_results")
+        // Team isolation: only results taken for this team.
         .select("profile_id, score_d, score_i, score_s, score_c, archetype_code, primary_dimension, created_at, profiles (profession)")
+        .eq("team_id", teamId)
         .in("profile_id", profileIds)
         .order("created_at", { ascending: false })
     : { data: [] };

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireOnboarded } from "@/lib/auth/guards";
+import { facilitatedProductState } from "@/lib/teams/session-guard";
 
 /**
  * Combined controller. Each visit advances the flow: DISC first, then Focus,
@@ -13,7 +14,7 @@ export default async function CombinedAssessmentController() {
   // The in-progress combined session (created by startCombinedAssessment).
   let { data: combined } = await supabase
     .from("combined_sessions")
-    .select("id, disc_session_id, focus_session_id, status")
+    .select("id, disc_session_id, focus_session_id, status, team_id")
     .eq("profile_id", user.id)
     .eq("status", "in_progress")
     .order("created_at", { ascending: false })
@@ -24,7 +25,7 @@ export default async function CombinedAssessmentController() {
     const { data: created } = await supabase
       .from("combined_sessions")
       .insert({ profile_id: user.id })
-      .select("id, disc_session_id, focus_session_id, status")
+      .select("id, disc_session_id, focus_session_id, status, team_id")
       .single();
     combined = created;
   }
@@ -48,7 +49,7 @@ export default async function CombinedAssessmentController() {
       if (!version) redirect("/combined");
       const { data: session } = await supabase
         .from("assessment_sessions")
-        .insert({ profile_id: user.id, version_id: version!.id })
+        .insert({ profile_id: user.id, version_id: version!.id, team_id: combined.team_id })
         .select("id")
         .single();
       discId = session?.id ?? null;
@@ -70,7 +71,7 @@ export default async function CombinedAssessmentController() {
       if (!version) redirect("/combined");
       const { data: session } = await supabase
         .from("focus_sessions")
-        .insert({ profile_id: user.id, version_id: version!.id })
+        .insert({ profile_id: user.id, version_id: version!.id, team_id: combined.team_id })
         .select("id")
         .single();
       focusId = session?.id ?? null;
@@ -80,7 +81,10 @@ export default async function CombinedAssessmentController() {
     redirect(`/focus/assessment/${focusId}`);
   }
 
-  // ── Both done: finalize and show the combined result ──
+  // ── Both done: finalize. Facilitated participants wait on the session
+  // card until the facilitator releases; everyone else sees the result. ──
   await supabase.from("combined_sessions").update({ status: "completed" }).eq("id", combined.id);
+  const release = await facilitatedProductState(supabase, user.id, "combined");
+  if (release === "held") redirect("/app");
   redirect(`/combined/results/${combined.id}`);
 }

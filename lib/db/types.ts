@@ -181,6 +181,7 @@ export type Database = {
           secondary_dimension: Database["public"]["Enums"]["dimension"] | null
           session_id: string
           share_token: string
+          team_id: string | null
         }
         Insert: {
           archetype_code: Database["public"]["Enums"]["archetype_code"]
@@ -199,6 +200,7 @@ export type Database = {
           secondary_dimension?: Database["public"]["Enums"]["dimension"] | null
           session_id: string
           share_token?: string
+          team_id?: string | null
         }
         Update: {
           archetype_code?: Database["public"]["Enums"]["archetype_code"]
@@ -217,6 +219,7 @@ export type Database = {
           secondary_dimension?: Database["public"]["Enums"]["dimension"] | null
           session_id?: string
           share_token?: string
+          team_id?: string | null
         }
         Relationships: [
           {
@@ -233,6 +236,13 @@ export type Database = {
             referencedRelation: "assessment_sessions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "assessment_results_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
         ]
       }
       assessment_sessions: {
@@ -245,6 +255,7 @@ export type Database = {
           profile_id: string
           started_at: string
           status: Database["public"]["Enums"]["session_status"]
+          team_id: string | null
           updated_at: string
           version_id: string
         }
@@ -257,6 +268,7 @@ export type Database = {
           profile_id: string
           started_at?: string
           status?: Database["public"]["Enums"]["session_status"]
+          team_id?: string | null
           updated_at?: string
           version_id: string
         }
@@ -269,6 +281,7 @@ export type Database = {
           profile_id?: string
           started_at?: string
           status?: Database["public"]["Enums"]["session_status"]
+          team_id?: string | null
           updated_at?: string
           version_id?: string
         }
@@ -285,6 +298,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assessment_sessions_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
           {
@@ -483,6 +503,7 @@ export type Database = {
           id: string
           profile_id: string
           status: Database["public"]["Enums"]["session_status"]
+          team_id: string | null
           updated_at: string
         }
         Insert: {
@@ -493,6 +514,7 @@ export type Database = {
           id?: string
           profile_id: string
           status?: Database["public"]["Enums"]["session_status"]
+          team_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -503,6 +525,7 @@ export type Database = {
           id?: string
           profile_id?: string
           status?: Database["public"]["Enums"]["session_status"]
+          team_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -532,6 +555,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combined_sessions_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -728,6 +758,7 @@ export type Database = {
           raw: Json
           recovery: number
           session_id: string
+          team_id: string | null
         }
         Insert: {
           automaticity: number
@@ -744,6 +775,7 @@ export type Database = {
           raw?: Json
           recovery: number
           session_id: string
+          team_id?: string | null
         }
         Update: {
           automaticity?: number
@@ -760,6 +792,7 @@ export type Database = {
           raw?: Json
           recovery?: number
           session_id?: string
+          team_id?: string | null
         }
         Relationships: [
           {
@@ -776,6 +809,13 @@ export type Database = {
             referencedRelation: "focus_sessions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "focus_results_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
         ]
       }
       focus_sessions: {
@@ -788,6 +828,7 @@ export type Database = {
           profile_id: string
           started_at: string
           status: Database["public"]["Enums"]["session_status"]
+          team_id: string | null
           updated_at: string
           version_id: string
         }
@@ -800,6 +841,7 @@ export type Database = {
           profile_id: string
           started_at?: string
           status?: Database["public"]["Enums"]["session_status"]
+          team_id?: string | null
           updated_at?: string
           version_id: string
         }
@@ -812,6 +854,7 @@ export type Database = {
           profile_id?: string
           started_at?: string
           status?: Database["public"]["Enums"]["session_status"]
+          team_id?: string | null
           updated_at?: string
           version_id?: string
         }
@@ -828,6 +871,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "focus_sessions_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
           {

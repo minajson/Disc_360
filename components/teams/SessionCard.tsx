@@ -68,6 +68,8 @@ export function SessionCard({
 
         {view.cta === "begin_assessment" ? (
           <form action={START_ACTIONS[team.assessment_type]}>
+            {/* Canonical context: the attempt binds to THIS team's session. */}
+            <input type="hidden" name="team_id" value={team.id} />
             <Button type="submit" size="lg">
               Begin assessment
             </Button>

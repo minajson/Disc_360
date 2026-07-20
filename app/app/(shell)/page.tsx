@@ -40,7 +40,21 @@ interface TeamMembershipRow {
   } | null;
 }
 
-export default async function AppDashboardPage() {
+const NOTICES: Record<string, string> = {
+  session_not_open: "The assessment has not been opened by the facilitator yet.",
+  wrong_assessment: "This assessment is not part of your current session.",
+  wrong_team: "This invitation belongs to another team.",
+  result_not_released: "Your facilitator has not released results yet.",
+  attempt_failed: "We could not create your assessment attempt. Please try again.",
+};
+
+export default async function AppDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ notice?: string }>;
+}) {
+  const { notice } = await searchParams;
+  const noticeMessage = notice ? (NOTICES[notice] ?? null) : null;
   const context = await requireOnboarded();
   const { supabase, user, profile } = context;
 
@@ -86,6 +100,8 @@ export default async function AppDashboardPage() {
 
   let sessionProgress: SessionProgress | null = null;
   if (facilitatedTeam) {
+    // Progress is scoped to THIS team's attempts — an attempt or result from
+    // another team (or an individual run) never satisfies this session.
     const type = facilitatedTeam.assessment_type as AssessmentProduct;
     if (type === "focus") {
       const [{ data: open }, { data: result }] = await Promise.all([
@@ -93,6 +109,7 @@ export default async function AppDashboardPage() {
           .from("focus_sessions")
           .select("id")
           .eq("profile_id", user.id)
+          .eq("team_id", facilitatedTeam.id)
           .eq("status", "in_progress")
           .limit(1)
           .maybeSingle(),
@@ -100,6 +117,7 @@ export default async function AppDashboardPage() {
           .from("focus_results")
           .select("id")
           .eq("profile_id", user.id)
+          .eq("team_id", facilitatedTeam.id)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
@@ -111,18 +129,46 @@ export default async function AppDashboardPage() {
         resultHref: result ? `/focus/results/${result.id}` : null,
       };
     } else if (type === "combined") {
-      const [{ data: open }, { data: result }] = await Promise.all([
+      const [{ data: open }, { data: done }] = await Promise.all([
         supabase
           .from("combined_sessions")
           .select("id")
           .eq("profile_id", user.id)
+          .eq("team_id", facilitatedTeam.id)
           .eq("status", "in_progress")
           .limit(1)
           .maybeSingle(),
         supabase
-          .from("combined_results")
+          .from("combined_sessions")
           .select("id")
           .eq("profile_id", user.id)
+          .eq("team_id", facilitatedTeam.id)
+          .eq("status", "completed")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      sessionProgress = {
+        hasOpenSession: Boolean(open),
+        hasResult: Boolean(done),
+        continueHref: open ? "/combined/assessment" : null,
+        resultHref: done ? `/combined/results/${done.id}` : null,
+      };
+    } else {
+      const [{ data: open }, { data: result }] = await Promise.all([
+        supabase
+          .from("assessment_sessions")
+          .select("id")
+          .eq("profile_id", user.id)
+          .eq("team_id", facilitatedTeam.id)
+          .eq("status", "in_progress")
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("assessment_results")
+          .select("id")
+          .eq("profile_id", user.id)
+          .eq("team_id", facilitatedTeam.id)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
@@ -130,21 +176,19 @@ export default async function AppDashboardPage() {
       sessionProgress = {
         hasOpenSession: Boolean(open),
         hasResult: Boolean(result),
-        continueHref: open ? "/combined/assessment" : null,
-        resultHref: result ? `/combined/results/${result.id}` : null,
-      };
-    } else {
-      sessionProgress = {
-        hasOpenSession: Boolean(openSession),
-        hasResult: Boolean(latest),
-        continueHref: openSession ? `/app/assessments/${openSession.id}` : null,
-        resultHref: latest ? `/app/results/${latest.id}` : null,
+        continueHref: open ? `/app/assessments/${open.id}` : null,
+        resultHref: result ? `/app/results/${result.id}` : null,
       };
     }
   }
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-5 py-10 sm:px-8">
+      {noticeMessage ? (
+        <p role="alert" className="rounded-xl border-l-4 border-l-disc-i bg-sand/60 px-4 py-3 text-sm text-ink">
+          {noticeMessage}
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div className="flex flex-col gap-1.5">
           <Eyebrow>Dashboard</Eyebrow>

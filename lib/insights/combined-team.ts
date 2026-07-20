@@ -42,7 +42,9 @@ export async function getCombinedTeamSummary(
   const { data: discResults } = profileIds.length
     ? await admin
         .from("assessment_results")
+        // Team isolation: only results taken for this team.
         .select("profile_id, primary_dimension, score_d, score_i, score_s, score_c")
+        .eq("team_id", teamId)
         .in("profile_id", profileIds)
         .order("created_at", { ascending: false })
     : { data: [] as never[] };

@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOnboarded } from "@/lib/auth/guards";
-import { requireProductAllowed } from "@/lib/teams/session-guard";
+import { facilitatedProductState, requireProductAllowed } from "@/lib/teams/session-guard";
 import { computeFocusResult, type FocusAnswerInput } from "@/lib/scoring/focus";
 
 /**
@@ -13,17 +13,24 @@ import { computeFocusResult, type FocusAnswerInput } from "@/lib/scoring/focus";
  * never only in the browser.
  */
 
-/** Resume the open Focus session or start a new one, then go to the runner. */
-export async function startFocusAssessment(): Promise<void> {
+/**
+ * Resume the open Focus session or start a new one, then go to the runner.
+ * Attempts are team-bound (facilitated) or individual — never cross-team.
+ */
+export async function startFocusAssessment(formData?: FormData): Promise<void> {
+  const requestedTeam = (formData?.get("team_id") as string | null) || null;
   // Backend lock: facilitator-led participants can only start the
   // assessment their facilitator selected, while its window is open.
-  const { supabase, user } = await requireProductAllowed("focus");
+  const { context, teamId } = await requireProductAllowed("focus", requestedTeam);
+  const { supabase, user } = context;
 
-  const { data: existing } = await supabase
+  let resumeQuery = supabase
     .from("focus_sessions")
     .select("id")
     .eq("profile_id", user.id)
-    .eq("status", "in_progress")
+    .eq("status", "in_progress");
+  resumeQuery = teamId ? resumeQuery.eq("team_id", teamId) : resumeQuery.is("team_id", null);
+  const { data: existing } = await resumeQuery
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -38,7 +45,7 @@ export async function startFocusAssessment(): Promise<void> {
 
   const { data: session, error } = await supabase
     .from("focus_sessions")
-    .insert({ profile_id: user.id, version_id: version.id })
+    .insert({ profile_id: user.id, version_id: version.id, team_id: teamId })
     .select("id")
     .single();
   if (error || !session) throw new Error("Could not start the Focus Pulse");
@@ -75,7 +82,7 @@ export async function saveFocusResponse(
 
   const { data: session } = await supabase
     .from("focus_sessions")
-    .select("id, status, profile_id, current_index, version_id")
+    .select("id, status, profile_id, current_index, version_id, team_id")
     .eq("id", sessionId)
     .maybeSingle();
   if (!session || session.profile_id !== user.id) {
@@ -148,7 +155,7 @@ export async function submitFocusAssessment(sessionId: string): Promise<SubmitFo
 
   const { data: session } = await supabase
     .from("focus_sessions")
-    .select("id, status, profile_id, version_id")
+    .select("id, status, profile_id, version_id, team_id")
     .eq("id", sessionId)
     .maybeSingle();
   if (!session || session.profile_id !== user.id) {
@@ -195,6 +202,7 @@ export async function submitFocusAssessment(sessionId: string): Promise<SubmitFo
     .insert({
       session_id: sessionId,
       profile_id: user.id,
+      team_id: session.team_id ?? null,
       automaticity: computed.scores.automaticity,
       distraction: computed.scores.distraction,
       mental_load: computed.scores.mentalLoad,
@@ -227,5 +235,7 @@ export async function submitFocusAssessment(sessionId: string): Promise<SubmitFo
     .maybeSingle();
   if (combined) redirect("/combined/assessment");
 
+  // Facilitator-led participants wait until results are released.
+  if ((await facilitatedProductState(supabase, user.id, "focus")) === "held") redirect("/app");
   redirect(`/focus/results/${resultRow.id}?new=1`);
 }

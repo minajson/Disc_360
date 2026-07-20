@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOnboarded } from "@/lib/auth/guards";
+import { requireResultReleased } from "@/lib/teams/session-guard";
 import { FocusResultView, type FocusResultData } from "@/components/focus/FocusResultView";
 import type {
   EnergyKey,
@@ -20,6 +21,8 @@ interface PageProps {
 export default async function FocusResultPage({ params }: PageProps) {
   const { resultId } = await params;
   const { supabase, user } = await requireOnboarded();
+  // Facilitator-led release gate: held results bounce to the session card.
+  await requireResultReleased("focus");
 
   const { data: result } = await supabase
     .from("focus_results")

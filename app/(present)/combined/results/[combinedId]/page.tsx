@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOnboarded } from "@/lib/auth/guards";
+import { requireResultReleased } from "@/lib/teams/session-guard";
 import { loadCombinedResult } from "@/lib/insights/combined-loader";
 import { CombinedResultView } from "@/components/combined/CombinedResultView";
 
@@ -14,6 +15,8 @@ interface PageProps {
 export default async function CombinedResultPage({ params }: PageProps) {
   const { combinedId } = await params;
   const { supabase, user } = await requireOnboarded();
+  // Facilitator-led release gate: held results bounce to the session card.
+  await requireResultReleased("combined");
 
   const assembled = await loadCombinedResult(supabase, combinedId, user.id);
   if (!assembled) notFound();

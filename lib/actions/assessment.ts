@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOnboarded } from "@/lib/auth/guards";
-import { requireProductAllowed } from "@/lib/teams/session-guard";
+import { facilitatedProductState, requireProductAllowed } from "@/lib/teams/session-guard";
 import { computeResult } from "@/lib/scoring/compute-result";
 import { insightMap } from "@/data/insight-maps";
 import {
@@ -17,17 +17,25 @@ import type { Question } from "@/lib/types";
  * owner; these actions re-verify ownership and enforce flow invariants.
  */
 
-/** Resume the open session or create a new one, then go to the runner. */
-export async function startAssessment(): Promise<void> {
+/**
+ * Resume the open session or create a new one, then go to the runner.
+ * The attempt binds to the authorized team (facilitated) or to none
+ * (individual) — resume NEVER picks up an attempt from another team.
+ */
+export async function startAssessment(formData?: FormData): Promise<void> {
+  const requestedTeam = (formData?.get("team_id") as string | null) || null;
   // Backend lock: facilitator-led participants can only start the
   // assessment their facilitator selected, while its window is open.
-  const { supabase, user } = await requireProductAllowed("disc");
+  const { context, teamId } = await requireProductAllowed("disc", requestedTeam);
+  const { supabase, user } = context;
 
-  const { data: existing } = await supabase
+  let resumeQuery = supabase
     .from("assessment_sessions")
     .select("id")
     .eq("profile_id", user.id)
-    .eq("status", "in_progress")
+    .eq("status", "in_progress");
+  resumeQuery = teamId ? resumeQuery.eq("team_id", teamId) : resumeQuery.is("team_id", null);
+  const { data: existing } = await resumeQuery
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -43,7 +51,7 @@ export async function startAssessment(): Promise<void> {
 
   const { data: session, error } = await supabase
     .from("assessment_sessions")
-    .insert({ profile_id: user.id, version_id: version.id })
+    .insert({ profile_id: user.id, version_id: version.id, team_id: teamId })
     .select("id")
     .single();
   if (error || !session) throw new Error("Could not start the assessment");
@@ -146,7 +154,7 @@ export async function submitAssessment(sessionId: string): Promise<SubmitResult>
 
   const { data: session } = await supabase
     .from("assessment_sessions")
-    .select("id, status, profile_id, version_id, campaign_id")
+    .select("id, status, profile_id, version_id, campaign_id, team_id")
     .eq("id", sessionId)
     .maybeSingle();
   if (!session || session.profile_id !== user.id) {
@@ -219,6 +227,7 @@ export async function submitAssessment(sessionId: string): Promise<SubmitResult>
     .insert({
       session_id: sessionId,
       profile_id: user.id,
+      team_id: session.team_id ?? null,
       score_d: computed.normalized.d,
       score_i: computed.normalized.i,
       score_s: computed.normalized.s,
@@ -321,5 +330,7 @@ export async function submitAssessment(sessionId: string): Promise<SubmitResult>
     }
   }
 
+  // Facilitator-led participants wait until results are released.
+  if ((await facilitatedProductState(supabase, user.id, "disc")) === "held") redirect("/app");
   redirect(`/app/results/${resultRow.id}?new=1`);
 }
