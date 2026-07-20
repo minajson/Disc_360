@@ -556,7 +556,7 @@ test("19: with several facilitated teams, the ACTIVE session wins — never a st
   await expect(page.getByText("Today’s session · Facil FCL-9002")).toBeVisible();
   await expect(page.getByRole("button", { name: "Begin assessment" })).toBeVisible();
   // Both sessions reachable through the switcher; the draft one explains itself.
-  await page.getByRole("link", { name: "Facil FCL-9001" }).click();
+  await page.getByRole("link", { name: "Facil FCL-9001", exact: true }).click();
   await expect(
     page.getByText("Your facilitator has not started the session yet."),
   ).toBeVisible();
