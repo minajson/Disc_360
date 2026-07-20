@@ -344,7 +344,7 @@ test("15: the backend rejects assessments the facilitator did not select", async
   const focusStart = page.getByRole("button", { name: /Start|Begin|assessment/i }).first();
   if (await focusStart.isVisible().catch(() => false)) {
     await focusStart.click();
-    await page.waitForURL("**/app", { timeout: 15000 });
+    await page.waitForURL(/\/app(\?notice=|$)/, { timeout: 15000 });
   }
   const focusSessions = sql(`select count(*) from focus_sessions where profile_id='${uid}'`);
   expect(focusSessions).toBe("0");
@@ -354,7 +354,7 @@ test("15: the backend rejects assessments the facilitator did not select", async
   const combinedStart = page.getByRole("button", { name: /Start|Begin|assessment/i }).first();
   if (await combinedStart.isVisible().catch(() => false)) {
     await combinedStart.click();
-    await page.waitForURL("**/app", { timeout: 15000 });
+    await page.waitForURL(/\/app(\?notice=|$)/, { timeout: 15000 });
   }
   const combinedSessions = sql(`select count(*) from combined_sessions where profile_id='${uid}'`);
   expect(combinedSessions).toBe("0");
@@ -410,7 +410,10 @@ test("16: combined facilitated flow — DISC then Focus, wait for release, then 
     `select id from combined_sessions where profile_id='${uid}' order by created_at desc limit 1`,
   );
   await page.goto(`/combined/results/${combinedId}`);
-  await page.waitForURL("**/app", { timeout: 15000 });
+  await page.waitForURL(/\/app\?notice=result_not_released/, { timeout: 15000 });
+  await expect(
+    page.getByText("Your facilitator has not released results yet."),
+  ).toBeVisible();
 
   // Facilitator releases → the card flips and the result opens.
   sql(`update teams set session_state='results' where id='${team.id}'`);
@@ -460,7 +463,8 @@ test("17: two teams, two participants — attempts and reports are fully isolate
     await options.nth(1).click();
   }
   await pageA.getByRole("button", { name: "Submit assessment" }).click();
-  await pageA.waitForURL("**/app**", { timeout: 30000 });
+  await pageA.waitForURL(/\/app(\?|$)/, { timeout: 30000 });
+  await expect(pageA.getByText("Assessment submitted")).toBeVisible({ timeout: 15000 });
 
   // A's attempt/result is bound to exactly ONE team.
   const aAttemptTeams = sql(
