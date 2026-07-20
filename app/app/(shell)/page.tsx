@@ -15,6 +15,7 @@ import { ResultQuickActions } from "@/components/report/ResultQuickActions";
 import { ProductCards } from "@/components/presentations/ProductCards";
 import { JoinByCodeForm } from "@/components/teams/JoinByCodeForm";
 import { SessionCard, type SessionProgress } from "@/components/teams/SessionCard";
+import { logRouteDiagnostic } from "@/lib/observability/diagnostics";
 import type {
   AssessmentProduct,
   PresentationAccess,
@@ -37,6 +38,7 @@ interface TeamMembershipRow {
     session_state: string;
     assessment_type: string;
     presentation_access: string;
+    updated_at: string;
   } | null;
 }
 
@@ -51,9 +53,9 @@ const NOTICES: Record<string, string> = {
 export default async function AppDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ notice?: string }>;
+  searchParams: Promise<{ notice?: string; team?: string }>;
 }) {
-  const { notice } = await searchParams;
+  const { notice, team: teamParam } = await searchParams;
   const noticeMessage = notice ? (NOTICES[notice] ?? null) : null;
   const context = await requireOnboarded();
   const { supabase, user, profile } = context;
@@ -77,7 +79,7 @@ export default async function AppDashboardPage({
       supabase
         .from("team_members")
         .select(
-          "role, teams (id, name, archived_at, session_mode, session_state, assessment_type, presentation_access)",
+          "role, teams (id, name, archived_at, session_mode, session_state, assessment_type, presentation_access, updated_at)",
         )
         .eq("profile_id", user.id),
       getTeamEntitlement(context),
@@ -91,12 +93,45 @@ export default async function AppDashboardPage({
   const showTeamManagement = isTeamAdmin || entitlement.allowed;
 
   // Facilitator-led participants get ONE session card — the coach decides
-  // what runs. Facilitators and self-paced users keep the full dashboard.
-  const facilitatedTeam = isTeamAdmin
-    ? null
-    : (teams.find(
-        (team) => team.memberRole !== "team_admin" && team.session_mode === "facilitator_led",
-      ) ?? null);
+  // what runs. With several facilitated memberships the choice must be
+  // deterministic and session-aware: an ACTIVE session always beats a draft
+  // one (the exact production mismatch: the first-returned membership was a
+  // draft team while the coach had opened another). Ties resolve to the team
+  // the coach touched most recently; ?team= lets the participant switch.
+  const SESSION_PRIORITY: Record<string, number> = {
+    presentation: 0,
+    assessment_open: 1,
+    assessment_closed: 2,
+    results: 3,
+    draft: 4,
+    ended: 5,
+  };
+  const facilitatedCandidates = isTeamAdmin
+    ? []
+    : teams
+        .filter(
+          (team) => team.memberRole !== "team_admin" && team.session_mode === "facilitator_led",
+        )
+        .sort(
+          (a, b) =>
+            (SESSION_PRIORITY[a.session_state] ?? 9) - (SESSION_PRIORITY[b.session_state] ?? 9) ||
+            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+        );
+  const facilitatedTeam =
+    facilitatedCandidates.find((team) => team.id === teamParam) ??
+    facilitatedCandidates[0] ??
+    null;
+  if (facilitatedCandidates.length > 1 && facilitatedTeam) {
+    logRouteDiagnostic({
+      route: "/app",
+      teamId: facilitatedTeam.id,
+      userId: user.id,
+      step: "session-card-selection",
+      message: `chose ${facilitatedTeam.session_state}; candidates: ${facilitatedCandidates
+        .map((t) => `${t.id.slice(0, 8)}=${t.session_state}`)
+        .join(",")}`,
+    });
+  }
 
   let sessionProgress: SessionProgress | null = null;
   if (facilitatedTeam) {
@@ -247,6 +282,23 @@ export default async function AppDashboardPage({
         </section>
       )}
 
+      {facilitatedTeam && facilitatedCandidates.length > 1 ? (
+        <nav aria-label="Your sessions" className="flex flex-wrap gap-2">
+          {facilitatedCandidates.map((team) => (
+            <Link
+              key={team.id}
+              href={`/app?team=${team.id}`}
+              className={
+                team.id === facilitatedTeam.id
+                  ? "rounded-full bg-botanical px-4 py-1.5 text-xs font-medium text-mineral"
+                  : "rounded-full border border-hairline bg-paper px-4 py-1.5 text-xs text-slate transition-colors hover:border-botanical hover:text-botanical"
+              }
+            >
+              {team.name}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
       {facilitatedTeam && sessionProgress ? (
         <SessionCard
           team={{

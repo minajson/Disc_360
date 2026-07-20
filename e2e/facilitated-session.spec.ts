@@ -537,3 +537,27 @@ test("18: denial reasons are explicit, never silent", async ({ page }) => {
     await page.waitForURL(/notice=(wrong_assessment|session_not_open)/, { timeout: 15000 });
   }
 });
+
+test("19: with several facilitated teams, the ACTIVE session wins — never a stale draft", async ({
+  page,
+}) => {
+  const draftTeam = makeTeam({ code: "FCL-9001", assessment: "combined", state: "draft" });
+  const openTeam = makeTeam({ code: "FCL-9002", assessment: "disc", state: "assessment_open" });
+  const email = "facil-multi@disc360.dev";
+  const uid = await createUser(email);
+  onboardProfile(uid, email, "Multi Member");
+  // Membership order mirrors production: the DRAFT team row comes first.
+  addMember(draftTeam.id, uid, email, "Multi Member");
+  addMember(openTeam.id, uid, email, "Multi Member");
+
+  await signIn(page, email);
+  await page.goto("/app");
+  // The open session is chosen — not the first-returned draft membership.
+  await expect(page.getByText("Today’s session · Facil FCL-9002")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Begin assessment" })).toBeVisible();
+  // Both sessions reachable through the switcher; the draft one explains itself.
+  await page.getByRole("link", { name: "Facil FCL-9001" }).click();
+  await expect(
+    page.getByText("Your facilitator has not started the session yet."),
+  ).toBeVisible();
+});
