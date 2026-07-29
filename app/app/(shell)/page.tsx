@@ -16,10 +16,11 @@ import { ProductCards } from "@/components/presentations/ProductCards";
 import { JoinByCodeForm } from "@/components/teams/JoinByCodeForm";
 import { SessionCard, type SessionProgress } from "@/components/teams/SessionCard";
 import { logRouteDiagnostic } from "@/lib/observability/diagnostics";
-import type {
-  AssessmentProduct,
-  PresentationAccess,
-  SessionState,
+import {
+  SESSION_CARD_PRIORITY,
+  type AssessmentProduct,
+  type PresentationAccess,
+  type SessionState,
 } from "@/lib/teams/session";
 import type { ArchetypeCode, Dimension } from "@/lib/types";
 
@@ -43,7 +44,6 @@ interface TeamMembershipRow {
 }
 
 const NOTICES: Record<string, string> = {
-  session_not_open: "The assessment has not been opened by the facilitator yet.",
   wrong_assessment: "This assessment is not part of your current session.",
   wrong_team: "This invitation belongs to another team.",
   result_not_released: "Your facilitator has not released results yet.",
@@ -95,17 +95,8 @@ export default async function AppDashboardPage({
   // Facilitator-led participants get ONE session card — the coach decides
   // what runs. With several facilitated memberships the choice must be
   // deterministic and session-aware: an ACTIVE session always beats a draft
-  // one (the exact production mismatch: the first-returned membership was a
-  // draft team while the coach had opened another). Ties resolve to the team
-  // the coach touched most recently; ?team= lets the participant switch.
-  const SESSION_PRIORITY: Record<string, number> = {
-    presentation: 0,
-    assessment_open: 1,
-    assessment_closed: 2,
-    results: 3,
-    draft: 4,
-    ended: 5,
-  };
+  // one. Ties resolve to the team the coach touched most recently; ?team=
+  // lets the participant switch.
   const facilitatedCandidates = isTeamAdmin
     ? []
     : teams
@@ -114,7 +105,8 @@ export default async function AppDashboardPage({
         )
         .sort(
           (a, b) =>
-            (SESSION_PRIORITY[a.session_state] ?? 9) - (SESSION_PRIORITY[b.session_state] ?? 9) ||
+            (SESSION_CARD_PRIORITY[a.session_state as SessionState] ?? 9) -
+              (SESSION_CARD_PRIORITY[b.session_state as SessionState] ?? 9) ||
             new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
         );
   const facilitatedTeam =

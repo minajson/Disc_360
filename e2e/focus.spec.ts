@@ -137,12 +137,8 @@ test("QR join opens the Focus assessment for a Focus team", async ({ page, brows
   // Facilitator creates a Focus team and grabs the join link.
   await signUpIndividual(page, "QR Facilitator", `pw-qrfac-${Date.now()}@disc360.dev`);
   await createTeam(page, "focus", "QR Focus");
-  // New teams start in draft: the facilitator explicitly opens the
-  // assessment window before participants can begin (session controls).
-  await page.goto(page.url().replace(/\/dashboard.*/, "/settings"));
-  await page.getByRole("button", { name: "Open assessment" }).click();
-  await expect(page.getByText("Assessment open")).toBeVisible({ timeout: 10_000 });
-  await page.goto(page.url().replace(/\/settings.*/, "/dashboard"));
+  // New teams start in DRAFT — and that must not matter: participants can
+  // join and start immediately, with no facilitator opening step.
   const joinHref = await page
     .getByRole("link", { name: "Open participant join page" })
     .getAttribute("href");

@@ -60,7 +60,7 @@ export function SessionCard({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        {view.cta === "join_live" ? (
+        {view.joinLive ? (
           <LinkButton href={`/app/teams/${team.id}/live`} size="lg">
             Join live presentation
           </LinkButton>

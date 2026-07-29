@@ -154,7 +154,8 @@ test("1+4: invitation onboarding shows the summary, hides the team code, and con
   );
   expect(memberCount).toBe("1");
   await expect(page.getByText("Today’s session · Facil FCL-1001")).toBeVisible();
-  await expect(page.getByText("Your facilitator has not started the session yet.")).toBeVisible();
+  // Draft session: the assessment is startable immediately — no facilitator gate.
+  await expect(page.getByRole("button", { name: "Begin assessment" })).toBeVisible();
 });
 
 test("2: the manual path still asks for a team code", async ({ page }) => {
@@ -511,31 +512,46 @@ test("17: two teams, two participants — attempts and reports are fully isolate
   await admin.close();
 });
 
-test("18: denial reasons are explicit, never silent", async ({ page }) => {
+test("18: no facilitator gate — draft starts, closed resumes; wrong product stays denied", async ({
+  page,
+}) => {
   const team = makeTeam({ code: "FCL-8001", assessment: "disc", state: "draft" });
-  const email = "facil-denied@disc360.dev";
+  const email = "facil-ungated@disc360.dev";
   const uid = await createUser(email);
-  onboardProfile(uid, email, "Denied Member");
-  addMember(team.id, uid, email, "Denied Member");
+  onboardProfile(uid, email, "Ungated Member");
+  addMember(team.id, uid, email, "Ungated Member");
 
   await signIn(page, email);
-  // Direct deep-link to the DISC product start while the session is draft.
-  await page.goto("/disc");
-  const start = page.getByRole("button", { name: /Start|Begin|assessment/i }).first();
-  if (await start.isVisible().catch(() => false)) {
-    await start.click();
-    await page.waitForURL("**/app?notice=session_not_open", { timeout: 15000 });
-    await expect(
-      page.getByText("The assessment has not been opened by the facilitator yet."),
-    ).toBeVisible();
-  }
-  // Wrong product while facilitated: explicit reason too.
+  // DRAFT session: the participant starts immediately, bound to the team.
+  await page.goto("/app");
+  await expect(page.getByText("Today’s session · Facil FCL-8001")).toBeVisible();
+  await page.getByRole("button", { name: "Begin assessment" }).click();
+  await page.waitForURL("**/app/assessments/**", { timeout: 20000 });
+  await expect(page.getByText("Scenario 1 of 24")).toBeVisible();
+  const attemptTeam = sql(
+    `select team_id from assessment_sessions where profile_id='${uid}' and status='in_progress'`,
+  );
+  expect(attemptTeam).toBe(team.id);
+
+  // Even a CLOSED window never blocks: the same attempt resumes.
+  sql(`update teams set session_state='assessment_closed' where id='${team.id}'`);
+  await page.goto("/app");
+  await page.getByRole("link", { name: "Continue assessment" }).click();
+  await page.waitForURL("**/app/assessments/**", { timeout: 20000 });
+  await expect(page.getByText("Scenario 1 of 24")).toBeVisible();
+
+  // Wrong product while facilitated: still an explicit denial, never silent.
   await page.goto("/focus");
   const focusStart = page.getByRole("button", { name: /Start|Begin|assessment/i }).first();
   if (await focusStart.isVisible().catch(() => false)) {
     await focusStart.click();
-    await page.waitForURL(/notice=(wrong_assessment|session_not_open)/, { timeout: 15000 });
+    await page.waitForURL(/notice=wrong_assessment/, { timeout: 15000 });
+    await expect(
+      page.getByText("This assessment is not part of your current session."),
+    ).toBeVisible();
   }
+  const focusSessions = sql(`select count(*) from focus_sessions where profile_id='${uid}'`);
+  expect(focusSessions).toBe("0");
 });
 
 test("19: with several facilitated teams, the ACTIVE session wins — never a stale draft", async ({
@@ -555,9 +571,9 @@ test("19: with several facilitated teams, the ACTIVE session wins — never a st
   // The open session is chosen — not the first-returned draft membership.
   await expect(page.getByText("Today’s session · Facil FCL-9002")).toBeVisible();
   await expect(page.getByRole("button", { name: "Begin assessment" })).toBeVisible();
-  // Both sessions reachable through the switcher; the draft one explains itself.
+  // Both sessions reachable through the switcher; the draft one is startable
+  // too — the facilitator's state never gates entry.
   await page.getByRole("link", { name: "Facil FCL-9001", exact: true }).click();
-  await expect(
-    page.getByText("Your facilitator has not started the session yet."),
-  ).toBeVisible();
+  await expect(page.getByText("Today’s session · Facil FCL-9001")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Begin assessment" })).toBeVisible();
 });

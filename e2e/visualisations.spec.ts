@@ -77,11 +77,16 @@ test("compass, lens and fusion render across the full viewport matrix", async ({
   await page.waitForURL("**/focus/results/**", { timeout: 20_000 });
   const focusUrl = new URL(page.url()).pathname;
 
-  // Combined result: the full DISC → Focus chain.
+  // Combined result: the full DISC → Focus chain. The controller ADOPTS an
+  // open same-scope attempt (solo@ is seeded mid-assessment at scenario 9),
+  // so walk from wherever the runner resumes rather than assuming scenario 1.
   await page.goto("/combined/assessment");
   await page.waitForURL("**/app/assessments/**", { timeout: 20_000 });
-  for (let s = 0; s < 24; s++) {
-    await expect(page.getByText(`Scenario ${s + 1} of 24`)).toBeVisible();
+  await expect(page.getByText(/Scenario \d+ of 24/)).toBeVisible({ timeout: 15_000 });
+  const resumeText = await page.getByText(/Scenario \d+ of 24/).textContent();
+  const resumeAt = Number(/Scenario (\d+) of 24/.exec(resumeText ?? "")?.[1] ?? "1");
+  for (let s = resumeAt; s <= 24; s++) {
+    await expect(page.getByText(`Scenario ${s} of 24`)).toBeVisible();
     const options = page.getByRole("group").getByRole("button");
     await options.first().click();
     await options.nth(1).click();

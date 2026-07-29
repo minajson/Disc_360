@@ -20,7 +20,7 @@ import { computeFocusResult, type FocusAnswerInput } from "@/lib/scoring/focus";
 export async function startFocusAssessment(formData?: FormData): Promise<void> {
   const requestedTeam = (formData?.get("team_id") as string | null) || null;
   // Backend lock: facilitator-led participants can only start the
-  // assessment their facilitator selected, while its window is open.
+  // assessment their facilitator selected — never gated on session state.
   const { context, teamId } = await requireProductAllowed("focus", requestedTeam);
   const { supabase, user } = context;
 

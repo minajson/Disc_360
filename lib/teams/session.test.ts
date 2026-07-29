@@ -22,24 +22,38 @@ test("session transitions follow the facilitated flow", () => {
   assert.ok(!canTransition("ended", "results"));
 });
 
-test("participant card mirrors the coach's state", () => {
+test("the assessment is startable in EVERY session state — no facilitator gate", () => {
   const none = { hasOpenSession: false, hasResult: false };
-  assert.equal(participantView("draft", none).cta, "none");
-  assert.equal(participantView("presentation", none).cta, "join_live");
-  assert.equal(participantView("assessment_open", none).cta, "begin_assessment");
-  assert.equal(
-    participantView("assessment_open", { hasOpenSession: true, hasResult: false }).cta,
-    "continue_assessment",
-  );
-  assert.equal(
-    participantView("assessment_open", { hasOpenSession: false, hasResult: true }).status,
-    "Assessment submitted",
-  );
-  assert.equal(
-    participantView("results", { hasOpenSession: false, hasResult: true }).cta,
-    "view_result",
-  );
-  assert.equal(participantView("results", none).cta, "none");
+  const states = [
+    "draft",
+    "presentation",
+    "assessment_open",
+    "assessment_closed",
+    "results",
+    "ended",
+  ] as const;
+  for (const state of states) {
+    assert.equal(participantView(state, none).cta, "begin_assessment", `begin in ${state}`);
+    assert.equal(
+      participantView(state, { hasOpenSession: true, hasResult: false }).cta,
+      "continue_assessment",
+      `resume in ${state}`,
+    );
+  }
+});
+
+test("participant card reflects progress; results wait on the facilitator's release", () => {
+  const none = { hasOpenSession: false, hasResult: false };
+  // The live deck is offered alongside the assessment while presenting.
+  assert.equal(participantView("presentation", none).joinLive, true);
+  assert.equal(participantView("assessment_open", none).joinLive, false);
+  // Submitted → waiting until the facilitator releases; then the result opens.
+  const done = { hasOpenSession: false, hasResult: true };
+  assert.match(participantView("assessment_open", done).status, /Assessment submitted/);
+  assert.equal(participantView("assessment_open", done).cta, "waiting");
+  assert.equal(participantView("assessment_closed", done).cta, "waiting");
+  assert.equal(participantView("results", done).cta, "view_result");
+  assert.equal(participantView("ended", done).cta, "view_result");
 });
 
 test("review access respects the coach's presentation setting", () => {

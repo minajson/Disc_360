@@ -2,7 +2,11 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { requireOnboarded, type AuthContext } from "@/lib/auth/guards";
 import { logRouteDiagnostic } from "@/lib/observability/diagnostics";
-import type { AssessmentProduct } from "@/lib/teams/session";
+import {
+  SESSION_CARD_PRIORITY,
+  type AssessmentProduct,
+  type SessionState,
+} from "@/lib/teams/session";
 
 interface MembershipTeamRow {
   role: string;
@@ -12,6 +16,7 @@ interface MembershipTeamRow {
     session_state: string;
     assessment_type: string;
     archived_at: string | null;
+    updated_at: string;
   } | null;
 }
 
@@ -20,7 +25,6 @@ export type AssessmentDenialReason =
   | "not_team_member"
   | "wrong_team"
   | "wrong_assessment"
-  | "session_not_open"
   | "result_not_released";
 
 export interface AssessmentAuthorization {
@@ -37,7 +41,9 @@ async function loadFacilitatedMemberships(
 ): Promise<MembershipTeamRow[]> {
   const { data } = await supabase
     .from("team_members")
-    .select("role, teams (id, session_mode, session_state, assessment_type, archived_at)")
+    .select(
+      "role, teams (id, session_mode, session_state, assessment_type, archived_at, updated_at)",
+    )
     .eq("profile_id", userId);
   return ((data ?? []) as unknown as MembershipTeamRow[]).filter(
     (row) =>
@@ -52,10 +58,14 @@ async function loadFacilitatedMemberships(
  * The single server-side authorization for starting/continuing an assessment.
  *
  * Resolves the authenticated user's facilitated memberships, validates the
- * requested product against the facilitator's selection and session state,
- * and returns the EXACT team the attempt must bind to — with a typed denial
- * reason (logged safely) instead of a silent redirect. Coaches and purely
- * self-paced users authorize as individual attempts (teamId null).
+ * requested product against the facilitator's selection, and returns the
+ * EXACT team the attempt must bind to — with a typed denial reason (logged
+ * safely) instead of a silent redirect. Coaches and purely self-paced users
+ * authorize as individual attempts (teamId null).
+ *
+ * The facilitator's session_state NEVER gates entry: membership + the team's
+ * selected assessment_type are the whole authorization. The facilitator
+ * sequences the presentation and releases results, nothing more.
  */
 export async function authorizeAssessment(
   product: AssessmentProduct,
@@ -78,25 +88,30 @@ export async function authorizeAssessment(
     return { ok: false, reason, teamId, context };
   };
 
-  // The requested team must be one of the caller's own facilitated teams.
+  // The requested team must be one of the caller's own facilitated teams,
+  // running exactly this product — session_state is deliberately not checked.
   if (requestedTeamId) {
     const target = facilitated.find((row) => row.teams!.id === requestedTeamId);
     if (!target) return deny("wrong_team", requestedTeamId);
     if (target.teams!.assessment_type !== product) return deny("wrong_assessment", requestedTeamId);
-    if (target.teams!.session_state !== "assessment_open")
-      return deny("session_not_open", requestedTeamId);
     return { ok: true, teamId: requestedTeamId, context };
   }
 
-  // No explicit team: bind to the unique open facilitated team for this product.
-  const open = facilitated.filter(
-    (row) =>
-      row.teams!.assessment_type === product && row.teams!.session_state === "assessment_open",
-  );
-  if (open.length > 0) return { ok: true, teamId: open[0]!.teams!.id, context };
+  // No explicit team: bind to the caller's facilitated team for this product.
+  // With several, prefer the session the coach is actively running — the same
+  // deterministic order the dashboard card uses, so a deep-link start binds
+  // to the team the participant sees on their card.
+  const candidates = facilitated
+    .filter((row) => row.teams!.assessment_type === product)
+    .sort(
+      (a, b) =>
+        (SESSION_CARD_PRIORITY[a.teams!.session_state as SessionState] ?? 9) -
+          (SESSION_CARD_PRIORITY[b.teams!.session_state as SessionState] ?? 9) ||
+        new Date(b.teams!.updated_at).getTime() - new Date(a.teams!.updated_at).getTime(),
+    );
+  if (candidates.length > 0) return { ok: true, teamId: candidates[0]!.teams!.id, context };
 
-  const runsProduct = facilitated.some((row) => row.teams!.assessment_type === product);
-  return deny(runsProduct ? "session_not_open" : "wrong_assessment", null);
+  return deny("wrong_assessment", null);
 }
 
 /** Denials land on the session card with an explicit, human explanation. */

@@ -1,7 +1,6 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { requireOnboarded } from "@/lib/auth/guards";
 import { requireProductAllowed } from "@/lib/teams/session-guard";
 
 /**
@@ -21,7 +20,7 @@ import { requireProductAllowed } from "@/lib/teams/session-guard";
 export async function startCombinedAssessment(formData?: FormData): Promise<void> {
   const requestedTeam = (formData?.get("team_id") as string | null) || null;
   // Backend lock: facilitator-led participants can only start the
-  // assessment their facilitator selected, while its window is open.
+  // assessment their facilitator selected — never gated on session state.
   const { context, teamId } = await requireProductAllowed("combined", requestedTeam);
   const { supabase, user } = context;
 
