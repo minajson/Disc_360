@@ -93,7 +93,7 @@ test("individual navigation matches the specified set", () => {
 test("facilitator navigation matches the specified set", () => {
   assert.deepEqual(
     navFor("facilitator").map((item) => item.label),
-    ["Dashboard", "My Teams", "Participants", "Present", "Reports", "Account"],
+    ["Dashboard", "My Teams", "Participants", "Analytics", "Present", "Reports", "Account"],
   );
 });
 
@@ -105,6 +105,7 @@ test("coach navigation matches the specified set", () => {
       "Clients",
       "Teams",
       "Assessments",
+      "Analytics",
       "Presentations",
       "Reports",
       "Coach Profile",
@@ -120,6 +121,7 @@ test("super admin navigation matches the specified set", () => {
       "Overview",
       "Users",
       "Teams",
+      "Analytics",
       "Submissions",
       "Payments",
       "Emails",
@@ -132,11 +134,22 @@ test("super admin navigation matches the specified set", () => {
   assert.equal(RETURN_TO_APP.href, "/app");
 });
 
+test("only the experiences that administer teams reach executive analytics", () => {
+  for (const experience of EXPERIENCES) {
+    const hrefs = navFor(experience).map((item) => item.href);
+    assert.equal(
+      hrefs.includes("/app/analytics"),
+      experience !== "individual",
+      `${experience} analytics visibility`,
+    );
+  }
+});
+
 /* ── Separation of concerns between experiences ─────────────── */
 
 test("an individual sees no team administration", () => {
   const hrefs = navFor("individual").map((item) => item.href);
-  for (const forbidden of ["/app/teams", "/app/participants", "/app/present"]) {
+  for (const forbidden of ["/app/teams", "/app/participants", "/app/present", "/app/analytics"]) {
     assert.ok(
       !hrefs.includes(forbidden),
       `individuals must not see ${forbidden}`,
@@ -210,6 +223,32 @@ test("coach outranks facilitator", () => {
       isCoach: true,
       isTeamAdmin: true,
       hasTeamEntitlement: true,
+    }),
+    "coach",
+  );
+});
+
+test("a platform admin with no memberships still gets the facilitator experience", () => {
+  // They administer every team in the database; an individual's nav would
+  // hide the surfaces they exist to support.
+  assert.equal(
+    resolveExperience({
+      isCoach: false,
+      isTeamAdmin: false,
+      hasTeamEntitlement: false,
+      isSuperAdmin: true,
+    }),
+    "facilitator",
+  );
+});
+
+test("a platform admin who is also a coach is still a coach", () => {
+  assert.equal(
+    resolveExperience({
+      isCoach: true,
+      isTeamAdmin: false,
+      hasTeamEntitlement: false,
+      isSuperAdmin: true,
     }),
     "coach",
   );

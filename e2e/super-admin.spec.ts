@@ -15,6 +15,8 @@ import { signOut } from "./helpers";
  */
 
 const BOOTSTRAP_EMAIL = "minajjumbo@gmail.com";
+/** Added to the same allowlist by migration 00019. */
+const SECOND_ADMIN_EMAIL = "njntia@gmail.com";
 // Fixed so the spec is re-runnable against a database that was not just reset:
 // a per-run password would fail to sign in to the account the previous run
 // created, while sign-up would reject the address as taken. This is a local
@@ -29,6 +31,7 @@ const ADMIN_ROUTES = [
   { path: "/admin", label: "Overview" },
   { path: "/admin/users", label: "Users" },
   { path: "/admin/teams", label: "Teams" },
+  { path: "/admin/analytics", label: "Executive analytics" },
   { path: "/admin/submissions", label: "Submissions" },
   { path: "/admin/payments", label: "Payments" },
   { path: "/admin/reports", label: "Reports" },
@@ -41,7 +44,11 @@ const ADMIN_ROUTES = [
  * re-runnable against a database that was not just reset, so "already
  * registered" is an expected state, not a failure.
  */
-async function signInBootstrapAccount(page: Page): Promise<void> {
+async function signInBootstrapAccount(
+  page: Page,
+  email: string = BOOTSTRAP_EMAIL,
+  fullName = "Mina Jumbo",
+): Promise<void> {
   // The three settled states this flow can reach, expressed as locators so we
   // wait on the DOM rather than on the URL or on networkidle (which never
   // settles here). `.or()` + a single web-first assertion is race-free: no
@@ -52,7 +59,7 @@ async function signInBootstrapAccount(page: Page): Promise<void> {
 
   // 1. Try signing in — an earlier run in this file may already have created it.
   await page.goto("/sign-in");
-  await page.getByLabel("Email").fill(BOOTSTRAP_EMAIL);
+  await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(
@@ -62,8 +69,8 @@ async function signInBootstrapAccount(page: Page): Promise<void> {
   // 2. No account yet → create one through the real form. Nothing is seeded.
   if (await wrongCredentials.isVisible().catch(() => false)) {
     await page.goto("/sign-up");
-    await page.getByLabel("Full name").fill("Mina Jumbo");
-    await page.getByLabel("Email").fill(BOOTSTRAP_EMAIL);
+    await page.getByLabel("Full name").fill(fullName);
+    await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(onboardingChoice).toBeVisible({ timeout: 20_000 });
@@ -91,6 +98,22 @@ test("bootstrap account becomes super admin by signing up normally", async ({ pa
   // The role was granted by the migration's allowlist trigger on confirmation —
   // no seeded flag, no password in the codebase, no auth bypass.
   await expect(page.getByRole("link", { name: "Platform Admin" }).first()).toBeVisible();
+});
+
+test("the second allowlisted address becomes a platform administrator", async ({
+  page,
+}) => {
+  test.slow();
+  // Migration 00019 adds njntia@gmail.com to the same allowlist. Nothing is
+  // seeded and no email check exists in application code — the account earns
+  // the role by confirming its mailbox, exactly like the first one.
+  await signInBootstrapAccount(page, SECOND_ADMIN_EMAIL, "N J Ntia");
+
+  await expect(page.getByRole("link", { name: "Platform Admin" }).first()).toBeVisible();
+
+  await page.goto("/admin/analytics");
+  await expect(page).toHaveURL(/\/admin\/analytics(\?|$)/, { timeout: 15_000 });
+  await expect(page.getByText("Executive analytics", { exact: true }).first()).toBeVisible();
 });
 
 test("super admin reaches every admin route", async ({ page }) => {

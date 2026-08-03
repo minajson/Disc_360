@@ -7,9 +7,15 @@ import { cn } from "@/lib/utils/cn";
 interface TeamTabsProps {
   teamId: string;
   isAdmin: boolean;
+  /**
+   * The executive brief and member comparison read the DISC profile model,
+   * which the Focus and Combined products do not share — so those teams do
+   * not get tabs that would open an empty view.
+   */
+  isDisc?: boolean;
 }
 
-export function TeamTabs({ teamId, isAdmin }: TeamTabsProps) {
+export function TeamTabs({ teamId, isAdmin, isDisc = true }: TeamTabsProps) {
   const pathname = usePathname();
   const base = `/app/teams/${teamId}`;
 
@@ -17,6 +23,12 @@ export function TeamTabs({ teamId, isAdmin }: TeamTabsProps) {
     ? [
         { href: `${base}/dashboard`, label: "Dashboard", exact: false },
         { href: `${base}/results`, label: "Results", exact: false },
+        ...(isDisc
+          ? [
+              { href: `${base}/executive`, label: "Executive brief", exact: false },
+              { href: `${base}/compare`, label: "Compare", exact: false },
+            ]
+          : []),
         { href: `${base}/presentation`, label: "Presentation", exact: false },
         { href: `${base}/settings`, label: "Settings", exact: false },
       ]

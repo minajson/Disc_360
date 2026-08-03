@@ -17,7 +17,7 @@ export default async function TeamLayout({
   const [{ data: team }, { data: isAdmin }] = await Promise.all([
     supabase
       .from("teams")
-      .select("id, name, department, logo_url, archived_at")
+      .select("id, name, department, logo_url, archived_at, assessment_type")
       .eq("id", teamId)
       .maybeSingle(),
     supabase.rpc("is_team_admin", { team: teamId }),
@@ -56,7 +56,11 @@ export default async function TeamLayout({
         </div>
       </div>
 
-      <TeamTabs teamId={team.id} isAdmin={Boolean(isAdmin)} />
+      <TeamTabs
+        teamId={team.id}
+        isAdmin={Boolean(isAdmin)}
+        isDisc={(team.assessment_type ?? "disc") === "disc"}
+      />
 
       <div className="flex flex-col gap-8">{children}</div>
     </div>

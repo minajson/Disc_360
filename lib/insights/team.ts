@@ -121,12 +121,15 @@ const pressureCopy: Record<Dimension, string> = {
 
 export async function getTeamIntelligence(
   teamId: string,
-  options: { presentation?: boolean } = {},
+  options: { presentation?: boolean; requireAdmin?: boolean } = {},
 ): Promise<TeamIntelligence | { error: string }> {
-  // Authorization first — presentation mode requires admin.
-  const context = options.presentation
-    ? await requireTeamAdmin(teamId)
-    : await requireTeamAccess(teamId);
+  // Authorization first. Presenting, and the facilitator-only surfaces
+  // (member comparison, the executive brief), are admin scope; the shared
+  // team summary follows team visibility settings.
+  const context =
+    options.presentation || options.requireAdmin
+      ? await requireTeamAdmin(teamId)
+      : await requireTeamAccess(teamId);
 
   const { data: team } = await context.supabase
     .from("teams")

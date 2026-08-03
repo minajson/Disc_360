@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { requireSuperAdmin } from "@/lib/auth/guards";
 import { createSupabaseAdminClient } from "@/lib/db/admin";
 import { archiveTeamAsAdmin } from "@/lib/actions/admin";
@@ -86,13 +87,36 @@ export default async function AdminTeamsPage({
                     {new Date(team.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </td>
                   <td className="px-5 py-3">
-                    {!team.archived_at ? (
-                      <form action={archiveTeamAsAdmin.bind(null, team.id)} className="flex justify-end">
-                        <button type="submit" className="rounded-full border border-hairline px-3 py-1 text-xs text-slate hover:border-disc-d hover:text-disc-d">
-                          Archive
-                        </button>
-                      </form>
-                    ) : null}
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      {/* Platform admins hold facilitator scope on every team
+                          (is_team_admin), so these open the real product
+                          surfaces rather than an admin-only replica. */}
+                      <Link
+                        href={`/app/teams/${team.id}/dashboard`}
+                        className="rounded-full border border-hairline px-3 py-1 text-xs text-slate transition-colors hover:border-botanical hover:text-botanical"
+                      >
+                        Open
+                      </Link>
+                      <Link
+                        href={`/app/teams/${team.id}/executive`}
+                        className="rounded-full border border-hairline px-3 py-1 text-xs text-slate transition-colors hover:border-botanical hover:text-botanical"
+                      >
+                        Brief
+                      </Link>
+                      <Link
+                        href={`/app/teams/${team.id}/compare`}
+                        className="rounded-full border border-hairline px-3 py-1 text-xs text-slate transition-colors hover:border-botanical hover:text-botanical"
+                      >
+                        Compare
+                      </Link>
+                      {!team.archived_at ? (
+                        <form action={archiveTeamAsAdmin.bind(null, team.id)}>
+                          <button type="submit" className="rounded-full border border-hairline px-3 py-1 text-xs text-slate hover:border-disc-d hover:text-disc-d">
+                            Archive
+                          </button>
+                        </form>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               );

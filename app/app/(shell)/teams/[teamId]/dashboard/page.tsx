@@ -145,6 +145,24 @@ export default async function TeamDashboardPage({
         >
           Present results
         </Link>
+        {/* DISC-only: the executive brief and member comparison read the DISC
+            profile model, which the Focus and Combined products do not share. */}
+        {assessmentType === "disc" ? (
+          <>
+            <Link
+              href={`/app/teams/${teamId}/executive`}
+              className="rounded-full border border-hairline bg-paper px-4 py-2 font-mono text-xs text-slate transition-colors hover:border-botanical hover:text-botanical"
+            >
+              Executive brief
+            </Link>
+            <Link
+              href={`/app/teams/${teamId}/compare`}
+              className="rounded-full border border-hairline bg-paper px-4 py-2 font-mono text-xs text-slate transition-colors hover:border-botanical hover:text-botanical"
+            >
+              Compare members
+            </Link>
+          </>
+        ) : null}
         <Link
           href={summaryHref}
           className="rounded-full border border-hairline bg-paper px-4 py-2 font-mono text-xs text-slate transition-colors hover:border-botanical hover:text-botanical"

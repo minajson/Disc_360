@@ -34,6 +34,7 @@ const FACILITATOR_NAV: readonly NavItem[] = [
   { href: "/app", label: "Dashboard", exact: true },
   { href: "/app/teams", label: "My Teams" },
   { href: "/app/participants", label: "Participants" },
+  { href: "/app/analytics", label: "Analytics" },
   { href: "/app/present", label: "Present" },
   { href: "/app/reports", label: "Reports" },
   { href: "/app/settings", label: "Account" },
@@ -45,6 +46,7 @@ const COACH_NAV: readonly NavItem[] = [
   { href: "/app/coach/clients", label: "Clients" },
   { href: "/app/teams", label: "Teams" },
   { href: "/app/assessments", label: "Assessments" },
+  { href: "/app/analytics", label: "Analytics" },
   { href: "/app/present", label: "Presentations" },
   { href: "/app/reports", label: "Reports" },
   { href: "/app/coach/profile", label: "Coach Profile" },
@@ -56,6 +58,7 @@ export const SUPER_ADMIN_NAV: readonly NavItem[] = [
   { href: "/admin", label: "Overview", exact: true },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/teams", label: "Teams" },
+  { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/submissions", label: "Submissions" },
   { href: "/admin/payments", label: "Payments" },
   { href: "/admin/emails", label: "Emails" },
@@ -89,6 +92,12 @@ export interface ExperienceSignals {
   isTeamAdmin: boolean;
   /** Has paid for (or been granted) the Team plan. */
   hasTeamEntitlement: boolean;
+  /**
+   * Platform administrator. They administer every team in the database
+   * (is_team_admin() resolves true platform-wide), so an individual's nav
+   * would hide the surfaces they are specifically there to support.
+   */
+  isSuperAdmin?: boolean;
 }
 
 /**
@@ -99,11 +108,16 @@ export interface ExperienceSignals {
  *
  * Entitlement alone promotes to facilitator: someone who has just paid for
  * the Team plan but not yet created a team must be able to reach the team
- * area, or the purchase leads nowhere.
+ * area, or the purchase leads nowhere. The same reasoning covers a platform
+ * administrator, who can open any team's dashboard but may hold no membership
+ * row of their own — the Platform Admin area stays a separate shell, reached
+ * from the account menu.
  */
 export function resolveExperience(signals: ExperienceSignals): AppExperience {
   if (signals.isCoach) return "coach";
-  if (signals.isTeamAdmin || signals.hasTeamEntitlement) return "facilitator";
+  if (signals.isTeamAdmin || signals.hasTeamEntitlement || signals.isSuperAdmin) {
+    return "facilitator";
+  }
   return "individual";
 }
 

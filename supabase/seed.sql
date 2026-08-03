@@ -314,6 +314,201 @@ begin
   end loop;
 end $$;
 
+-- ── enterprise-scale fixtures ────────────────────────────────────────
+--
+-- Four cohorts of 5, 10, 20 and 100 fictional participants under one client
+-- organisation. These exist so the enterprise surfaces can be exercised at
+-- the sizes they were designed for — the comparison workspace's batching
+-- (2–8 simultaneous, 9–10 on a rail, 11+ in batches of ten), department
+-- cohorts, the department heat map and a twelve-month completion trend.
+--
+-- Fictional people only. Every account shares the same local development
+-- password as the rest of this seed and none of it ships anywhere.
+do $$
+declare
+  v_version uuid := '00000000-0000-4000-8000-000000000002';
+  v_admin uuid := '10000000-0000-4000-8000-000000000001';
+  v_org uuid := '20000000-0000-4000-8000-000000000003';
+
+  -- Deterministic ids so a reset produces stable links for local bookmarks.
+  v_teams uuid[] := array[
+    '30000000-0000-4000-8000-000000000101'::uuid,  -- 100
+    '30000000-0000-4000-8000-000000000102'::uuid,  --  20
+    '30000000-0000-4000-8000-000000000103'::uuid,  --  10
+    '30000000-0000-4000-8000-000000000104'::uuid   --   5
+  ];
+  v_sizes int[] := array[100, 20, 10, 5];
+  v_names text[] := array[
+    'Meridian Group — Enterprise Program',
+    'Meridian Group — Cohort 20',
+    'Meridian Group — Cohort 10',
+    'Meridian Group — Cohort 5'
+  ];
+  v_codes_team text[] := array['MERID-9100', 'MERID-9020', 'MERID-9010', 'MERID-9005'];
+
+  -- Archetype codes paired with the primary/secondary they imply, so
+  -- archetype_code, primary_dimension and the scores can never disagree.
+  v_codes text[] := array['D','DI','ID','I','IS','SI','S','SC','CS','C','CD','DC','BAL'];
+  v_prim  text[] := array['D','D', 'I', 'I','I', 'S', 'S','S', 'C', 'C','C', 'D', 'S'];
+  v_sec   text[] := array[null,'I','D',null,'S','I',null,'C','S',null,'D','C',null];
+
+  v_first text[] := array['Mina','Prince','Vivian','Emmanuel','Ada','Chidi','Zainab',
+    'Tunde','Ngozi','Kofi','Amaka','Bola','Ifeoma','Segun','Hauwa','Obi','Yemi',
+    'Sade','Chinedu','Halima','Femi','Rita','Uche','Kemi','Bayo'];
+  v_last text[] := array['Allison','Okoro','Bello','Nwosu','Adeyemi','Mensah',
+    'Danjuma','Eze','Ogbonna','Suleiman','Balogun','Ikenna','Sani','Chukwu',
+    'Ogunlesi','Yusuf','Abara','Duru','Tetteh','Kalu'];
+
+  -- One bcrypt hash reused across the fixtures: 135 salted hashes would add
+  -- seconds to every `supabase db reset` for zero local benefit.
+  v_pw text := crypt('disc360-demo', gen_salt('bf'));
+
+  v_team uuid;
+  v_size int;
+  v_uid uuid;
+  v_session uuid;
+  v_code text;
+  v_slot int;
+  v_dept text;
+  v_full text;
+  v_email text;
+  v_d int; v_i2 int; v_s int; v_c int;
+  v_scores jsonb;
+  v_completed boolean;
+  v_days int;
+  t int;
+  n int;
+begin
+  insert into public.organizations (id, name, industry, created_by)
+  values (v_org, 'Meridian Group', 'Financial services', v_admin);
+
+  insert into public.organization_members (organization_id, profile_id, role)
+  values (v_org, v_admin, 'organization_admin');
+
+  for t in 1..4 loop
+    v_team := v_teams[t];
+    v_size := v_sizes[t];
+
+    insert into public.teams (id, organization_id, name, description, department,
+      team_code, client_organization, session_name, results_named,
+      members_can_view_summary, deadline_at, created_by, timezone)
+    values (v_team, v_org, v_names[t],
+      'Enterprise fixture cohort of ' || v_size || ' participants.',
+      'Enterprise', v_codes_team[t], 'Meridian Group',
+      'Organisational Development Programme', true, true,
+      now() + interval '21 days', v_admin, 'Europe/London');
+
+    insert into public.team_members (team_id, profile_id, display_name, email, department, role)
+    values (v_team, v_admin, 'Dana Whitfield', 'demo@disc360.dev', 'Leadership', 'team_admin');
+
+    for n in 0..(v_size - 1) loop
+      v_uid := gen_random_uuid();
+      v_full := v_first[1 + (n % 25)] || ' ' || v_last[1 + (n % 20)];
+      v_email := 'p' || t || '-' || n || '@meridiandemo.dev';
+
+      -- Departments only where the cohort is large enough for the split to
+      -- mean anything; the small cohorts stay single-department.
+      v_dept := case
+        when v_size < 20 then 'Leadership'
+        when n % 5 = 0 then 'Leadership'
+        when n % 5 = 1 then 'Operations'
+        when n % 5 = 2 then 'Engineering'
+        when n % 5 = 3 then 'Commercial'
+        else 'People'
+      end;
+
+      v_slot := 1 + ((n * 7) % 13);
+      v_code := v_codes[v_slot];
+
+      -- Primary highest, secondary second, remainder well below — so the
+      -- stored scores, primary_dimension and archetype_code agree.
+      v_d := 30 + (n % 17);
+      v_i2 := 30 + ((n * 3) % 17);
+      v_s := 30 + ((n * 5) % 17);
+      v_c := 30 + ((n * 11) % 17);
+      if v_code = 'BAL' then
+        v_d := 48 + (n % 7); v_i2 := 47 + ((n * 3) % 7);
+        v_s := 49 + ((n * 5) % 7); v_c := 46 + ((n * 11) % 7);
+      else
+        case v_prim[v_slot]
+          when 'D' then v_d := 70 + (n % 15);
+          when 'I' then v_i2 := 70 + (n % 15);
+          when 'S' then v_s := 70 + (n % 15);
+          else v_c := 70 + (n % 15);
+        end case;
+        if v_sec[v_slot] is not null then
+          case v_sec[v_slot]
+            when 'D' then v_d := 56 + (n % 9);
+            when 'I' then v_i2 := 56 + (n % 9);
+            when 'S' then v_s := 56 + (n % 9);
+            else v_c := 56 + (n % 9);
+          end case;
+        end if;
+      end if;
+
+      -- The 100-cohort deliberately leaves eight profiles outstanding so
+      -- completion analytics has something real to report.
+      v_completed := not (v_size = 100 and n % 12 = 11);
+      v_days := (n * 3) % 300;
+
+      insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+        email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+        created_at, updated_at, confirmation_token, recovery_token, email_change, email_change_token_new)
+      values ('00000000-0000-0000-0000-000000000000', v_uid, 'authenticated', 'authenticated',
+        v_email, v_pw, now(),
+        '{"provider":"email","providers":["email"]}',
+        jsonb_build_object('full_name', v_full),
+        now(), now(), '', '', '', '');
+
+      insert into auth.identities (id, user_id, provider_id, identity_data, provider,
+        last_sign_in_at, created_at, updated_at)
+      values (gen_random_uuid(), v_uid, v_uid::text,
+        jsonb_build_object('sub', v_uid::text, 'email', v_email), 'email', now(), now(), now());
+
+      update public.profiles set
+        preferred_name = split_part(v_full, ' ', 1),
+        profession = v_dept || ' team member',
+        country = 'GB', timezone = 'Europe/London',
+        onboarding_intent = 'join_team', consented_at = now(), onboarded_at = now()
+      where id = v_uid;
+
+      insert into public.team_members (team_id, profile_id, display_name, email, department, role)
+      values (v_team, v_uid, v_full, v_email, v_dept, 'member');
+
+      if v_completed then
+        insert into public.assessment_sessions (profile_id, version_id, team_id, status,
+          current_index, started_at, completed_at)
+        values (v_uid, v_version, v_team, 'completed', 23,
+          now() - (interval '1 day' * v_days),
+          now() - (interval '1 day' * v_days) + interval '9 minutes')
+        returning id into v_session;
+
+        v_scores := jsonb_build_object(
+          'D', case when v_d <= 35 then 'LOW' when v_d <= 55 then 'MODERATE' when v_d <= 75 then 'HIGH' else 'VERY_HIGH' end,
+          'I', case when v_i2 <= 35 then 'LOW' when v_i2 <= 55 then 'MODERATE' when v_i2 <= 75 then 'HIGH' else 'VERY_HIGH' end,
+          'S', case when v_s <= 35 then 'LOW' when v_s <= 55 then 'MODERATE' when v_s <= 75 then 'HIGH' else 'VERY_HIGH' end,
+          'C', case when v_c <= 35 then 'LOW' when v_c <= 55 then 'MODERATE' when v_c <= 75 then 'HIGH' else 'VERY_HIGH' end);
+
+        insert into public.assessment_results (session_id, profile_id, team_id,
+          score_d, score_i, score_s, score_c, archetype_code,
+          primary_dimension, secondary_dimension, intensity, raw_most, raw_least, net, created_at)
+        values (v_session, v_uid, v_team,
+          v_d, v_i2, v_s, v_c, v_code::public.archetype_code,
+          v_prim[v_slot]::public.dimension,
+          case when v_sec[v_slot] is null then null else v_sec[v_slot]::public.dimension end,
+          v_scores,
+          jsonb_build_object('d', round(v_d * 0.24), 'i', round(v_i2 * 0.24),
+                             's', round(v_s * 0.24), 'c', round(v_c * 0.24)),
+          jsonb_build_object('d', round((100 - v_d) * 0.24), 'i', round((100 - v_i2) * 0.24),
+                             's', round((100 - v_s) * 0.24), 'c', round((100 - v_c) * 0.24)),
+          jsonb_build_object('d', round(v_d * 0.48 - 24), 'i', round(v_i2 * 0.48 - 24),
+                             's', round(v_s * 0.48 - 24), 'c', round(v_c * 0.48 - 24)),
+          now() - (interval '1 day' * v_days));
+      end if;
+    end loop;
+  end loop;
+end $$;
+
 -- Seeded teams are mid-flight fixtures: like the production backfill, teams
 -- that already have members run with the assessment window open.
 update public.teams set session_state = 'assessment_open'

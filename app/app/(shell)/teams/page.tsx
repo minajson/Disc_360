@@ -23,16 +23,28 @@ export default async function TeamsIndexPage({
   searchParams: Promise<{ denied?: string }>;
 }) {
   const { denied } = await searchParams;
-  const { supabase, user } = await requireOnboarded();
+  const { supabase, user, profile } = await requireOnboarded();
 
-  const { data: memberships } = await supabase
-    .from("team_members")
-    .select("role, teams (id, name, description, department, team_code, archived_at)")
-    .eq("profile_id", user.id);
-
-  const teams = ((memberships ?? []) as unknown as TeamRow[])
-    .filter((row) => row.teams && !row.teams.archived_at)
-    .map((row) => ({ ...row.teams!, memberRole: row.role }));
+  // A platform administrator administers every team (is_team_admin resolves
+  // platform-wide), but holds no membership rows — so the membership query
+  // would show them an empty list of teams they can in fact open.
+  const teams = profile.is_super_admin
+    ? ((
+        await supabase
+          .from("teams")
+          .select("id, name, description, department, team_code, archived_at")
+          .is("archived_at", null)
+          .order("name")
+      ).data ?? []
+      ).map((team) => ({ ...team, memberRole: "team_admin" }))
+    : ((
+        await supabase
+          .from("team_members")
+          .select("role, teams (id, name, description, department, team_code, archived_at)")
+          .eq("profile_id", user.id)
+      ).data as unknown as TeamRow[] | null ?? [])
+        .filter((row) => row.teams && !row.teams.archived_at)
+        .map((row) => ({ ...row.teams!, memberRole: row.role }));
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-5 py-12 sm:px-8">

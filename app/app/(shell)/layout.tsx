@@ -38,6 +38,7 @@ export default async function AppLayout({
       Boolean(coachProfile) || profile.onboarding_intent === "manage_clients",
     isTeamAdmin: Boolean(adminMembership),
     hasTeamEntitlement: entitlement.allowed,
+    isSuperAdmin: profile.is_super_admin,
   });
 
   return (
