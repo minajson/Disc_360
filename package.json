@@ -8,11 +8,12 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --test lib/scoring/*.test.ts lib/teams/*.test.ts lib/utils/*.test.ts lib/navigation/*.test.ts lib/auth/*.test.ts lib/presentations/*.test.ts lib/visuals/*.test.ts lib/insights/*.test.ts lib/history/*.test.ts data/*.test.ts",
+    "test": "node --test lib/scoring/*.test.ts lib/teams/*.test.ts lib/utils/*.test.ts lib/navigation/*.test.ts lib/auth/*.test.ts lib/presentations/*.test.ts lib/visuals/*.test.ts lib/insights/*.test.ts lib/history/*.test.ts lib/ai/*.test.ts data/*.test.ts",
     "test:e2e": "playwright test",
     "media:guide": "node scripts/generate-media-guide.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@react-email/components": "^1.0.12",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.2",

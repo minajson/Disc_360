@@ -36,6 +36,13 @@ const DECK_TABS = [
 const memberCards = (scope: Page | Locator) =>
   scope.getByRole("img", { name: /^DISC profile — Dominant/ });
 
+/**
+ * The insight cards themselves. The facilitator brief above them lists the
+ * same category names as a running order, so an unscoped text locator matches
+ * both — this names the region the assertion is actually about.
+ */
+const insightCards = (page: Page) => page.getByRole("region", { name: "Insight cards" });
+
 /* ── 1–4 · navigation ───────────────────────────────────────────────── */
 
 test("the facilitator deck exposes every section in the required order", async ({ page }) => {
@@ -112,7 +119,7 @@ test("a platform admin gets the identical facilitator interface, not a reduced o
   await expect(tabs.getByRole("tab")).toHaveText(DECK_TABS);
 
   await page.goto(`/app/teams/${TEAM_PRODUCT}/insights`);
-  await expect(page.getByText("Team snapshot")).toBeVisible();
+  await expect(insightCards(page).getByText("Team snapshot")).toBeVisible();
 });
 
 /* ── 6–8 · team-only scope ──────────────────────────────────────────── */

@@ -331,7 +331,9 @@ test("reduced motion keeps every projected surface usable", async ({ browser }) 
   await expect(page.getByRole("complementary", { name: "Compare members" })).toBeVisible();
 
   await page.goto(`/app/teams/${TEAM}/insights`);
-  await expect(page.getByText("Team snapshot")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Insight cards" }).getByText("Team snapshot"),
+  ).toBeVisible();
 
   // Cards below the fold must not be stranded at opacity 0 by an entrance
   // reveal that never fires — the defect the [data-reveal] override fixes.

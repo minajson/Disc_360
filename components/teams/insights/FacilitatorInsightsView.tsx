@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
 import { Eyebrow } from "@/components/ui/Eyebrow";
+import { FacilitatorBriefPanel } from "@/components/teams/insights/FacilitatorBriefPanel";
+import type { NarrativeBrief, NarrativeSummary } from "@/lib/ai/narrative";
 import { dimensionMeta } from "@/data/dimension-meta";
 import { DIMENSION_KEY, DIMENSIONS } from "@/lib/types";
 import {
@@ -326,8 +328,13 @@ export interface FacilitatorInsightsViewProps {
   teamName: string;
   memberCount: number;
   completedCount: number;
-  /** True once a model has written the narrative (Phase 3). */
+  /** True once a model has written the narrative. */
   aiGenerated?: boolean;
+  /** Facilitator brief and executive summary — rule-written until generated. */
+  brief?: NarrativeBrief;
+  summary?: NarrativeSummary;
+  /** Generation controls. Absent inside the deck, which is read-only. */
+  controls?: ReactNode;
   /** Embedded inside the presentation deck — drops the page header. */
   embedded?: boolean;
 }
@@ -339,6 +346,9 @@ export function FacilitatorInsightsView({
   memberCount,
   completedCount,
   aiGenerated = false,
+  brief,
+  summary,
+  controls,
   embedded = false,
 }: FacilitatorInsightsViewProps) {
   const [presentation, setPresentation] = useState(false);
@@ -416,10 +426,18 @@ export function FacilitatorInsightsView({
         </button>
       </div>
 
+      {controls}
+
+      {!set.suppressed && brief && summary ? (
+        <div className={presentation ? "presentation-scale" : undefined}>
+          <FacilitatorBriefPanel brief={brief} summary={summary} presentation={presentation} />
+        </div>
+      ) : null}
+
       {set.suppressed ? (
         <Suppressed message={set.suppressed} />
       ) : presentation && card ? (
-        <div className="presentation-scale flex flex-col gap-5">
+        <section aria-label="Insight cards" className="presentation-scale flex flex-col gap-5">
           <InsightCard
             key={card.category}
             insight={card}
@@ -454,9 +472,9 @@ export function FacilitatorInsightsView({
               →
             </button>
           </div>
-        </div>
+        </section>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-2">
+        <section aria-label="Insight cards" className="grid gap-5 lg:grid-cols-2">
           {set.insights.map((insight, index) => (
             <InsightCard
               key={insight.category}
@@ -467,7 +485,7 @@ export function FacilitatorInsightsView({
               scopeLabel={set.scope.label}
             />
           ))}
-        </div>
+        </section>
       )}
 
       {departments.length > 1 ? (

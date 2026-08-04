@@ -47,6 +47,7 @@ app/app/           authenticated product: dashboard, assessments, results,
 components/        marketing/ media/ ui/ charts/ motion/ (+ app/ feature dirs)
 lib/               scoring/ (pure, tested) · assessment/ · actions/ (server actions)
                    db/ (supabase clients, queries) · auth/ (guards) · email/
+                   insights/ (evidence layer) · history/ · ai/ (narrative layer)
                    motion/ · types/ · utils/
 data/              disc-questions.ts · insight-maps.ts · dimension-meta.ts
 supabase/          config.toml · migrations/ · seed.sql
@@ -113,6 +114,23 @@ not in the client.
   the TS bank, then add a migration; never edit an applied one.
 - Campaigns: `draft → scheduled → active → closed → archived` (reopen:
   closed → active).
+
+## AI narrative rules
+
+- The evidence layer (`lib/insights/`) owns every number, sample size, signal
+  and evidence chip, and writes a complete narrative of its own. A model
+  (`lib/ai/`) rewrites prose only — never a figure, never a category.
+- `ANTHROPIC_API_KEY` is server-only; `lib/ai/client.ts` is `server-only` by
+  import. Without a key the product is complete and says so.
+- Only aggregate figures leave the server: no name, email, id, department,
+  note or assessment response. `payloadLeaks()` fails a test rather than
+  shipping one.
+- Generated and facilitator-edited prose both pass `checkNarrative()` /
+  `screenBrief()` / `screenSummary()`: no clinical, diagnostic, selection or
+  causal language. A card that fails keeps its rule-written text.
+- Team scope only, team admins only, never auto-published to participants.
+  Generate / edit / share / discard each write an `audit_logs` row with safe
+  metadata; generations are rate-limited per facilitator from those rows.
 
 ## Design rules — "Meridian" light editorial
 

@@ -34,6 +34,95 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_insight_narratives: {
+        Row: {
+          created_at: string
+          edited_at: string | null
+          edited_by: string | null
+          fell_back: string[]
+          generated_at: string
+          generated_by: string | null
+          id: string
+          model: string | null
+          narrative: Json
+          population_size: number
+          sample_size: number
+          shared_at: string | null
+          shared_by: string | null
+          source: Database["public"]["Enums"]["ai_narrative_source"]
+          status: Database["public"]["Enums"]["ai_narrative_status"]
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          edited_at?: string | null
+          edited_by?: string | null
+          fell_back?: string[]
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          model?: string | null
+          narrative?: Json
+          population_size?: number
+          sample_size?: number
+          shared_at?: string | null
+          shared_by?: string | null
+          source?: Database["public"]["Enums"]["ai_narrative_source"]
+          status?: Database["public"]["Enums"]["ai_narrative_status"]
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          edited_at?: string | null
+          edited_by?: string | null
+          fell_back?: string[]
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          model?: string | null
+          narrative?: Json
+          population_size?: number
+          sample_size?: number
+          shared_at?: string | null
+          shared_by?: string | null
+          source?: Database["public"]["Enums"]["ai_narrative_source"]
+          status?: Database["public"]["Enums"]["ai_narrative_status"]
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_insight_narratives_edited_by_fkey"
+            columns: ["edited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_insight_narratives_generated_by_fkey"
+            columns: ["generated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_insight_narratives_shared_by_fkey"
+            columns: ["shared_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_insight_narratives_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assessment_campaigns: {
         Row: {
           archived_at: string | null
@@ -1893,6 +1982,8 @@ export type Database = {
       }
     }
     Enums: {
+      ai_narrative_source: "model" | "rules" | "edited"
+      ai_narrative_status: "draft" | "shared"
       archetype_code:
         | "D"
         | "DI"
@@ -2074,6 +2165,8 @@ export const Constants = {
   },
   public: {
     Enums: {
+      ai_narrative_source: ["model", "rules", "edited"],
+      ai_narrative_status: ["draft", "shared"],
       archetype_code: [
         "D",
         "DI",

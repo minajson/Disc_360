@@ -224,7 +224,9 @@ test("Compare and AI Insights still behave exactly as Phase 1 shipped them", asy
   ]);
 
   await page.goto(`/app/teams/${TEAM_PRODUCT}/insights`);
-  await expect(page.getByText("Team snapshot")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Insight cards" }).getByText("Team snapshot"),
+  ).toBeVisible();
 
   await page.goto(`/app/teams/${TEAM_PRODUCT}/compare`);
   await expect(page.getByRole("complementary", { name: "Compare members" })).toBeVisible();
