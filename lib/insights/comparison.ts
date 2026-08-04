@@ -33,6 +33,51 @@ export const MAX_CARDS_PER_VIEW = 10;
 /** Score at or above which a dimension counts as a pronounced strength. */
 export const HIGH_BAND = 60;
 
+/**
+ * Cards per slide when the workspace is being projected.
+ *
+ * Ten readable cards on an analyst's monitor become ten unreadable ones on a
+ * projector, so presentation mode trades density for legibility: three
+ * full-size cards, and the facilitator advances through the set. The answer
+ * to "too much on screen" is another slide, never smaller type.
+ */
+export const CARDS_PER_SLIDE = 3;
+
+export interface SlideWindow {
+  /** 0-based slide index. */
+  index: number;
+  slideCount: number;
+  from: number;
+  to: number;
+  /** "Members 1–3 of 10". */
+  label: string;
+}
+
+/** Which members are on slide `index`, and how to caption it. */
+export function slideWindow(
+  total: number,
+  index: number,
+  perSlide: number = CARDS_PER_SLIDE,
+): SlideWindow {
+  const size = Math.max(1, perSlide);
+  const slideCount = Math.max(1, Math.ceil(total / size));
+  const clamped = total === 0 ? 0 : ((index % slideCount) + slideCount) % slideCount;
+  const from = total === 0 ? 0 : clamped * size + 1;
+  const to = Math.min(total, clamped * size + size);
+  return {
+    index: clamped,
+    slideCount,
+    from,
+    to,
+    label:
+      total === 0
+        ? "No members"
+        : from === to
+          ? `Member ${from} of ${total}`
+          : `Members ${from}–${to} of ${total}`,
+  };
+}
+
 export interface ComparisonMember {
   /** Stable identity within one roster render — never a database id. */
   id: string;

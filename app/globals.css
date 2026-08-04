@@ -154,6 +154,20 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+
+  /* Scroll-triggered entrance reveals are progressive enhancement, and they
+     must never be able to leave content invisible.
+
+     whileInView + viewport.once means an element that never enters the
+     viewport keeps its initial opacity forever — so a facilitator scrolling a
+     projected page with motion reduced could reach cards stuck at opacity 0.
+     Framer applies that opacity as an inline style, which is why this needs
+     !important to win. Marking the wrappers rather than every element keeps
+     the override narrow. */
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
 
 /* ── print (report & presentation exports) ────────────────── */
@@ -242,6 +256,97 @@ body {
     border-radius: 0;
     box-shadow: none;
   }
+}
+
+/* ── facilitator presentation scale ────────────────────────────────
+   A second, deliberately different engine from the .pres-canvas one above.
+
+   That one letterboxes a strict 16:9 slide whose content is authored to fit.
+   This one takes an existing scrolling facilitator layout — the team deck,
+   the executive brief, comparison sets, insight cards — and scales it up for
+   a projector without restructuring it.
+
+   Type tracks the CONTAINER, not the viewport. A 2560 or 3840 screen then
+   renders a proportionally larger slide instead of the same ~1280px column
+   marooned in empty margins, which is what viewport-capped clamp() produced
+   before. The floors keep a 1280 laptop honest; the ceilings stop a 21:9
+   ultrawide from generating absurd display type.
+
+   Calibration at container width:
+     1280 → body 18px · label 15px · nav 15px
+     1920 → body 24px · label 18px · nav 19px      ← the projector target
+     2560 → body 32px · label 24px · nav 26px
+     3840 → body 38px · label 28px · nav 26px (ceilings)             */
+@utility presentation-scale {
+  container-type: inline-size;
+
+  --pres-room-h1: clamp(1.9rem, 3.4cqi, 5.5rem);
+  --pres-room-h2: clamp(1.55rem, 2.5cqi, 4rem);
+  --pres-room-h3: clamp(1.25rem, 1.7cqi, 2.6rem);
+  --pres-room-metric: clamp(2.5rem, 4.2cqi, 6.5rem);
+  --pres-room-body: clamp(1.125rem, 1.25cqi, 2.4rem);
+  --pres-room-label: clamp(0.9375rem, 0.94cqi, 1.75rem);
+  --pres-room-mono: clamp(0.8125rem, 0.72cqi, 1.35rem);
+  --pres-room-nav: clamp(0.9375rem, 1cqi, 1.6rem);
+  /* Wide screens gain columns and larger type — never longer lines. */
+  --pres-room-measure: 62ch;
+
+  /* Chart sizes. Read through var() with the current dashboard value as the
+     fallback, so a chart outside a presentation container is untouched. */
+  --pres-chart-sm: clamp(200px, 20cqi, 640px);
+  --pres-chart-md: clamp(260px, 30cqi, 900px);
+  --pres-chart-lg: clamp(320px, 52cqi, 1600px);
+}
+
+/* Charts are shared between the analytical dashboard and the projected deck,
+   so they carry dashboard type by default and cannot simply swap classes.
+   Inside a presentation container these win on specificity alone (0,2,0 beats
+   a utility's 0,1,0) — no !important, and no effect anywhere else. */
+.presentation-scale .pres-scaled-label {
+  font-size: var(--pres-room-label);
+}
+.presentation-scale .pres-scaled-mono {
+  font-size: var(--pres-room-mono);
+}
+
+@utility pres-h1 {
+  font-size: var(--pres-room-h1, var(--text-h1));
+  line-height: 1.06;
+  letter-spacing: -0.015em;
+}
+@utility pres-h2 {
+  font-size: var(--pres-room-h2, var(--text-h2));
+  line-height: 1.14;
+  letter-spacing: -0.01em;
+}
+@utility pres-h3 {
+  font-size: var(--pres-room-h3, var(--text-h3));
+  line-height: 1.25;
+}
+@utility pres-metric {
+  font-size: var(--pres-room-metric, 2.5rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+@utility pres-body {
+  font-size: var(--pres-room-body, 1rem);
+  line-height: 1.55;
+}
+@utility pres-label {
+  font-size: var(--pres-room-label, 0.875rem);
+  line-height: 1.4;
+}
+@utility pres-mono {
+  font-size: var(--pres-room-mono, 0.75rem);
+  line-height: 1.4;
+}
+@utility pres-nav {
+  font-size: var(--pres-room-nav, 0.875rem);
+  line-height: 1.3;
+}
+/* Prose stays inside a comfortable measure however wide the room screen. */
+@utility pres-measure {
+  max-width: var(--pres-room-measure, 62ch);
 }
 
 /* ── Live Profile hero card ─────────────────────────────────────────

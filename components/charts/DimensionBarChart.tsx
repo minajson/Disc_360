@@ -21,7 +21,7 @@ export function DimensionBarChart({ scores, className }: DimensionBarChartProps)
         const value = scores[DIMENSION_KEY[dim]];
         return (
           <div key={dim} className="flex items-center gap-3">
-            <span className="w-20 shrink-0 text-xs text-slate sm:w-24 sm:text-sm">
+            <span className="pres-scaled-label w-20 shrink-0 text-xs text-slate sm:w-24 sm:text-sm">
               {meta.label}
             </span>
             <div className="h-2 flex-1 overflow-hidden rounded-[4px] bg-ink/8">
@@ -38,7 +38,7 @@ export function DimensionBarChart({ scores, className }: DimensionBarChartProps)
                 }}
               />
             </div>
-            <span className="w-8 shrink-0 text-right font-mono text-xs text-ink">
+            <span className="pres-scaled-mono w-8 shrink-0 text-right font-mono text-xs text-ink">
               {value}
             </span>
           </div>

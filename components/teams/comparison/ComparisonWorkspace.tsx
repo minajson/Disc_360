@@ -17,6 +17,7 @@ import {
   comparisonLayout,
   comparisonReadout,
   dimensionDivergence,
+  slideWindow,
   groupAverage,
   highBandCounts,
   styleCounts,
@@ -130,6 +131,29 @@ export function ComparisonWorkspace({
   const activeSet = sets[Math.min(setIndex, Math.max(0, sets.length - 1))];
   const cards = useMemo(() => activeSet?.members ?? [], [activeSet]);
   const layout = comparisonLayout(cards.length);
+
+  /*
+   * Projection pagination. On a monitor the whole set is readable at once; on
+   * a projector three cards is the honest maximum, so presentation mode
+   * windows the set and the facilitator advances. Density is traded for
+   * legibility rather than type size.
+   */
+  const slideKey = `${scope}:${activeSet?.id ?? ""}`;
+  const [slidePointer, setSlidePointer] = useState({ key: slideKey, index: 0 });
+  const rawSlide = slidePointer.key === slideKey ? slidePointer.index : 0;
+  const slide = slideWindow(cards.length, rawSlide);
+  const goToSlide = useCallback(
+    (delta: number) =>
+      setSlidePointer((current) => ({
+        key: slideKey,
+        index: (current.key === slideKey ? current.index : 0) + delta,
+      })),
+    [slideKey],
+  );
+  const projected = presentation ? cards.slice(slide.from - 1, slide.to) : cards;
+  const projectedLayout = presentation
+    ? comparisonLayout(projected.length)
+    : layout;
   const readout = useMemo(
     () => comparisonReadout(cards, activeSet?.label ?? "This set"),
     [cards, activeSet?.label],
@@ -273,7 +297,7 @@ export function ComparisonWorkspace({
       <div
         className={cn(
           "grid gap-6",
-          presentation ? "grid-cols-1" : "lg:grid-cols-[320px_1fr]",
+          presentation ? "presentation-scale grid-cols-1" : "lg:grid-cols-[320px_1fr]",
         )}
       >
         {!presentation ? (
@@ -348,7 +372,7 @@ export function ComparisonWorkspace({
 
                 {/* the cards — same anatomy at every set size */}
                 <div className="paper-card p-6 lg:p-7">
-                  {layout.scrolls ? (
+                  {projectedLayout.scrolls && !presentation ? (
                     <div className="-mx-6 overflow-x-auto px-6 pb-2 lg:-mx-7 lg:px-7">
                       <div
                         className="grid gap-7"
@@ -357,7 +381,7 @@ export function ComparisonWorkspace({
                           minWidth: `${cards.length * 252}px`,
                         }}
                       >
-                        {cards.map((member) => (
+                        {projected.map((member) => (
                           <ComparisonCard
                             key={member.id}
                             member={member}
@@ -371,14 +395,14 @@ export function ComparisonWorkspace({
                     <div
                       className={cn(
                         "grid gap-7",
-                        layout.mode === "duo"
+                        projectedLayout.mode === "duo"
                           ? "sm:grid-cols-2"
-                          : layout.columns === 3
+                          : projectedLayout.columns === 3
                             ? "sm:grid-cols-2 lg:grid-cols-3"
                             : "sm:grid-cols-2 lg:grid-cols-4",
                       )}
                     >
-                      {cards.map((member, index) => (
+                      {projected.map((member, index) => (
                         <ComparisonCard
                           key={member.id}
                           member={member}
@@ -386,8 +410,8 @@ export function ComparisonWorkspace({
                              person opposite — exactly as the two-member
                              comparison has always read. */
                           reach={
-                            layout.mode === "duo"
-                              ? (cards[index === 0 ? 1 : 0] ?? member)
+                            projectedLayout.mode === "duo"
+                              ? (projected[index === 0 ? 1 : 0] ?? member)
                               : member
                           }
                           presentation={presentation}
@@ -395,10 +419,39 @@ export function ComparisonWorkspace({
                       ))}
                     </div>
                   )}
-                  {layout.scrolls ? (
+                  {projectedLayout.scrolls && !presentation ? (
                     <p className="pt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-faint print:hidden">
                       Scroll sideways for the rest of this set
                     </p>
+                  ) : null}
+
+                  {/* Projected sets advance a slide at a time rather than
+                      squeezing ten cards across one screen. */}
+                  {presentation && slide.slideCount > 1 ? (
+                    <div className="mt-5 flex items-center justify-between rule-t pt-5 print:hidden">
+                      <button
+                        type="button"
+                        onClick={() => goToSlide(-1)}
+                        aria-label="Previous members"
+                        className="pres-h3 flex size-14 items-center justify-center rounded-full border border-hairline-strong bg-paper text-ink transition-colors hover:border-botanical"
+                      >
+                        ←
+                      </button>
+                      <span aria-live="polite" className="pres-label font-mono text-slate">
+                        {slide.label}
+                        <span className="pl-3 text-faint">
+                          slide {slide.index + 1} of {slide.slideCount}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => goToSlide(1)}
+                        aria-label="Next members"
+                        className="pres-h3 flex size-14 items-center justify-center rounded-full border border-hairline-strong bg-paper text-ink transition-colors hover:border-botanical"
+                      >
+                        →
+                      </button>
+                    </div>
                   ) : null}
                 </div>
 

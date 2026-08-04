@@ -34,7 +34,7 @@ export function DonutChart({
         aria-label={`${centerLabel}: ${segments
           .map((segment) => `${segment.label} ${segment.value}`)
           .join(", ")}`}
-        className="w-full max-w-[220px]"
+        className="w-full max-w-[var(--pres-chart-sm,220px)]"
       >
         <circle
           cx={SIZE / 2}
@@ -92,8 +92,8 @@ export function DonutChart({
       </svg>
       <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5">
         {segments.map((segment) => (
-          <span key={segment.label} className="flex items-center gap-1.5 text-xs text-slate">
-            <span aria-hidden className="size-2.5 rounded-full" style={{ background: segment.color }} />
+          <span key={segment.label} className="pres-scaled-mono flex items-center gap-1.5 text-xs text-slate">
+            <span aria-hidden className="size-[0.9em] rounded-full" style={{ background: segment.color }} />
             {segment.label}
             <span className="font-mono text-faint">{segment.value}</span>
           </span>

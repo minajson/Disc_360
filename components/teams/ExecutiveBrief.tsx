@@ -77,6 +77,7 @@ function Section({
   const reduced = useReducedMotion();
   return (
     <motion.section
+      data-reveal
       className="flex flex-col gap-5 break-inside-avoid"
       initial={reduced ? false : { opacity: 0, y: 18 }}
       whileInView={{ opacity: 1, y: 0 }}
@@ -90,7 +91,7 @@ function Section({
         <h2
           className={cn(
             "font-display font-semibold text-ink",
-            presentation ? "text-h2" : "text-h3",
+            presentation ? "pres-h2" : "text-h3",
           )}
         >
           {title}
@@ -117,12 +118,12 @@ function Metric({
       <span
         className={cn(
           "font-display font-semibold tracking-tight text-ink",
-          presentation ? "text-6xl" : "text-4xl lg:text-5xl",
+          presentation ? "pres-metric" : "text-4xl lg:text-5xl",
         )}
       >
         {value}
       </span>
-      <span className={cn("text-slate", presentation ? "text-base" : "text-sm")}>
+      <span className={cn("text-slate", presentation ? "pres-label" : "text-sm")}>
         {label}
       </span>
       {detail ? (
@@ -208,7 +209,7 @@ export function ExecutiveBrief({ data }: { data: ExecutiveBriefData }) {
       ref={stageRef}
       className={cn(
         "flex flex-col gap-12 bg-canvas",
-        presentation && "overflow-y-auto px-8 py-10 lg:px-16 lg:py-14",
+        presentation && "presentation-scale overflow-y-auto px-8 py-10 lg:px-16 lg:py-14",
       )}
     >
       {/* controls */}
@@ -285,8 +286,8 @@ export function ExecutiveBrief({ data }: { data: ExecutiveBriefData }) {
         <Eyebrow>Executive brief · {data.teamName}</Eyebrow>
         <p
           className={cn(
-            "max-w-4xl font-display leading-snug text-ink",
-            presentation ? "text-h1" : "text-h2",
+            "font-display leading-snug text-ink",
+            presentation ? "pres-h1 pres-measure" : "max-w-4xl text-h2",
           )}
         >
           {leadSentences(data.cultureSummary)}
@@ -339,7 +340,7 @@ export function ExecutiveBrief({ data }: { data: ExecutiveBriefData }) {
             </h3>
             <DiscRadarOverlay
               series={radarSeries}
-              className={cn("mx-auto", presentation ? "max-w-[520px]" : "max-w-[420px]")}
+              className="mx-auto max-w-[var(--pres-chart-lg,420px)]"
             />
             {profiles.length > 8 ? (
               <p className="text-center font-mono text-[10px] uppercase tracking-[0.16em] text-faint">
@@ -444,7 +445,7 @@ export function ExecutiveBrief({ data }: { data: ExecutiveBriefData }) {
           <TeamQuadrantMap
             profiles={profiles}
             presentation={presentation}
-            className="mx-auto w-full max-w-3xl"
+            className="mx-auto w-full max-w-[var(--pres-chart-lg,48rem)]"
           />
         </div>
       </Section>
@@ -547,8 +548,8 @@ export function ExecutiveBrief({ data }: { data: ExecutiveBriefData }) {
         <div className="paper-card p-8">
           <p
             className={cn(
-              "max-w-4xl font-display leading-relaxed text-ink",
-              presentation ? "text-2xl" : "text-lead",
+              "font-display leading-relaxed text-ink",
+              presentation ? "pres-h3 pres-measure" : "max-w-4xl text-lead",
             )}
           >
             {data.collaboration}

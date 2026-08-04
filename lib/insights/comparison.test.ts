@@ -14,6 +14,7 @@ import {
   highBandCounts,
   pairDistance,
   pairDistances,
+  slideWindow,
   styleCounts,
   toggleSelection,
   type ComparisonMember,
@@ -269,4 +270,50 @@ test("an evenly balanced set is headlined as balanced", () => {
   ];
   const readout = comparisonReadout(members, "All members");
   assert.match(readout.headline, /evenly balanced/);
+});
+
+/* ── presentation pagination ────────────────────────────────────────── */
+
+test("a projected set shows three cards per slide, never shrunken ten", () => {
+  const window = slideWindow(10, 0);
+  assert.equal(window.slideCount, 4);
+  assert.equal(window.from, 1);
+  assert.equal(window.to, 3);
+  assert.equal(window.label, "Members 1–3 of 10");
+});
+
+test("the final slide holds the remainder without overflowing", () => {
+  const last = slideWindow(10, 3);
+  assert.equal(last.from, 10);
+  assert.equal(last.to, 10);
+  assert.equal(last.label, "Member 10 of 10");
+});
+
+test("slide indexes wrap in both directions", () => {
+  assert.equal(slideWindow(10, 4).index, 0);
+  assert.equal(slideWindow(10, -1).index, 3);
+  assert.equal(slideWindow(10, 7).index, 3);
+});
+
+test("small and empty sets stay well formed", () => {
+  assert.equal(slideWindow(2, 0).label, "Members 1–2 of 2");
+  assert.equal(slideWindow(2, 0).slideCount, 1);
+  assert.equal(slideWindow(1, 0).label, "Member 1 of 1");
+  assert.equal(slideWindow(0, 0).label, "No members");
+  assert.equal(slideWindow(0, 0).slideCount, 1);
+});
+
+test("every member appears on exactly one slide", () => {
+  for (const total of [1, 3, 5, 8, 10, 23, 100]) {
+    const seen = new Set<number>();
+    const { slideCount } = slideWindow(total, 0);
+    for (let index = 0; index < slideCount; index++) {
+      const w = slideWindow(total, index);
+      for (let n = w.from; n <= w.to; n++) {
+        assert.ok(!seen.has(n), `member ${n} duplicated at total ${total}`);
+        seen.add(n);
+      }
+    }
+    assert.equal(seen.size, total, `total ${total}`);
+  }
 });

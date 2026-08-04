@@ -8,6 +8,7 @@ import { DonutChart } from "@/components/charts/DonutChart";
 import { DiscRadarChart } from "@/components/charts/DiscRadarChart";
 import { TeamQuadrantMap } from "@/components/teams/TeamQuadrantMap";
 import { DIMENSION_KEY, DIMENSIONS, type Dimension } from "@/lib/types";
+import { leadSentences } from "@/lib/insights/board";
 import type { TeamIntelligence, TeamMemberProfile } from "@/lib/insights/team";
 
 /**
@@ -39,7 +40,7 @@ function Panel({
 }) {
   return (
     <div className={cn("paper-card flex flex-col gap-4 p-6", className)}>
-      <h3 className="font-mono text-[11px] uppercase tracking-[0.2em] text-teal">{title}</h3>
+      <h3 className="pres-mono font-mono uppercase tracking-[0.2em] text-teal">{title}</h3>
       {children}
     </div>
   );
@@ -48,10 +49,8 @@ function Panel({
 function BigStat({ value, label }: { value: string; label: string }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="font-display text-4xl font-semibold tracking-tight text-ink lg:text-5xl">
-        {value}
-      </span>
-      <span className="text-sm text-slate">{label}</span>
+      <span className="pres-metric font-display font-semibold text-ink">{value}</span>
+      <span className="pres-label text-slate">{label}</span>
     </div>
   );
 }
@@ -60,8 +59,8 @@ function Bullets({ items, color = "var(--color-teal)" }: { items: string[]; colo
   return (
     <ul className="flex flex-col gap-2.5">
       {items.map((item) => (
-        <li key={item} className="flex items-start gap-3 text-base leading-snug text-ink lg:text-lg">
-          <span aria-hidden className="mt-2 size-2 shrink-0 rounded-full" style={{ background: color }} />
+        <li key={item} className="pres-body pres-measure flex items-start gap-3 text-ink">
+          <span aria-hidden className="mt-[0.55em] size-2 shrink-0 rounded-full" style={{ background: color }} />
           {item}
         </li>
       ))}
@@ -105,8 +104,8 @@ export function OverviewTab({ data, profiles }: TabContext) {
         </div>
       </Panel>
       <Panel title="Culture in one line">
-        <p className="font-display text-xl leading-snug text-ink lg:text-2xl">
-          {data.cultureSummary.split(". ").slice(0, 2).join(". ")}.
+        <p className="pres-h3 pres-measure font-display text-ink">
+          {leadSentences(data.cultureSummary)}
         </p>
         <DonutChart
           centerLabel="primaries"
@@ -147,16 +146,16 @@ export function DistributionTab({ data, profiles }: TabContext) {
         />
       </Panel>
       <Panel title="Team averages">
-        <DiscRadarChart scores={data.averages} className="mx-auto max-w-[300px]" />
+        <DiscRadarChart scores={data.averages} className="mx-auto max-w-[var(--pres-chart-md,300px)]" />
       </Panel>
       <Panel title="Member map" className="lg:col-span-2">
-        <TeamQuadrantMap profiles={profiles} presentation className="mx-auto w-full max-w-2xl" />
+        <TeamQuadrantMap profiles={profiles} presentation className="mx-auto w-full max-w-[var(--pres-chart-lg,42rem)]" />
       </Panel>
       {departmentCounts.length > 1 ? (
         <Panel title="By department" className="lg:col-span-2">
           <div className="flex flex-wrap gap-3">
             {departmentCounts.map(([department, count]) => (
-              <span key={department} className="rounded-full border border-hairline bg-paper px-4 py-2 text-sm text-ink">
+              <span key={department} className="pres-label rounded-full border border-hairline bg-paper px-4 py-2 text-ink">
                 {department} <span className="font-mono text-faint">{count}</span>
               </span>
             ))}
@@ -185,8 +184,8 @@ export function CommunicationTab({ data, profiles }: TabContext) {
           {represented.map((dim) => (
             <div key={dim} className="flex items-center gap-3">
               <span aria-hidden className="size-3 rounded-full" style={{ background: discColor(dim) }} />
-              <span className="flex-1 text-base text-ink lg:text-lg">{commStyleLabel[dim]}</span>
-              <span className="font-mono text-sm text-faint">
+              <span className="pres-body flex-1 text-ink">{commStyleLabel[dim]}</span>
+              <span className="pres-label font-mono text-faint">
                 {profiles.filter((p) => p.primary === dim).length}
               </span>
             </div>
@@ -197,10 +196,10 @@ export function CommunicationTab({ data, profiles }: TabContext) {
         <div className="flex flex-col gap-4">
           {data.communicationGaps.map((gap) => (
             <div key={gap.between.join("-")} className="flex flex-col gap-1">
-              <span className="font-display text-lg font-semibold text-ink">
+              <span className="pres-h3 font-display font-semibold text-ink">
                 {gap.between[0]} ↔ {gap.between[1]}
               </span>
-              <span className="text-sm leading-snug text-slate">{gap.bridge}</span>
+              <span className="pres-label leading-snug text-slate">{gap.bridge}</span>
             </div>
           ))}
         </div>
@@ -209,7 +208,7 @@ export function CommunicationTab({ data, profiles }: TabContext) {
         <div className="grid gap-4 sm:grid-cols-2">
           {represented.slice(0, 4).map((dim) => (
             <div key={dim} className="flex flex-col gap-2">
-              <span className="text-sm font-medium" style={{ color: discColor(dim) }}>
+              <span className="pres-label font-medium" style={{ color: discColor(dim) }}>
                 With {dimensionMeta[dim].label} members
               </span>
               <Bullets items={insightMap[dim].communication.do.slice(0, 2)} color={discColor(dim)} />
@@ -235,10 +234,10 @@ export function LeadershipTab({ data, profiles }: TabContext) {
         <div className="flex flex-col gap-4">
           {represented.map((dim) => (
             <div key={dim} className="flex flex-col gap-0.5">
-              <span className="font-display text-lg font-semibold text-ink">
+              <span className="pres-h3 font-display font-semibold text-ink">
                 {insightMap[dim].leadershipStyle.headline}
               </span>
-              <span className="text-sm text-slate">
+              <span className="pres-label text-slate">
                 {dimensionMeta[dim].label} · {profiles.filter((p) => p.primary === dim).length} member
                 {profiles.filter((p) => p.primary === dim).length === 1 ? "" : "s"}
               </span>
@@ -253,7 +252,7 @@ export function LeadershipTab({ data, profiles }: TabContext) {
             { label: "Deliberation", value: deliberation, color: "var(--color-disc-c)" },
           ].map((meter) => (
             <div key={meter.label} className="flex flex-col gap-1.5">
-              <div className="flex justify-between text-sm text-slate">
+              <div className="pres-label flex justify-between text-slate">
                 <span>{meter.label}</span>
                 <span className="font-mono text-ink">{meter.value}</span>
               </div>
@@ -262,7 +261,7 @@ export function LeadershipTab({ data, profiles }: TabContext) {
               </div>
             </div>
           ))}
-          <p className="text-sm leading-snug text-slate">
+          <p className="pres-label leading-snug text-slate">
             {actionBias > deliberation + 10
               ? "Decisions move fast — verification needs a named owner."
               : deliberation > actionBias + 10
@@ -281,7 +280,7 @@ export function LeadershipTab({ data, profiles }: TabContext) {
             color="var(--color-disc-d)"
           />
         ) : (
-          <p className="text-base text-ink">All four leadership energies are represented.</p>
+          <p className="pres-body text-ink">All four leadership energies are represented.</p>
         )}
       </Panel>
     </div>
@@ -299,10 +298,10 @@ export function ConflictTab({ data, profiles }: TabContext) {
           {represented.map((dim) => (
             <div key={dim} className="flex items-center gap-3">
               <span aria-hidden className="size-3 rounded-full" style={{ background: discColor(dim) }} />
-              <span className="flex-1 text-base text-ink lg:text-lg">
+              <span className="pres-body flex-1 text-ink">
                 {insightMap[dim].conflictResponse.headline}
               </span>
-              <span className="font-mono text-sm text-faint">
+              <span className="pres-label font-mono text-faint">
                 {profiles.filter((p) => p.primary === dim).length}
               </span>
             </div>
@@ -314,15 +313,15 @@ export function ConflictTab({ data, profiles }: TabContext) {
           <div className="flex flex-col gap-3">
             {data.frictionPairs.map((pair) => (
               <div key={`${pair.aIndex}-${pair.bIndex}`} className="flex flex-col gap-0.5">
-                <span className="font-display text-lg font-semibold text-ink">
+                <span className="pres-h3 font-display font-semibold text-ink">
                   {data.profiles[pair.aIndex]?.label} ↔ {data.profiles[pair.bIndex]?.label}
                 </span>
-                <span className="text-sm leading-snug text-slate">{pair.reason}</span>
+                <span className="pres-label leading-snug text-slate">{pair.reason}</span>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-base text-ink">No high-tension pairings detected.</p>
+          <p className="pres-body text-ink">No high-tension pairings detected.</p>
         )}
       </Panel>
       <Panel title="Prevention actions" className="lg:col-span-2">
@@ -356,10 +355,10 @@ export function PressureTab({ data, profiles }: TabContext) {
             <div key={dim} className="flex items-start gap-3">
               <span aria-hidden className="mt-1.5 size-3 shrink-0 rounded-full" style={{ background: discColor(dim) }} />
               <div className="flex flex-col gap-0.5">
-                <span className="text-base font-medium text-ink lg:text-lg">
+                <span className="pres-body font-medium text-ink">
                   {dimensionMeta[dim].label}
                 </span>
-                <span className="text-sm leading-snug text-slate">
+                <span className="pres-label leading-snug text-slate">
                   {dimensionMeta[dim].underPressure}
                 </span>
               </div>
@@ -372,13 +371,13 @@ export function PressureTab({ data, profiles }: TabContext) {
           value={`${concentration}%`}
           label={`of the team defaults to the ${dimensionMeta[lead].label} pressure response`}
         />
-        <p className="text-sm leading-snug text-slate">{data.pressureShift}</p>
+        <p className="pres-label leading-snug text-slate">{data.pressureShift}</p>
       </Panel>
       <Panel title="Recovery guidance" className="lg:col-span-2">
         <div className="grid gap-4 sm:grid-cols-2">
           {represented.slice(0, 2).map((dim) => (
             <div key={dim} className="flex flex-col gap-2">
-              <span className="text-sm font-medium" style={{ color: discColor(dim) }}>
+              <span className="pres-label font-medium" style={{ color: discColor(dim) }}>
                 For {dimensionMeta[dim].label} members
               </span>
               <Bullets items={insightMap[dim].stressResponse.recovery.slice(0, 2)} color={discColor(dim)} />
@@ -400,15 +399,15 @@ export function PairingsTab({ data }: TabContext) {
           <div className="flex flex-col gap-3">
             {data.complementaryPairs.map((pair) => (
               <div key={`${pair.aIndex}-${pair.bIndex}`} className="flex flex-col gap-0.5">
-                <span className="font-display text-lg font-semibold text-ink">
+                <span className="pres-h3 font-display font-semibold text-ink">
                   {data.profiles[pair.aIndex]?.label} + {data.profiles[pair.bIndex]?.label}
                 </span>
-                <span className="text-sm leading-snug text-slate">{pair.reason}</span>
+                <span className="pres-label leading-snug text-slate">{pair.reason}</span>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-base text-ink">No strong complements detected yet.</p>
+          <p className="pres-body text-ink">No strong complements detected yet.</p>
         )}
       </Panel>
       <Panel title="High-friction pairings">
@@ -416,15 +415,15 @@ export function PairingsTab({ data }: TabContext) {
           <div className="flex flex-col gap-3">
             {data.frictionPairs.map((pair) => (
               <div key={`${pair.aIndex}-${pair.bIndex}`} className="flex flex-col gap-0.5">
-                <span className="font-display text-lg font-semibold text-ink">
+                <span className="pres-h3 font-display font-semibold text-ink">
                   {data.profiles[pair.aIndex]?.label} ↔ {data.profiles[pair.bIndex]?.label}
                 </span>
-                <span className="text-sm leading-snug text-slate">{pair.reason}</span>
+                <span className="pres-label leading-snug text-slate">{pair.reason}</span>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-base text-ink">No high-tension pairings detected.</p>
+          <p className="pres-body text-ink">No high-tension pairings detected.</p>
         )}
       </Panel>
 
@@ -474,10 +473,10 @@ export function RecommendationsTab({ data, profiles }: TabContext) {
         <ol className="flex flex-col gap-3">
           {teamActions.concat(meetingActions).slice(0, 5).map((action, index) => (
             <li key={action} className="flex items-start gap-3.5">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-botanical font-display text-base font-semibold text-mineral">
+              <span className="pres-body flex size-[2em] shrink-0 items-center justify-center rounded-full bg-botanical font-display font-semibold text-mineral">
                 {index + 1}
               </span>
-              <span className="pt-1 text-base leading-snug text-ink lg:text-lg">{action}</span>
+              <span className="pres-body pres-measure pt-1 text-ink">{action}</span>
             </li>
           ))}
         </ol>

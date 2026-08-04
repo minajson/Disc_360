@@ -92,6 +92,7 @@ function Section({
   const reduced = useReducedMotion();
   return (
     <motion.section
+      data-reveal
       className="flex flex-col gap-5"
       initial={reduced ? false : { opacity: 0, y: 16 }}
       whileInView={{ opacity: 1, y: 0 }}
@@ -280,7 +281,7 @@ export function ExecutiveAnalyticsView({
                 <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border border-hairline font-mono text-[11px] text-faint">
                   {index + 1}
                 </span>
-                <span className="text-lead leading-relaxed text-ink">{line}</span>
+                <span className="pres-measure text-lead leading-relaxed text-ink">{line}</span>
               </li>
             ))}
           </ol>
@@ -352,7 +353,7 @@ export function ExecutiveAnalyticsView({
                   color: `var(--color-disc-${group.lead.toLowerCase()})`,
                 })),
               ]}
-              className="mx-auto max-w-[340px]"
+              className="mx-auto max-w-[var(--pres-chart-md,340px)]"
             />
           </Panel>
           <Panel title="Average intensity">

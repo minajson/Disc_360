@@ -94,15 +94,19 @@ function InsightCard({
   generatedAt,
   basis,
   scopeLabel,
+  presentation = false,
+  defaultOpen = false,
 }: {
   insight: FacilitatorInsight;
   index: number;
   generatedAt: string;
   basis: string;
   scopeLabel: string;
+  presentation?: boolean;
+  defaultOpen?: boolean;
 }) {
   const reduced = useReducedMotion();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
 
   const coverage =
     insight.populationSize > 0
@@ -111,6 +115,7 @@ function InsightCard({
 
   return (
     <motion.article
+      data-reveal
       className="paper-card flex flex-col gap-4 p-6 lg:p-7"
       initial={reduced ? false : { opacity: 0, y: 14 }}
       whileInView={{ opacity: 1, y: 0 }}
@@ -122,17 +127,34 @@ function InsightCard({
       }}
     >
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-teal">
+        <span
+          className={cn(
+            "font-mono uppercase tracking-[0.2em] text-teal",
+            presentation ? "pres-mono" : "text-[11px]",
+          )}
+        >
           {CATEGORY_TITLE[insight.category]}
         </span>
         <SignalMeter signal={insight.signal} />
       </header>
 
-      <h3 className="font-display text-lg font-semibold leading-snug text-ink lg:text-xl">
+      <h3
+        className={cn(
+          "font-display font-semibold leading-snug text-ink",
+          presentation ? "pres-h2" : "text-lg lg:text-xl",
+        )}
+      >
         {insight.title}
       </h3>
 
-      <p className="text-sm leading-relaxed text-slate">{insight.observation}</p>
+      <p
+        className={cn(
+          "text-slate",
+          presentation ? "pres-body pres-measure" : "text-sm leading-relaxed",
+        )}
+      >
+        {insight.observation}
+      </p>
 
       <div className="flex flex-col gap-2 rule-t pt-4">
         <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint">
@@ -142,9 +164,12 @@ function InsightCard({
           {insight.interpretation.map((line) => (
             <li
               key={line}
-              className="flex items-start gap-2.5 text-sm leading-relaxed text-ink"
+              className={cn(
+                "flex items-start gap-2.5 text-ink",
+                presentation ? "pres-body pres-measure" : "text-sm leading-relaxed",
+              )}
             >
-              <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full bg-sage" />
+              <span aria-hidden className="mt-[0.6em] size-1.5 shrink-0 rounded-full bg-sage" />
               {line}
             </li>
           ))}
@@ -316,6 +341,9 @@ export function FacilitatorInsightsView({
   aiGenerated = false,
   embedded = false,
 }: FacilitatorInsightsViewProps) {
+  const [presentation, setPresentation] = useState(false);
+  const [slide, setSlide] = useState(0);
+
   const generatedAt = useMemo(
     () =>
       new Date(set.scope.generatedAt).toLocaleDateString("en-GB", {
@@ -327,6 +355,15 @@ export function FacilitatorInsightsView({
   );
 
   const reportable = departments.filter((department) => !department.suppressed).length;
+
+  /*
+   * Projection mode. Eight evidence cards in a two-column grid is right for an
+   * analyst and wrong for a room: at projector distance the observation and
+   * the "what this may mean" block stop being readable together. So one
+   * category fills the slide and the facilitator advances.
+   */
+  const total = set.insights.length;
+  const card = total > 0 ? set.insights[Math.min(slide, total - 1)]! : null;
 
   return (
     <div className="flex flex-col gap-8">
@@ -359,8 +396,21 @@ export function FacilitatorInsightsView({
         </span>
         <button
           type="button"
+          onClick={() => setPresentation((value) => !value)}
+          aria-pressed={presentation}
+          className={cn(
+            "ml-auto rounded-full px-5 py-1.5 text-xs font-medium transition-colors print:hidden",
+            presentation
+              ? "bg-botanical text-mineral"
+              : "border border-hairline text-slate hover:border-botanical hover:text-botanical",
+          )}
+        >
+          {presentation ? "Exit presentation" : "Presentation mode"}
+        </button>
+        <button
+          type="button"
           onClick={() => window.print()}
-          className="ml-auto rounded-full border border-hairline px-4 py-1.5 text-xs text-slate transition-colors hover:border-botanical hover:text-botanical print:hidden"
+          className="rounded-full border border-hairline px-4 py-1.5 text-xs text-slate transition-colors hover:border-botanical hover:text-botanical print:hidden"
         >
           Export PDF
         </button>
@@ -368,6 +418,43 @@ export function FacilitatorInsightsView({
 
       {set.suppressed ? (
         <Suppressed message={set.suppressed} />
+      ) : presentation && card ? (
+        <div className="presentation-scale flex flex-col gap-5">
+          <InsightCard
+            key={card.category}
+            insight={card}
+            index={0}
+            generatedAt={generatedAt}
+            basis={set.scope.basis}
+            scopeLabel={set.scope.label}
+            presentation
+            defaultOpen
+          />
+          <div className="flex items-center justify-between print:hidden">
+            <button
+              type="button"
+              onClick={() => setSlide((n) => (n - 1 + total) % total)}
+              aria-label="Previous insight"
+              className="pres-h3 flex size-14 items-center justify-center rounded-full border border-hairline-strong bg-paper text-ink transition-colors hover:border-botanical"
+            >
+              ←
+            </button>
+            <span aria-live="polite" className="pres-label font-mono text-slate">
+              {CATEGORY_TITLE[card.category]}
+              <span className="pl-3 text-faint">
+                {Math.min(slide, total - 1) + 1} of {total}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setSlide((n) => (n + 1) % total)}
+              aria-label="Next insight"
+              className="pres-h3 flex size-14 items-center justify-center rounded-full border border-hairline-strong bg-paper text-ink transition-colors hover:border-botanical"
+            >
+              →
+            </button>
+          </div>
+        </div>
       ) : (
         <div className="grid gap-5 lg:grid-cols-2">
           {set.insights.map((insight, index) => (

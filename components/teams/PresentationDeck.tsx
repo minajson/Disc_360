@@ -151,7 +151,7 @@ export function PresentationDeck({
 
   const controlChip = (active = false) =>
     cn(
-      "rounded-full border px-4 py-2 text-sm transition-colors",
+      "pres-label rounded-full border px-4 py-2 transition-colors",
       active
         ? "border-botanical text-botanical"
         : "border-hairline text-slate hover:border-botanical hover:text-botanical",
@@ -160,12 +160,14 @@ export function PresentationDeck({
   const active = TABS[tabIndex]!;
 
   return (
-    <div className="flex min-h-screen flex-col bg-canvas">
+    /* presentation-scale makes this element the container every type token
+       below measures against, so the whole deck grows with the screen. */
+    <div className="presentation-scale flex min-h-screen flex-col bg-canvas">
       {/* presenter chrome */}
       <header className="flex flex-wrap items-center gap-x-4 gap-y-2 px-6 py-4 print:hidden">
         <div className="flex flex-col">
-          <span className="font-display text-lg font-semibold text-ink">{data.teamName}</span>
-          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-faint">
+          <span className="pres-h3 font-display font-semibold text-ink">{data.teamName}</span>
+          <span className="pres-mono font-mono uppercase tracking-[0.18em] text-faint">
             DISC360 · {data.completedCount} of {data.memberCount} completed
           </span>
         </div>
@@ -251,7 +253,7 @@ export function PresentationDeck({
               className="size-9 rounded-full object-cover"
             />
           ) : null}
-          <span className="text-sm text-slate">
+          <span className="pres-label text-slate">
             Facilitated by <span className="font-medium text-ink">{facilitator.name}</span>
             {facilitator.title ? ` · ${facilitator.title}` : ""}
             {facilitator.organization ? ` · ${facilitator.organization}` : ""}
@@ -276,7 +278,7 @@ export function PresentationDeck({
             aria-selected={tabIndex === index}
             onClick={() => setTabIndex(index)}
             className={cn(
-              "whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors lg:text-base",
+              "pres-nav whitespace-nowrap border-b-2 px-5 py-3.5 font-medium transition-colors",
               tabIndex === index
                 ? "border-botanical text-botanical"
                 : "border-transparent text-slate hover:text-ink",
@@ -288,7 +290,7 @@ export function PresentationDeck({
       </nav>
 
       {/* active tab (screen) */}
-      <main className="flex-1 px-6 py-6 lg:px-10 lg:py-8 print:hidden">
+      <main className="flex flex-1 flex-col overflow-y-auto px-6 py-6 lg:px-10 lg:py-8 print:hidden">
         {data.completedCount === 0 ? (
           <div className="paper-card mx-auto max-w-lg p-10 text-center">
             <p className="text-lg text-slate">
@@ -306,7 +308,14 @@ export function PresentationDeck({
               animate={{ opacity: 1, y: 0 }}
               exit={reduced ? { opacity: 0 } : { opacity: 0, y: -10 }}
               transition={{ duration: 0.25, ease: [0.32, 0.94, 0.6, 1] }}
-              className="mx-auto w-full max-w-6xl"
+              /* Grows with the room: ~92% of the stage, ceilinged so an
+                 ultrawide gains columns rather than stretched rows. */
+              /* my-auto centres the slide when the screen is taller than the
+                 content — a 4K projector should not show one band of cards at
+                 the top and 1500px of empty ivory below. Auto margins collapse
+                 safely when the content overflows, so tall slides still scroll
+                 from the top rather than being clipped. */
+              className="mx-auto my-auto w-full max-w-[min(94cqi,2800px)]"
             >
               <active.Component {...context} />
             </motion.div>
@@ -379,18 +388,18 @@ export function PresentationDeck({
           type="button"
           onClick={() => go(-1)}
           aria-label="Previous section"
-          className="flex size-12 items-center justify-center rounded-full border border-hairline-strong bg-paper text-ink transition-colors hover:border-botanical"
+          className="pres-h3 flex size-14 items-center justify-center rounded-full border border-hairline-strong bg-paper text-ink transition-colors hover:border-botanical"
         >
           ←
         </button>
-        <span className="font-mono text-xs text-faint">
+        <span className="pres-mono font-mono text-faint">
           {tabIndex + 1} / {TABS.length} · arrow keys navigate
         </span>
         <button
           type="button"
           onClick={() => go(1)}
           aria-label="Next section"
-          className="flex size-12 items-center justify-center rounded-full border border-hairline-strong bg-paper text-ink transition-colors hover:border-botanical"
+          className="pres-h3 flex size-14 items-center justify-center rounded-full border border-hairline-strong bg-paper text-ink transition-colors hover:border-botanical"
         >
           →
         </button>

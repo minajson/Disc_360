@@ -148,6 +148,7 @@ export function TeamHistoryView({ history }: { history: TeamHistory }) {
         <section className="flex flex-col gap-4" aria-label="Assessment periods">
           {periods.map((period, index) => (
             <motion.article
+              data-reveal
               key={period.teamId}
               className="paper-card flex flex-col gap-4 p-6 lg:p-7"
               initial={reduced ? false : { opacity: 0, y: 14 }}
