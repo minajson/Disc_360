@@ -11,9 +11,21 @@ import type { PresentationDeck, PresentationSlide } from "@/lib/presentations/ty
 
 const slides: PresentationSlide[] = [
   {
-    id: "combined-01-opening",
+    id: "combined-00-wheel",
     deckType: "combined",
     order: 1,
+    section: "Opening",
+    title: "The DISC wheel",
+    visualType: "wheel",
+    facilitatorPrompt:
+      "Open here and say nothing for a beat — let the room look. Then name the four preferences in your own words and move on; the wheel is orientation, not the content.",
+    audienceQuestion: "Before we name anything: which part of that picture do you think your team lives in?",
+    estimatedSeconds: 30,
+  },
+  {
+    id: "combined-01-opening",
+    deckType: "combined",
+    order: 2,
     section: "Opening",
     eyebrow: "DISC360 · Combined",
     title: "How you behave and what captures your attention are connected.",
@@ -26,7 +38,7 @@ const slides: PresentationSlide[] = [
   {
     id: "combined-02-two-lenses",
     deckType: "combined",
-    order: 2,
+    order: 3,
     section: "Two lenses",
     eyebrow: "The frame",
     title: "Two lenses on one person",
@@ -50,7 +62,7 @@ const slides: PresentationSlide[] = [
   {
     id: "combined-03-disc",
     deckType: "combined",
-    order: 3,
+    order: 4,
     section: "The behaviour lens",
     eyebrow: "DISC",
     title: "DISC explains how you tend to approach work",
@@ -69,7 +81,7 @@ const slides: PresentationSlide[] = [
   {
     id: "combined-04-focus",
     deckType: "combined",
-    order: 4,
+    order: 5,
     section: "The attention lens",
     eyebrow: "Focus Pulse",
     title: "Focus Pulse explores what competes for your attention",
@@ -88,7 +100,7 @@ const slides: PresentationSlide[] = [
   {
     id: "combined-05-different",
     deckType: "combined",
-    order: 5,
+    order: 6,
     section: "One interruption, four responses",
     eyebrow: "Examples, not diagnoses",
     title: "The same interruption affects people differently",
@@ -107,7 +119,7 @@ const slides: PresentationSlide[] = [
   {
     id: "combined-06-overuse",
     deckType: "combined",
-    order: 6,
+    order: 7,
     section: "Strength and overuse",
     eyebrow: "Where the lenses meet",
     title: "Behavioural strengths can shape focus habits",
@@ -126,7 +138,7 @@ const slides: PresentationSlide[] = [
   {
     id: "combined-07-team",
     deckType: "combined",
-    order: 7,
+    order: 8,
     section: "Team patterns",
     eyebrow: "Not only individual",
     title: "Focus is not only an individual issue.",
@@ -139,7 +151,7 @@ const slides: PresentationSlide[] = [
   {
     id: "combined-08-results",
     deckType: "combined",
-    order: 8,
+    order: 9,
     section: "What the combined results show",
     eyebrow: "The output",
     title: "What the combined results show",
@@ -160,7 +172,7 @@ const slides: PresentationSlide[] = [
   {
     id: "combined-09-answer",
     deckType: "combined",
-    order: 9,
+    order: 10,
     section: "How to answer",
     eyebrow: "Naturally",
     title: "How to answer",
@@ -179,7 +191,7 @@ const slides: PresentationSlide[] = [
   {
     id: "combined-10-privacy",
     deckType: "combined",
-    order: 10,
+    order: 11,
     section: "Privacy",
     eyebrow: "Trust",
     title: "How your responses are used",
@@ -203,7 +215,7 @@ const slides: PresentationSlide[] = [
   {
     id: "combined-11-roadmap",
     deckType: "combined",
-    order: 11,
+    order: 12,
     section: "Session roadmap",
     eyebrow: "The next hour",
     title: "How this session flows",
@@ -222,7 +234,7 @@ const slides: PresentationSlide[] = [
   {
     id: "combined-12-start",
     deckType: "combined",
-    order: 12,
+    order: 13,
     section: "Start",
     eyebrow: "Ready",
     title: "Ready to connect behaviour with attention?",

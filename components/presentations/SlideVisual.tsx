@@ -8,6 +8,7 @@ import { BehaviourCompass } from "@/components/visualisations/disc/BehaviourComp
 import { AttentionRippleMap } from "@/components/visualisations/focus/AttentionRippleMap";
 import { FocusCycle } from "@/components/visualisations/focus/FocusCycle";
 import { RecoveryCurve } from "@/components/visualisations/focus/RecoveryCurve";
+import { OVERTURE_ALT, OvertureSlide } from "@/components/presentations/OvertureSlide";
 import type {
   DisplayDimension,
   PresentationSlide,
@@ -690,6 +691,13 @@ function RecoveryCurveSlide({ slide, reduced, children }: SlideVisualProps) {
 
 export function SlideVisual(props: SlideVisualProps) {
   switch (props.slide.visualType) {
+    // The opening slide is an image with nothing around it, so it does not use
+    // the shared slide Frame at all — the player and the live follower render
+    // OvertureSlide directly. This case exists so the switch stays exhaustive
+    // and a `wheel` slide reaching an unexpected surface renders the image
+    // rather than a blank canvas.
+    case "wheel":
+      return <OvertureSlide alt={OVERTURE_ALT} priority={false} />;
     case "hero":
       return <HeroVisual {...props} />;
     case "spectrum":

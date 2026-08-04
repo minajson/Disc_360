@@ -43,6 +43,9 @@ test.describe("audit verification shots", () => {
     await page.goto("/present/disc/introduction");
     await page.waitForSelector('[data-testid="deck-root"]');
 
+    // Past the opening wheel, which shows no controls at all.
+    await page.keyboard.press("ArrowRight");
+
     const next = page.getByRole("button", { name: "Next slide" });
     // slide 3 — compass (concept)
     await next.click();

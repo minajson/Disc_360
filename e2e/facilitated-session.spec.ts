@@ -228,7 +228,9 @@ test("9+10: a participant follows the coach's slide and cannot browse in live mo
     code: "FCL-3001",
     assessment: "disc",
     state: "presentation",
-    slide: 2,
+    // Index 3 — the DISC deck now opens on the wheel, so every content slide
+    // sits one further along.
+    slide: 3,
   });
   const email = "facil-live@disc360.dev";
   const uid = await createUser(email);
@@ -241,14 +243,14 @@ test("9+10: a participant follows the coach's slide and cannot browse in live mo
   await page.getByRole("link", { name: "Join live presentation" }).click();
   await page.waitForURL("**/live");
 
-  // Slide 3 (index 2) of the DISC deck.
+  // Slide 4 (index 3) of the DISC deck.
   await expect(page.getByText("Four ways of showing up")).toBeVisible({ timeout: 10000 });
   await expect(page.getByText("Following your facilitator")).toBeVisible();
   // no navigation controls in live mode
   await expect(page.getByRole("button", { name: "Next slide" })).toHaveCount(0);
 
   // Coach advances → the follower updates by polling.
-  sql(`update teams set active_slide=4 where id='${team.id}'`);
+  sql(`update teams set active_slide=5 where id='${team.id}'`);
   await expect(page.getByText("A strength, overused, becomes a pressure point")).toBeVisible({
     timeout: 8000,
   });
@@ -283,10 +285,14 @@ test("11: review access follows the coach's presentation setting", async ({ page
   await page.waitForURL("**/app", { timeout: 15000 });
 
   await page.goto(`/app/teams/${withReview.id}/live?mode=review`);
+  // Review starts at the top of the deck, which is the DISC wheel, and offers
+  // navigation — that is what review access means.
+  await expect(page.getByTestId("overture")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Next slide" })).toBeVisible();
+  await page.getByRole("button", { name: "Next slide" }).click();
   await expect(
     page.getByText("How do people lead, communicate and respond when it matters?"),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Next slide" })).toBeVisible();
 });
 
 test("12+13: QR download is a real PNG named for the team, at presentation size", async ({

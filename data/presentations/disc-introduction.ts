@@ -10,9 +10,21 @@ import type { PresentationDeck, PresentationSlide } from "@/lib/presentations/ty
 
 const slides: PresentationSlide[] = [
   {
-    id: "disc-01-opening",
+    id: "disc-00-wheel",
     deckType: "disc",
     order: 1,
+    section: "Opening",
+    title: "The DISC wheel",
+    visualType: "wheel",
+    facilitatorPrompt:
+      "Open here and say nothing for a beat — let the room look. Then name the four preferences in your own words and move on; the wheel is orientation, not the content.",
+    audienceQuestion: "Before we name anything: which part of that picture do you think your team lives in?",
+    estimatedSeconds: 30,
+  },
+  {
+    id: "disc-01-opening",
+    deckType: "disc",
+    order: 2,
     section: "Opening",
     eyebrow: "DISC360 · Behaviour",
     title: "How do people lead, communicate and respond when it matters?",
@@ -26,7 +38,7 @@ const slides: PresentationSlide[] = [
   {
     id: "disc-02-explores",
     deckType: "disc",
-    order: 2,
+    order: 3,
     section: "What DISC explores",
     eyebrow: "The lens",
     title: "What DISC explores",
@@ -40,7 +52,7 @@ const slides: PresentationSlide[] = [
   {
     id: "disc-03-dimensions",
     deckType: "disc",
-    order: 3,
+    order: 4,
     section: "The four dimensions",
     eyebrow: "Four preferences",
     title: "Four ways of showing up",
@@ -59,7 +71,7 @@ const slides: PresentationSlide[] = [
   {
     id: "disc-04-contribution",
     deckType: "disc",
-    order: 4,
+    order: 5,
     section: "Every style contributes",
     eyebrow: "As a system",
     title: "Every style contributes",
@@ -78,7 +90,7 @@ const slides: PresentationSlide[] = [
   {
     id: "disc-05-pressure",
     deckType: "disc",
-    order: 5,
+    order: 6,
     section: "Strengths under pressure",
     eyebrow: "Possibilities, not verdicts",
     title: "A strength, overused, becomes a pressure point",
@@ -97,7 +109,7 @@ const slides: PresentationSlide[] = [
   {
     id: "disc-06-blend",
     deckType: "disc",
-    order: 6,
+    order: 7,
     section: "People are not one letter",
     eyebrow: "Blends",
     title: "People are not one letter",
@@ -116,7 +128,7 @@ const slides: PresentationSlide[] = [
   {
     id: "disc-07-answer",
     deckType: "disc",
-    order: 7,
+    order: 8,
     section: "How to answer",
     eyebrow: "Forced choice",
     title: "How to answer",
@@ -135,7 +147,7 @@ const slides: PresentationSlide[] = [
   {
     id: "disc-08-no-good-bad",
     deckType: "disc",
-    order: 8,
+    order: 9,
     section: "No good or bad styles",
     eyebrow: "The point",
     title: "The goal is not to win the assessment.",
@@ -148,7 +160,7 @@ const slides: PresentationSlide[] = [
   {
     id: "disc-09-privacy",
     deckType: "disc",
-    order: 9,
+    order: 10,
     section: "Privacy and team use",
     eyebrow: "Trust",
     title: "How your responses are used",
@@ -175,7 +187,7 @@ const slides: PresentationSlide[] = [
   {
     id: "disc-10-start",
     deckType: "disc",
-    order: 10,
+    order: 11,
     section: "Start",
     eyebrow: "Ready",
     title: "Ready to see the patterns?",

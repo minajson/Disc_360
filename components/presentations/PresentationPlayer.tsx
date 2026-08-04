@@ -13,8 +13,15 @@ import { motion, useReducedMotion } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
 import { cn } from "@/lib/utils/cn";
 import { slideTransition } from "@/lib/presentations/motion";
-import { deckDurationSeconds, type PresentationDeck } from "@/lib/presentations/types";
+import {
+  deckDurationSeconds,
+  type PresentationDeck,
+} from "@/lib/presentations/types";
 import { SlideVisual } from "@/components/presentations/SlideVisual";
+import {
+  OVERTURE_ALT,
+  OvertureSlide,
+} from "@/components/presentations/OvertureSlide";
 
 /**
  * The deck player. Owns all chrome and navigation; SlideVisual owns each
@@ -103,7 +110,10 @@ export function PresentationPlayer({
     (next: number) => setIndex(Math.min(total - 1, Math.max(0, next))),
     [total],
   );
-  const goNext = useCallback(() => setIndex((c) => Math.min(total - 1, c + 1)), [total]);
+  const goNext = useCallback(
+    () => setIndex((c) => Math.min(total - 1, c + 1)),
+    [total],
+  );
   const goPrev = useCallback(() => setIndex((c) => Math.max(0, c - 1)), []);
   const restart = useCallback(() => setIndex(0), []);
 
@@ -208,6 +218,15 @@ export function PresentationPlayer({
 
   const st = slideTransition(reduced);
 
+  /*
+   * The opening slide is the whole screen and nothing else: no progress bar,
+   * no top bar, no controls, no dots. The facilitator advances by clicking
+   * anywhere, pressing a key or swiping — all of which are already wired — so
+   * the room sees a projected image rather than an application. Chrome returns
+   * the moment the deck does.
+   */
+  const isOverture = slide.visualType === "wheel";
+
   const ctrlBtn =
     "flex size-11 items-center justify-center rounded-full border border-hairline bg-paper/90 text-slate transition-colors hover:border-botanical hover:text-botanical disabled:opacity-40 disabled:hover:border-hairline disabled:hover:text-slate";
 
@@ -216,14 +235,32 @@ export function PresentationPlayer({
       ref={containerRef}
       data-testid="deck-root"
       className={cn(
-        "relative flex h-dvh w-full flex-col overflow-hidden bg-canvas",
+        "relative flex h-dvh w-full flex-col overflow-hidden",
+        isOverture ? "bg-paper" : "bg-canvas",
         isFullscreen && "pres-fullscreen",
       )}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
+      {isOverture ? (
+        <button
+          type="button"
+          onClick={goNext}
+          className="absolute inset-0 z-30 cursor-default bg-paper"
+        >
+          <OvertureSlide alt={OVERTURE_ALT} />
+          <span className="sr-only">Continue to the presentation</span>
+        </button>
+      ) : null}
+
       {/* progress bar */}
-      <div className="absolute inset-x-0 top-0 z-20 h-1 bg-ink/5" aria-hidden>
+      <div
+        className={cn(
+          "absolute inset-x-0 top-0 z-20 h-1 bg-ink/5",
+          isOverture && "hidden",
+        )}
+        aria-hidden
+      >
         <motion.div
           className="h-full bg-botanical"
           initial={false}
@@ -236,14 +273,22 @@ export function PresentationPlayer({
       <header
         className={cn(
           "z-20 flex flex-wrap items-center justify-between gap-y-1 px-[clamp(1rem,3vw,2.5rem)] py-3 pt-[max(0.75rem,env(safe-area-inset-top))] transition-opacity duration-300",
-          isFullscreen ? "absolute inset-x-0 top-0 bg-gradient-to-b from-canvas/95 to-transparent" : "relative",
+          isFullscreen
+            ? "absolute inset-x-0 top-0 bg-gradient-to-b from-canvas/95 to-transparent"
+            : "relative",
           isFullscreen && chromeHidden && "pointer-events-none opacity-0",
+          isOverture && "hidden",
         )}
         aria-hidden={isFullscreen && chromeHidden ? true : undefined}
       >
-        <span className="min-w-0 truncate font-mono text-xs text-faint">{deck.title}</span>
+        <span className="min-w-0 truncate font-mono text-xs text-faint">
+          {deck.title}
+        </span>
         <div className="flex items-center gap-2">
-          <span className="font-mono text-xs tabular-nums text-slate" aria-live="polite">
+          <span
+            className="font-mono text-xs tabular-nums text-slate"
+            aria-live="polite"
+          >
             {index + 1} / {total}
           </span>
           {qr ? (
@@ -273,69 +318,97 @@ export function PresentationPlayer({
         </div>
       </header>
 
-      {/* stage → 16:9 canvas in landscape, scrollable column on phones */}
-      <div className="pres-stage relative z-10 min-h-0 flex-1">
-        <motion.div
-          key={slide.id}
-          variants={st.variants}
-          initial="hidden"
-          animate="visible"
-          transition={st.transition}
-          className="pres-canvas"
-        >
-          <SlideVisual slide={slide} reduced={reduced}>
-            {slide.visualType === "closing" ? (
-              <div className="flex flex-col items-center gap-3 pt-2 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={start}
-                  disabled={pending}
-                  className="inline-flex min-h-12 items-center justify-center rounded-full bg-botanical px-8 text-base font-medium text-mineral transition-colors hover:bg-botanical-deep disabled:opacity-60"
-                >
-                  {pending ? "Starting…" : startLabel}
-                </button>
-                {dashboardHref ? (
-                  <Link
-                    href={dashboardHref}
-                    className="inline-flex min-h-12 items-center justify-center rounded-full border border-hairline-strong px-8 text-base font-medium text-ink transition-colors hover:border-botanical hover:text-botanical"
+      {/* stage → 16:9 canvas in landscape, scrollable column on phones.
+          Not rendered at all on the opening slide: the wheel is the screen,
+          and a stage behind it — even a hidden one — would mount a second copy
+          of the image. */}
+      {isOverture ? null : (
+        <div className="pres-stage relative z-10 min-h-0 flex-1">
+          <motion.div
+            key={slide.id}
+            variants={st.variants}
+            initial="hidden"
+            animate="visible"
+            transition={st.transition}
+            className="pres-canvas"
+          >
+            <SlideVisual slide={slide} reduced={reduced}>
+              {slide.visualType === "closing" ? (
+                <div className="flex flex-col items-center gap-3 pt-2 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={start}
+                    disabled={pending}
+                    className="inline-flex min-h-12 items-center justify-center rounded-full bg-botanical px-8 text-base font-medium text-mineral transition-colors hover:bg-botanical-deep disabled:opacity-60"
                   >
-                    {dashboardLabel ?? "Return to facilitator dashboard"}
-                  </Link>
-                ) : null}
-                {!assessmentLive ? (
-                  <span className="text-xs text-faint">
-                    This starts the available DISC assessment.
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
-          </SlideVisual>
-        </motion.div>
-      </div>
+                    {pending ? "Starting…" : startLabel}
+                  </button>
+                  {dashboardHref ? (
+                    <Link
+                      href={dashboardHref}
+                      className="inline-flex min-h-12 items-center justify-center rounded-full border border-hairline-strong px-8 text-base font-medium text-ink transition-colors hover:border-botanical hover:text-botanical"
+                    >
+                      {dashboardLabel ?? "Return to facilitator dashboard"}
+                    </Link>
+                  ) : null}
+                  {!assessmentLive ? (
+                    <span className="text-xs text-faint">
+                      This starts the available DISC assessment.
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+            </SlideVisual>
+          </motion.div>
+        </div>
+      )}
 
       {/* bottom controls — overlay and auto-hide in fullscreen */}
       <footer
         className={cn(
           "z-20 flex items-center justify-between gap-3 px-[clamp(1rem,3vw,2.5rem)] py-4 pb-[max(1rem,env(safe-area-inset-bottom))] transition-opacity duration-300",
-          isFullscreen ? "absolute inset-x-0 bottom-0 bg-gradient-to-t from-canvas/95 to-transparent" : "relative",
+          isFullscreen
+            ? "absolute inset-x-0 bottom-0 bg-gradient-to-t from-canvas/95 to-transparent"
+            : "relative",
           isFullscreen && chromeHidden && "pointer-events-none opacity-0",
+          isOverture && "hidden",
         )}
         aria-hidden={isFullscreen && chromeHidden ? true : undefined}
       >
         <div className="flex items-center gap-2">
-          <button type="button" onClick={goPrev} disabled={index === 0} aria-label="Previous slide" className={ctrlBtn}>
+          <button
+            type="button"
+            onClick={goPrev}
+            disabled={index === 0}
+            aria-label="Previous slide"
+            className={ctrlBtn}
+          >
             <Chevron dir="left" />
           </button>
-          <button type="button" onClick={goNext} disabled={isLast} aria-label="Next slide" className={ctrlBtn}>
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={isLast}
+            aria-label="Next slide"
+            className={ctrlBtn}
+          >
             <Chevron dir="right" />
           </button>
-          <button type="button" onClick={restart} aria-label="Restart presentation" className={cn(ctrlBtn, "size-11 text-xs")}>
+          <button
+            type="button"
+            onClick={restart}
+            aria-label="Restart presentation"
+            className={cn(ctrlBtn, "size-11 text-xs")}
+          >
             <RestartIcon />
           </button>
         </div>
 
         {/* progress dots */}
-        <nav aria-label="Slides" className="hidden items-center gap-1.5 sm:flex">
+        <nav
+          aria-label="Slides"
+          className="hidden items-center gap-1.5 sm:flex"
+        >
           {slides.map((s, i) => (
             <button
               key={s.id}
@@ -345,7 +418,9 @@ export function PresentationPlayer({
               aria-current={i === index ? "true" : undefined}
               className={cn(
                 "h-1.5 rounded-full transition-all",
-                i === index ? "w-6 bg-botanical" : "w-1.5 bg-ink/15 hover:bg-ink/30",
+                i === index
+                  ? "w-6 bg-botanical"
+                  : "w-1.5 bg-ink/15 hover:bg-ink/30",
               )}
             />
           ))}
@@ -360,7 +435,12 @@ export function PresentationPlayer({
           >
             {pending ? "Starting…" : "Jump to assessment"}
           </button>
-          <button type="button" onClick={toggleFullscreen} aria-label="Toggle fullscreen" className={ctrlBtn}>
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            aria-label="Toggle fullscreen"
+            className={ctrlBtn}
+          >
             {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
           </button>
         </div>
@@ -386,13 +466,16 @@ export function PresentationPlayer({
                 ) : null}
               </div>
               {slide.facilitatorPrompt ? (
-                <p className="max-w-prose text-sm leading-relaxed text-mineral">{slide.facilitatorPrompt}</p>
+                <p className="max-w-prose text-sm leading-relaxed text-mineral">
+                  {slide.facilitatorPrompt}
+                </p>
               ) : (
                 <p className="text-sm text-sage/70">No note for this slide.</p>
               )}
               {slide.audienceQuestion ? (
                 <p className="text-sm text-sage">
-                  <span className="font-medium text-mineral">Ask:</span> {slide.audienceQuestion}
+                  <span className="font-medium text-mineral">Ask:</span>{" "}
+                  {slide.audienceQuestion}
                 </p>
               ) : null}
             </div>
@@ -400,14 +483,22 @@ export function PresentationPlayer({
             {/* single-screen presenter console: next slide + deck timer */}
             <div className="flex shrink-0 gap-4 lg:w-72 lg:flex-col">
               <div className="flex-1 rounded-xl border border-mineral/15 bg-mineral/5 p-3">
-                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-sage/70">Next</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-sage/70">
+                  Next
+                </span>
                 <p className="mt-1 line-clamp-2 text-sm text-mineral">
-                  {nextSlide ? nextSlide.title : "End of deck — Start assessment"}
+                  {nextSlide
+                    ? nextSlide.title
+                    : "End of deck — Start assessment"}
                 </p>
               </div>
               <div className="flex items-center justify-between rounded-xl border border-mineral/15 bg-mineral/5 p-3">
-                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-sage/70">Deck</span>
-                <span className="font-mono text-sm text-mineral">~{formatTime(totalSeconds)}</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-sage/70">
+                  Deck
+                </span>
+                <span className="font-mono text-sm text-mineral">
+                  ~{formatTime(totalSeconds)}
+                </span>
               </div>
             </div>
           </div>
@@ -452,12 +543,19 @@ export function PresentationPlayer({
             </p>
             {qr.teamCode ? (
               <p className="text-[clamp(0.85rem,2vh,1.05rem)] text-slate">
-                or enter code <span className="font-mono font-semibold text-ink">{qr.teamCode}</span>
+                or enter code{" "}
+                <span className="font-mono font-semibold text-ink">
+                  {qr.teamCode}
+                </span>
               </p>
             ) : null}
             {qr.isLocal ? (
-              <p role="alert" className="max-w-sm rounded-xl bg-disc-i-soft px-4 py-2.5 text-center text-xs leading-relaxed text-disc-i">
-                Local development only — this QR cannot be opened from another device until a public URL is configured.
+              <p
+                role="alert"
+                className="max-w-sm rounded-xl bg-disc-i-soft px-4 py-2.5 text-center text-xs leading-relaxed text-disc-i"
+              >
+                Local development only — this QR cannot be opened from another
+                device until a public URL is configured.
               </p>
             ) : null}
           </div>
@@ -471,14 +569,32 @@ export function PresentationPlayer({
 
 function Chevron({ dir }: { dir: "left" | "right" }) {
   return (
-    <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      viewBox="0 0 24 24"
+      className="size-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <path d={dir === "left" ? "M15 6l-6 6 6 6" : "M9 6l6 6-6 6"} />
     </svg>
   );
 }
 function RestartIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      viewBox="0 0 24 24"
+      className="size-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
       <path d="M3 3v5h5" />
     </svg>
@@ -486,14 +602,32 @@ function RestartIcon() {
 }
 function FullscreenIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      viewBox="0 0 24 24"
+      className="size-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" />
     </svg>
   );
 }
 function ExitFullscreenIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      viewBox="0 0 24 24"
+      className="size-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <path d="M8 3v3a2 2 0 0 1-2 2H3M16 3v3a2 2 0 0 0 2 2h3M8 21v-3a2 2 0 0 0-2-2H3M16 21v-3a2 2 0 0 1 2-2h3" />
     </svg>
   );

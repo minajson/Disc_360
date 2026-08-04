@@ -13,6 +13,23 @@ async function counter(page: Page): Promise<string> {
   return (await page.getByText(/^\d+ \/ \d+$/).first().innerText()).trim();
 }
 
+/**
+ * Opens a deck and steps past the opening slide.
+ *
+ * The DISC and Combined decks open on the projected wheel, which deliberately
+ * shows no chrome — no counter, no controls, no exit. Every assertion about
+ * the player's controls therefore starts on the slide after it, and the wheel
+ * itself is covered by its own tests below.
+ */
+async function openDeck(page: Page, path: string): Promise<void> {
+  await page.goto(path);
+  await page.waitForSelector('[data-testid="deck-root"]');
+  if (await page.getByTestId("overture").count()) {
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByTestId("overture")).toHaveCount(0);
+  }
+}
+
 /* ── product start screens ──────────────────────────────────────────── */
 
 test("DISC start screen offers presentation or straight-to-assessment", async ({ page }) => {
@@ -39,8 +56,11 @@ test("choosing a presentation opens the deck", async ({ page }) => {
   await page.goto("/present/disc");
   await page.getByRole("link", { name: /Start with presentation/i }).click();
   await page.waitForURL("**/present/disc/introduction**");
+  // The wheel first, alone; the deck's opening message is the slide after it.
+  await expect(page.getByTestId("overture")).toBeVisible();
+  await page.keyboard.press("ArrowRight");
   await expect(page.getByText("How do people lead, communicate and respond when it matters?")).toBeVisible();
-  expect(await counter(page)).toBe("1 / 10");
+  expect(await counter(page)).toBe("2 / 11");
 });
 
 test("going straight to assessment leaves the start screen (auth-gated)", async ({ page }) => {
@@ -55,15 +75,15 @@ test("going straight to assessment leaves the start screen (auth-gated)", async 
 
 test("all three decks render their opening and reach a closing slide", async ({ page }) => {
   const decks = [
-    { path: "/present/disc/introduction", count: 10, cta: "Start DISC assessment" },
-    { path: "/present/focus/introduction", count: 10, cta: "Start Focus Pulse" },
-    { path: "/present/combined/introduction", count: 12, cta: "Start combined assessment" },
+    { path: "/present/disc/introduction", count: 11, opensOn: 2, cta: "Start DISC assessment" },
+    { path: "/present/focus/introduction", count: 10, opensOn: 1, cta: "Start Focus Pulse" },
+    { path: "/present/combined/introduction", count: 13, opensOn: 2, cta: "Start combined assessment" },
   ];
   for (const d of decks) {
-    await page.goto(d.path);
-    expect(await counter(page)).toBe(`1 / ${d.count}`);
+    await openDeck(page, d.path);
+    expect(await counter(page)).toBe(`${d.opensOn} / ${d.count}`);
     // Advance to the last slide.
-    for (let i = 1; i < d.count; i++) {
+    for (let i = d.opensOn; i < d.count; i++) {
       await page.getByRole("button", { name: "Next slide" }).click();
     }
     expect(await counter(page)).toBe(`${d.count} / ${d.count}`);
@@ -74,21 +94,21 @@ test("all three decks render their opening and reach a closing slide", async ({ 
 /* ── controls ───────────────────────────────────────────────────────── */
 
 test("keyboard arrows and space navigate slides", async ({ page }) => {
-  await page.goto("/present/disc/introduction");
-  expect(await counter(page)).toBe("1 / 10");
+  await openDeck(page, "/present/disc/introduction");
+  expect(await counter(page)).toBe("2 / 11");
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByText("2 / 10")).toBeVisible();
+  await expect(page.getByText("3 / 11")).toBeVisible();
   await page.keyboard.press(" ");
-  await expect(page.getByText("3 / 10")).toBeVisible();
+  await expect(page.getByText("4 / 11")).toBeVisible();
   await page.keyboard.press("ArrowLeft");
-  await expect(page.getByText("2 / 10")).toBeVisible();
+  await expect(page.getByText("3 / 11")).toBeVisible();
 });
 
 test("touch swipe navigates slides", async ({ browser }) => {
   const ctx = await browser.newContext({ hasTouch: true });
   const page = await ctx.newPage();
-  await page.goto("/present/disc/introduction");
-  expect(await counter(page)).toBe("1 / 10");
+  await openDeck(page, "/present/disc/introduction");
+  expect(await counter(page)).toBe("2 / 11");
   // Dispatch on the player root (which carries the onTouch handlers). Body is
   // an ancestor, so events dispatched there never enter the player's subtree.
   await page.evaluate(() => {
@@ -97,12 +117,12 @@ test("touch swipe navigates slides", async ({ browser }) => {
     el.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, cancelable: true, touches: touch(300), changedTouches: touch(300) }));
     el.dispatchEvent(new TouchEvent("touchend", { bubbles: true, cancelable: true, touches: [], changedTouches: touch(120) }));
   });
-  await expect(page.getByText("2 / 10")).toBeVisible();
+  await expect(page.getByText("3 / 11")).toBeVisible();
   await ctx.close();
 });
 
 test("facilitator notes toggle on and off; hidden by default", async ({ page }) => {
-  await page.goto("/present/disc/introduction");
+  await openDeck(page, "/present/disc/introduction");
   // Default: the prompt is not shown (safe for screen sharing).
   await expect(page.getByText(/Introduce DISC as a language/i)).toHaveCount(0);
   await page.getByRole("button", { name: "Show facilitator notes" }).click();
@@ -113,32 +133,33 @@ test("facilitator notes toggle on and off; hidden by default", async ({ page }) 
   await expect(page.getByText(/Introduce DISC as a language/i)).toHaveCount(0);
 });
 
-test("fullscreen and restart controls are present; restart returns to slide 1", async ({ page }) => {
-  await page.goto("/present/disc/introduction");
+test("fullscreen and restart controls are present; restart returns to the opening slide", async ({ page }) => {
+  await openDeck(page, "/present/disc/introduction");
   await expect(page.getByRole("button", { name: "Toggle fullscreen" })).toBeVisible();
   await page.getByRole("button", { name: "Next slide" }).click();
   await page.getByRole("button", { name: "Next slide" }).click();
-  expect(await counter(page)).toBe("3 / 10");
+  expect(await counter(page)).toBe("4 / 11");
   await page.getByRole("button", { name: "Restart presentation" }).click();
-  expect(await counter(page)).toBe("1 / 10");
+  // Restart goes all the way back to the wheel, chrome and all.
+  await expect(page.getByTestId("overture")).toBeVisible();
 });
 
 test("progress dots jump to a slide", async ({ page }) => {
-  await page.goto("/present/disc/introduction");
-  await page.getByRole("button", { name: "Go to slide 5" }).click();
-  await expect(page.getByText("5 / 10")).toBeVisible();
+  await openDeck(page, "/present/disc/introduction");
+  await page.getByRole("button", { name: "Go to slide 6" }).click();
+  await expect(page.getByText("6 / 11")).toBeVisible();
 });
 
 test("the final slide starts the assessment", async ({ page }) => {
-  await page.goto("/present/disc/introduction");
-  await page.getByRole("button", { name: "Go to slide 10" }).click();
+  await openDeck(page, "/present/disc/introduction");
+  await page.getByRole("button", { name: "Go to slide 11" }).click();
   await page.getByRole("button", { name: "Start DISC assessment" }).click();
   // Auth-gated: unauthenticated users land on sign-in, not a dead end.
   await page.waitForURL(/\/sign-in|\/app\/assessments|\/onboarding/, { timeout: 15_000 });
 });
 
 test("exit returns to the product start screen", async ({ page }) => {
-  await page.goto("/present/disc/introduction");
+  await openDeck(page, "/present/disc/introduction");
   await page.getByRole("link", { name: "Exit" }).click();
   await page.waitForURL("**/present/disc");
 });
@@ -148,7 +169,7 @@ test("exit returns to the product start screen", async ({ page }) => {
 test("mobile: content is readable and the page never scrolls sideways", async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
-  await page.goto("/present/disc/introduction");
+  await openDeck(page, "/present/disc/introduction");
   await page.getByRole("button", { name: "Next slide" }).click();
   await page.getByRole("button", { name: "Next slide" }).click();
   await expect(page.getByText("Direct and decisive")).toBeVisible();
@@ -162,7 +183,7 @@ test("mobile: content is readable and the page never scrolls sideways", async ({
 test("projector 1920×1080: opening headline is visible full-viewport", async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
   const page = await ctx.newPage();
-  await page.goto("/present/disc/introduction");
+  await openDeck(page, "/present/disc/introduction");
   await expect(page.getByText("How do people lead, communicate and respond when it matters?")).toBeVisible();
   await ctx.close();
 });
@@ -170,7 +191,7 @@ test("projector 1920×1080: opening headline is visible full-viewport", async ({
 test("reduced motion: deck content is immediately readable", async ({ browser }) => {
   const ctx = await browser.newContext({ reducedMotion: "reduce" });
   const page = await ctx.newPage();
-  await page.goto("/present/disc/introduction");
+  await openDeck(page, "/present/disc/introduction");
   // With reduced motion there is no travel/fade delay to wait out.
   await expect(page.getByText("How do people lead, communicate and respond when it matters?")).toBeVisible();
   await page.keyboard.press("ArrowRight");
@@ -188,14 +209,15 @@ test("facilitator presents the team introduction and can show the join QR", asyn
   await page.waitForURL(`**/teams/${ENG_TEAM}/presentation/introduction`);
 
   // The deck plays and offers a Show QR control (team sessions only).
-  expect(await counter(page)).toBe("1 / 10");
+  await page.keyboard.press("ArrowRight"); // past the opening wheel
+  expect(await counter(page)).toBe("2 / 11");
   await page.getByRole("button", { name: "Show QR" }).click();
   await expect(page.getByRole("dialog", { name: /Scan to begin/i })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Scan to begin" })).toBeVisible();
   await page.keyboard.press("Escape"); // closes the QR overlay first
 
   // The closing slide offers a return to the facilitator dashboard.
-  await page.getByRole("button", { name: "Go to slide 10" }).click();
+  await page.getByRole("button", { name: "Go to slide 11" }).click();
   await expect(page.getByRole("link", { name: /Return to facilitator dashboard/i })).toBeVisible();
 
   // The presentation shell has no account menu; return to the app to sign out.

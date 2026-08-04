@@ -15,6 +15,7 @@ export type PresentationDeckType = "disc" | "focus" | "combined";
 
 /** How a slide is rendered. The player switches on this. */
 export type SlideVisualType =
+  | "wheel" // the DISC wheel, full-bleed and chrome-free: the opening slide
   | "hero" // opening: oversized headline over an ambient field
   | "spectrum" // the four-point behavioural field / calm word reveal
   | "fourDimensions" // D/I/S/A as four regions

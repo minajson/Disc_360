@@ -5,7 +5,7 @@
 # DISC360 Media Guide
 
 Every replaceable visual asset in DISC360, generated from
-`data/media-registry.ts` (20 slots). Each slot ships as a
+`data/media-registry.ts` (21 slots). Each slot ships as a
 finished-looking editorial placeholder that becomes the real asset when its
 sources are passed — no call-site restructuring. Live inventory with the same
 data: `/media-guide` (dev, or super-admin in production).
@@ -132,7 +132,22 @@ cropping.
 | Direction | Professional headshot of quoted customer (with permission) |
 | Replace | public/media/testimonial-01.webp → CaseStudiesSection quote figure |
 
-## Product (per-account uploads & previews) (5)
+## Product (per-account uploads & previews) (6)
+
+### MEDIA-DECK-WHEEL-01 — The DISC wheel, projected edge-to-edge as the deck's first screen
+
+| | |
+|---|---|
+| Type | image |
+| Status | ready |
+| Route | /present/disc/introduction · /present/combined/introduction · team presentation |
+| Section | Opening slide |
+| Ratio | 1:1 |
+| Dimensions | 2560×2560 (current asset 1254×1254) |
+| Formats | PNG (served unoptimised, so the DISC colours are byte-exact) |
+| Size target | ≤ 2 MB |
+| Direction | The DISC wheel on a white field, no logo, no border, nothing cropped — it is projected whole |
+| Replace | public/media/DiscWheel.png |
 
 ### MEDIA-TEAM-COVER-01 — Optional organisation/team event cover
 

@@ -13,12 +13,16 @@ import { deckDurationSeconds, type PresentationDeck } from "./types.ts";
  */
 
 const DECKS: { deck: PresentationDeck; expected: number }[] = [
-  { deck: discIntroductionDeck, expected: 10 },
+  { deck: discIntroductionDeck, expected: 11 },
   { deck: focusIntroductionDeck, expected: 10 },
-  { deck: combinedIntroductionDeck, expected: 12 },
+  { deck: combinedIntroductionDeck, expected: 13 },
 ];
 
+/** Decks that open on the projected DISC wheel before their hero. */
+const WHEEL_DECKS = [discIntroductionDeck, combinedIntroductionDeck];
+
 const VALID_VISUALS = new Set([
+  "wheel",
   "hero",
   "spectrum",
   "fourDimensions",
@@ -65,14 +69,47 @@ test("every slide has a valid visualType and a non-empty title", () => {
   }
 });
 
-test("every deck opens on a hero and closes on a closing slide", () => {
+test("every deck opens on its opening visual and closes on a closing slide", () => {
   for (const { deck } of DECKS) {
-    assert.equal(deck.slides[0]?.visualType, "hero", `${deck.type} opens on hero`);
+    const opensOnWheel = WHEEL_DECKS.includes(deck);
+    assert.equal(
+      deck.slides[0]?.visualType,
+      opensOnWheel ? "wheel" : "hero",
+      `${deck.type} opening visual`,
+    );
     assert.equal(
       deck.slides[deck.slides.length - 1]?.visualType,
       "closing",
       `${deck.type} closes on closing`,
     );
+  }
+});
+
+test("the DISC and Combined decks open on the wheel, then the hero", () => {
+  // The wheel is orientation, not content: it comes first and the hero that
+  // carries the deck's actual opening message comes straight after it.
+  for (const deck of WHEEL_DECKS) {
+    assert.equal(deck.slides[0]?.visualType, "wheel", `${deck.type} slide 1`);
+    assert.equal(deck.slides[1]?.visualType, "hero", `${deck.type} slide 2`);
+  }
+  // Focus is not a DISC instrument, so it does not borrow the DISC wheel.
+  assert.ok(
+    focusIntroductionDeck.slides.every((slide) => slide.visualType !== "wheel"),
+    "the Focus deck has no DISC wheel",
+  );
+});
+
+test("the wheel slide carries no audience text of its own", () => {
+  // Whatever the artwork says, the slide adds nothing: no body, no eyebrow and
+  // no structured payload. A headline over it would make it a slide about the
+  // wheel instead of the wheel itself.
+  for (const deck of WHEEL_DECKS) {
+    const wheel = deck.slides[0]!;
+    assert.equal(wheel.body, undefined, `${deck.type} wheel has no body`);
+    assert.equal(wheel.eyebrow, undefined, `${deck.type} wheel has no eyebrow`);
+    assert.equal(wheel.words, undefined);
+    assert.equal(wheel.dimensions, undefined);
+    assert.equal(wheel.points, undefined);
   }
 });
 

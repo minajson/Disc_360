@@ -156,6 +156,25 @@ export const mediaRegistry: MediaEntry[] = [
 
   /* ── product ───────────────────────────────────────────────────── */
   {
+    id: "MEDIA-DECK-WHEEL-01",
+    type: "image",
+    group: "product",
+    route: "/present/disc/introduction · /present/combined/introduction · team presentation",
+    section: "Opening slide",
+    purpose: "The DISC wheel, projected edge-to-edge as the deck's first screen",
+    // Square, so it fills the height of any 16:9 or ultrawide projection.
+    // 2560 is the replacement target: at 1254 the wheel upscales on a 4K
+    // screen, where a keynote slide is exactly where softness shows.
+    dimensions: "2560×2560 (current asset 1254×1254)",
+    ratio: "1:1",
+    formats: "PNG (served unoptimised, so the DISC colours are byte-exact)",
+    sizeTarget: "≤ 2 MB",
+    suggestedContent:
+      "The DISC wheel on a white field, no logo, no border, nothing cropped — it is projected whole",
+    replacementPath: "public/media/DiscWheel.png",
+    status: "ready",
+  },
+  {
     id: "MEDIA-TEAM-COVER-01",
     type: "image",
     group: "product",

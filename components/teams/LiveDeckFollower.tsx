@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useReducedMotion } from "framer-motion";
 import { SlideVisual } from "@/components/presentations/SlideVisual";
+import { OVERTURE_ALT, OvertureSlide } from "@/components/presentations/OvertureSlide";
 import type { PresentationDeck } from "@/lib/presentations/types";
 import type { SessionState } from "@/lib/teams/session";
 
@@ -89,6 +90,11 @@ export function LiveDeckFollower({
                 Go to your session
               </Link>
             </div>
+          ) : slide.visualType === "wheel" ? (
+            // A follower's phone keeps the deck's card frame — the edge-to-edge
+            // treatment belongs to the projected screen — but the image itself
+            // is the same one the room is looking at.
+            <OvertureSlide alt={OVERTURE_ALT} className="p-4" />
           ) : (
             <SlideVisual slide={slide} reduced={reduced} />
           )}
