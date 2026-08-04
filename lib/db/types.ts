@@ -166,62 +166,102 @@ export type Database = {
       assessment_results: {
         Row: {
           archetype_code: Database["public"]["Enums"]["archetype_code"]
+          assessment_version: number | null
+          attempt_number: number | null
           created_at: string
+          department_at_completion: string | null
           id: string
           intensity: Json
           net: Json
+          organization_id: string | null
+          organization_name_at_completion: string | null
           primary_dimension: Database["public"]["Enums"]["dimension"]
           profile_id: string
           raw_least: Json
           raw_most: Json
+          retake_note: string | null
+          retake_reason: Database["public"]["Enums"]["retake_reason"] | null
+          role_at_completion: string | null
           score_c: number
           score_d: number
           score_i: number
           score_s: number
+          scoring_version: string | null
           secondary_dimension: Database["public"]["Enums"]["dimension"] | null
           session_id: string
           share_token: string
           team_id: string | null
+          team_name_at_completion: string | null
+          team_series_id: string | null
         }
         Insert: {
           archetype_code: Database["public"]["Enums"]["archetype_code"]
+          assessment_version?: number | null
+          attempt_number?: number | null
           created_at?: string
+          department_at_completion?: string | null
           id?: string
           intensity: Json
           net: Json
+          organization_id?: string | null
+          organization_name_at_completion?: string | null
           primary_dimension: Database["public"]["Enums"]["dimension"]
           profile_id: string
           raw_least: Json
           raw_most: Json
+          retake_note?: string | null
+          retake_reason?: Database["public"]["Enums"]["retake_reason"] | null
+          role_at_completion?: string | null
           score_c: number
           score_d: number
           score_i: number
           score_s: number
+          scoring_version?: string | null
           secondary_dimension?: Database["public"]["Enums"]["dimension"] | null
           session_id: string
           share_token?: string
           team_id?: string | null
+          team_name_at_completion?: string | null
+          team_series_id?: string | null
         }
         Update: {
           archetype_code?: Database["public"]["Enums"]["archetype_code"]
+          assessment_version?: number | null
+          attempt_number?: number | null
           created_at?: string
+          department_at_completion?: string | null
           id?: string
           intensity?: Json
           net?: Json
+          organization_id?: string | null
+          organization_name_at_completion?: string | null
           primary_dimension?: Database["public"]["Enums"]["dimension"]
           profile_id?: string
           raw_least?: Json
           raw_most?: Json
+          retake_note?: string | null
+          retake_reason?: Database["public"]["Enums"]["retake_reason"] | null
+          role_at_completion?: string | null
           score_c?: number
           score_d?: number
           score_i?: number
           score_s?: number
+          scoring_version?: string | null
           secondary_dimension?: Database["public"]["Enums"]["dimension"] | null
           session_id?: string
           share_token?: string
           team_id?: string | null
+          team_name_at_completion?: string | null
+          team_series_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "assessment_results_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "assessment_results_profile_id_fkey"
             columns: ["profile_id"]
@@ -243,6 +283,13 @@ export type Database = {
             referencedRelation: "teams"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "assessment_results_team_series_id_fkey"
+            columns: ["team_series_id"]
+            isOneToOne: false
+            referencedRelation: "team_series"
+            referencedColumns: ["id"]
+          },
         ]
       }
       assessment_sessions: {
@@ -253,6 +300,8 @@ export type Database = {
           current_index: number
           id: string
           profile_id: string
+          retake_note: string | null
+          retake_reason: Database["public"]["Enums"]["retake_reason"] | null
           started_at: string
           status: Database["public"]["Enums"]["session_status"]
           team_id: string | null
@@ -266,6 +315,8 @@ export type Database = {
           current_index?: number
           id?: string
           profile_id: string
+          retake_note?: string | null
+          retake_reason?: Database["public"]["Enums"]["retake_reason"] | null
           started_at?: string
           status?: Database["public"]["Enums"]["session_status"]
           team_id?: string | null
@@ -279,6 +330,8 @@ export type Database = {
           current_index?: number
           id?: string
           profile_id?: string
+          retake_note?: string | null
+          retake_reason?: Database["public"]["Enums"]["retake_reason"] | null
           started_at?: string
           status?: Database["public"]["Enums"]["session_status"]
           team_id?: string | null
@@ -502,6 +555,8 @@ export type Database = {
           focus_session_id: string | null
           id: string
           profile_id: string
+          retake_note: string | null
+          retake_reason: Database["public"]["Enums"]["retake_reason"] | null
           status: Database["public"]["Enums"]["session_status"]
           team_id: string | null
           updated_at: string
@@ -513,6 +568,8 @@ export type Database = {
           focus_session_id?: string | null
           id?: string
           profile_id: string
+          retake_note?: string | null
+          retake_reason?: Database["public"]["Enums"]["retake_reason"] | null
           status?: Database["public"]["Enums"]["session_status"]
           team_id?: string | null
           updated_at?: string
@@ -524,6 +581,8 @@ export type Database = {
           focus_session_id?: string | null
           id?: string
           profile_id?: string
+          retake_note?: string | null
+          retake_reason?: Database["public"]["Enums"]["retake_reason"] | null
           status?: Database["public"]["Enums"]["session_status"]
           team_id?: string | null
           updated_at?: string
@@ -744,57 +803,97 @@ export type Database = {
       }
       focus_results: {
         Row: {
+          assessment_version: number | null
+          attempt_number: number | null
           automaticity: number
           created_at: string
+          department_at_completion: string | null
           distraction: number
           energy_pattern: string
           id: string
           mental_load: number
           notification_pattern: string
+          organization_id: string | null
+          organization_name_at_completion: string | null
           pattern_code: string
           preferred_reset: string
           primary_loop: string
           profile_id: string
           raw: Json
           recovery: number
+          retake_note: string | null
+          retake_reason: Database["public"]["Enums"]["retake_reason"] | null
+          role_at_completion: string | null
+          scoring_version: string | null
           session_id: string
           team_id: string | null
+          team_name_at_completion: string | null
+          team_series_id: string | null
         }
         Insert: {
+          assessment_version?: number | null
+          attempt_number?: number | null
           automaticity: number
           created_at?: string
+          department_at_completion?: string | null
           distraction: number
           energy_pattern: string
           id?: string
           mental_load: number
           notification_pattern: string
+          organization_id?: string | null
+          organization_name_at_completion?: string | null
           pattern_code: string
           preferred_reset: string
           primary_loop: string
           profile_id: string
           raw?: Json
           recovery: number
+          retake_note?: string | null
+          retake_reason?: Database["public"]["Enums"]["retake_reason"] | null
+          role_at_completion?: string | null
+          scoring_version?: string | null
           session_id: string
           team_id?: string | null
+          team_name_at_completion?: string | null
+          team_series_id?: string | null
         }
         Update: {
+          assessment_version?: number | null
+          attempt_number?: number | null
           automaticity?: number
           created_at?: string
+          department_at_completion?: string | null
           distraction?: number
           energy_pattern?: string
           id?: string
           mental_load?: number
           notification_pattern?: string
+          organization_id?: string | null
+          organization_name_at_completion?: string | null
           pattern_code?: string
           preferred_reset?: string
           primary_loop?: string
           profile_id?: string
           raw?: Json
           recovery?: number
+          retake_note?: string | null
+          retake_reason?: Database["public"]["Enums"]["retake_reason"] | null
+          role_at_completion?: string | null
+          scoring_version?: string | null
           session_id?: string
           team_id?: string | null
+          team_name_at_completion?: string | null
+          team_series_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "focus_results_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "focus_results_profile_id_fkey"
             columns: ["profile_id"]
@@ -816,6 +915,13 @@ export type Database = {
             referencedRelation: "teams"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "focus_results_team_series_id_fkey"
+            columns: ["team_series_id"]
+            isOneToOne: false
+            referencedRelation: "team_series"
+            referencedColumns: ["id"]
+          },
         ]
       }
       focus_sessions: {
@@ -826,6 +932,8 @@ export type Database = {
           current_index: number
           id: string
           profile_id: string
+          retake_note: string | null
+          retake_reason: Database["public"]["Enums"]["retake_reason"] | null
           started_at: string
           status: Database["public"]["Enums"]["session_status"]
           team_id: string | null
@@ -839,6 +947,8 @@ export type Database = {
           current_index?: number
           id?: string
           profile_id: string
+          retake_note?: string | null
+          retake_reason?: Database["public"]["Enums"]["retake_reason"] | null
           started_at?: string
           status?: Database["public"]["Enums"]["session_status"]
           team_id?: string | null
@@ -852,6 +962,8 @@ export type Database = {
           current_index?: number
           id?: string
           profile_id?: string
+          retake_note?: string | null
+          retake_reason?: Database["public"]["Enums"]["retake_reason"] | null
           started_at?: string
           status?: Database["public"]["Enums"]["session_status"]
           team_id?: string | null
@@ -1349,6 +1461,51 @@ export type Database = {
           },
         ]
       }
+      result_corrections: {
+        Row: {
+          corrected_by: string
+          created_at: string
+          id: string
+          new_values: Json
+          previous_values: Json
+          reason: string
+          result_id: string
+        }
+        Insert: {
+          corrected_by: string
+          created_at?: string
+          id?: string
+          new_values: Json
+          previous_values: Json
+          reason: string
+          result_id: string
+        }
+        Update: {
+          corrected_by?: string
+          created_at?: string
+          id?: string
+          new_values?: Json
+          previous_values?: Json
+          reason?: string
+          result_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "result_corrections_corrected_by_fkey"
+            columns: ["corrected_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "result_corrections_result_id_fkey"
+            columns: ["result_id"]
+            isOneToOne: false
+            referencedRelation: "assessment_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       result_insights: {
         Row: {
           created_at: string
@@ -1521,6 +1678,54 @@ export type Database = {
           },
         ]
       }
+      team_series: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          name: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          created_by: string
+          description?: string
+          id?: string
+          name: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_series_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_series_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teams: {
         Row: {
           active_slide: number | null
@@ -1543,12 +1748,14 @@ export type Database = {
           members_can_view_summary: boolean
           name: string
           organization_id: string
+          parent_team_id: string | null
           presentation_access: Database["public"]["Enums"]["presentation_access"]
           results_named: boolean
           session_mode: Database["public"]["Enums"]["session_mode"]
           session_name: string | null
           session_state: Database["public"]["Enums"]["session_state"]
           team_code: string
+          team_series_id: string | null
           timezone: string | null
           updated_at: string
         }
@@ -1573,12 +1780,14 @@ export type Database = {
           members_can_view_summary?: boolean
           name: string
           organization_id: string
+          parent_team_id?: string | null
           presentation_access?: Database["public"]["Enums"]["presentation_access"]
           results_named?: boolean
           session_mode?: Database["public"]["Enums"]["session_mode"]
           session_name?: string | null
           session_state?: Database["public"]["Enums"]["session_state"]
           team_code: string
+          team_series_id?: string | null
           timezone?: string | null
           updated_at?: string
         }
@@ -1603,12 +1812,14 @@ export type Database = {
           members_can_view_summary?: boolean
           name?: string
           organization_id?: string
+          parent_team_id?: string | null
           presentation_access?: Database["public"]["Enums"]["presentation_access"]
           results_named?: boolean
           session_mode?: Database["public"]["Enums"]["session_mode"]
           session_name?: string | null
           session_state?: Database["public"]["Enums"]["session_state"]
           team_code?: string
+          team_series_id?: string | null
           timezone?: string | null
           updated_at?: string
         }
@@ -1625,6 +1836,20 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_parent_team_id_fkey"
+            columns: ["parent_team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_team_series_id_fkey"
+            columns: ["team_series_id"]
+            isOneToOne: false
+            referencedRelation: "team_series"
             referencedColumns: ["id"]
           },
         ]
@@ -1701,6 +1926,14 @@ export type Database = {
         | "live_only"
         | "live_and_review"
         | "review_after_session"
+      retake_reason:
+        | "first_attempt"
+        | "new_role"
+        | "new_team"
+        | "annual_reassessment"
+        | "leadership_programme"
+        | "personal_review"
+        | "other"
       session_mode: "self_paced" | "facilitator_led"
       session_state:
         | "draft"
@@ -1876,6 +2109,15 @@ export const Constants = {
         "live_only",
         "live_and_review",
         "review_after_session",
+      ],
+      retake_reason: [
+        "first_attempt",
+        "new_role",
+        "new_team",
+        "annual_reassessment",
+        "leadership_programme",
+        "personal_review",
+        "other",
       ],
       session_mode: ["self_paced", "facilitator_led"],
       session_state: [

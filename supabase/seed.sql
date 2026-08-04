@@ -514,6 +514,135 @@ begin
   end loop;
 end $$;
 
+-- ── longitudinal fixtures ────────────────────────────────────────────
+--
+-- A two-period team lineage plus participants who assessed in both, so the
+-- history surfaces have something real to render: retakes that preserve the
+-- earlier result, context snapshots that differ between periods, and an
+-- explicit team_series linking two separately-named teams.
+--
+-- The two teams are named differently on purpose. A name heuristic would fail
+-- to connect them, which is exactly why lineage is an explicit column.
+do $$
+declare
+  v_version uuid := '00000000-0000-4000-8000-000000000002';
+  v_admin uuid := '10000000-0000-4000-8000-000000000001';
+  v_org uuid := '20000000-0000-4000-8000-000000000003';
+  v_series uuid := '50000000-0000-4000-8000-000000000001';
+  v_team_2026 uuid := '30000000-0000-4000-8000-000000000201';
+  v_team_2027 uuid := '30000000-0000-4000-8000-000000000202';
+  v_pw text := crypt('disc360-demo', gen_salt('bf'));
+
+  v_period record;
+  v_uid uuid;
+  v_session uuid;
+  v_full text;
+  v_email text;
+  v_d int; v_i2 int; v_s int; v_c int;
+  n int;
+begin
+  insert into public.team_series (id, organization_id, name, description, created_by)
+  values (v_series, v_org, 'Applications & ERP Programme',
+    'Annual reassessment of the same continuing team.', v_admin);
+
+  insert into public.teams (id, organization_id, name, description, department,
+    team_code, client_organization, session_name, results_named,
+    members_can_view_summary, created_by, timezone, team_series_id)
+  values
+    (v_team_2026, v_org, 'ERP Team 2026', 'First assessment period.', 'ERP',
+     'MERID-8026', 'Meridian Group', 'Baseline assessment', true, true,
+     v_admin, 'Europe/London', v_series),
+    (v_team_2027, v_org, 'Applications & ERP 2027', 'Annual reassessment.', 'ERP',
+     'MERID-8027', 'Meridian Group', 'Annual reassessment', true, true,
+     v_admin, 'Europe/London', v_series);
+
+  update public.teams set parent_team_id = v_team_2026 where id = v_team_2027;
+
+  insert into public.team_members (team_id, profile_id, display_name, email, department, role)
+  values
+    (v_team_2026, v_admin, 'Dana Whitfield', 'demo@disc360.dev', 'ERP', 'team_admin'),
+    (v_team_2027, v_admin, 'Dana Whitfield', 'demo@disc360.dev', 'ERP', 'team_admin');
+
+  -- Eight people, both periods. The same account each time, so each of them
+  -- ends up with two completed results and a real personal history.
+  for n in 0..7 loop
+    v_uid := gen_random_uuid();
+    v_full := (array['Vivian Nwosu','Emmanuel Eze','Ada Bello','Chidi Okoro',
+                     'Zainab Sani','Tunde Balogun','Ngozi Duru','Kofi Mensah'])[n + 1];
+    v_email := 'lineage' || n || '@meridiandemo.dev';
+
+    insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+      email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+      created_at, updated_at, confirmation_token, recovery_token, email_change, email_change_token_new)
+    values ('00000000-0000-0000-0000-000000000000', v_uid, 'authenticated', 'authenticated',
+      v_email, v_pw, now(), '{"provider":"email","providers":["email"]}',
+      jsonb_build_object('full_name', v_full), now(), now(), '', '', '', '');
+
+    insert into auth.identities (id, user_id, provider_id, identity_data, provider,
+      last_sign_in_at, created_at, updated_at)
+    values (gen_random_uuid(), v_uid, v_uid::text,
+      jsonb_build_object('sub', v_uid::text, 'email', v_email), 'email', now(), now(), now());
+
+    update public.profiles set
+      preferred_name = split_part(v_full, ' ', 1),
+      profession = case when n < 4 then 'Systems Analyst' else 'Team Lead' end,
+      country = 'GB', timezone = 'Europe/London',
+      onboarding_intent = 'join_team', consented_at = now(), onboarded_at = now()
+    where id = v_uid;
+
+    for v_period in
+      select * from (values
+        -- team, department, role, days ago, score offset, retake reason
+        (v_team_2026, 'ERP', 'Systems Analyst', 400, 0, 'first_attempt'),
+        (v_team_2027, 'IDT', 'Team Lead', 40, 1, 'annual_reassessment')
+      ) as p(team_id, dept, role_title, days_ago, shift, reason)
+    loop
+      insert into public.team_members (team_id, profile_id, display_name, email, department, role)
+      values (v_period.team_id, v_uid, v_full, v_email, v_period.dept, 'member');
+
+      -- Second period moves Dominant up and Analytical down by a clearly
+      -- reportable margin, so the trend view has real movement to show.
+      v_d := 42 + (n % 5) + (v_period.shift * 12);
+      v_i2 := 38 + (n % 4);
+      v_s := 56 + (n % 6) + (v_period.shift * 4);
+      v_c := 64 - (n % 5) - (v_period.shift * 10);
+
+      insert into public.assessment_sessions (profile_id, version_id, team_id, status,
+        current_index, started_at, completed_at, retake_reason)
+      values (v_uid, v_version, v_period.team_id, 'completed', 23,
+        now() - (interval '1 day' * v_period.days_ago),
+        now() - (interval '1 day' * v_period.days_ago) + interval '8 minutes',
+        v_period.reason::public.retake_reason)
+      returning id into v_session;
+
+      insert into public.assessment_results (session_id, profile_id, team_id,
+        score_d, score_i, score_s, score_c, archetype_code,
+        primary_dimension, secondary_dimension, intensity, raw_most, raw_least, net, created_at,
+        role_at_completion, department_at_completion, team_name_at_completion,
+        organization_name_at_completion, organization_id, team_series_id,
+        assessment_version, scoring_version, retake_reason, attempt_number)
+      values (v_session, v_uid, v_period.team_id,
+        v_d, v_i2, v_s, v_c,
+        (case when v_c >= v_s then 'CS' else 'SC' end)::public.archetype_code,
+        (case when v_c >= v_s then 'C' else 'S' end)::public.dimension,
+        (case when v_c >= v_s then 'S' else 'C' end)::public.dimension,
+        jsonb_build_object('D','MODERATE','I','MODERATE','S','HIGH','C','HIGH'),
+        jsonb_build_object('d', round(v_d * 0.24), 'i', round(v_i2 * 0.24),
+                           's', round(v_s * 0.24), 'c', round(v_c * 0.24)),
+        jsonb_build_object('d', round((100 - v_d) * 0.24), 'i', round((100 - v_i2) * 0.24),
+                           's', round((100 - v_s) * 0.24), 'c', round((100 - v_c) * 0.24)),
+        jsonb_build_object('d', round(v_d * 0.48 - 24), 'i', round(v_i2 * 0.48 - 24),
+                           's', round(v_s * 0.48 - 24), 'c', round(v_c * 0.48 - 24)),
+        now() - (interval '1 day' * v_period.days_ago),
+        v_period.role_title, v_period.dept,
+        (select name from public.teams where id = v_period.team_id),
+        'Meridian Group', v_org, v_series,
+        2, '1.0.0', v_period.reason::public.retake_reason,
+        v_period.shift + 1);
+    end loop;
+  end loop;
+end $$;
+
 -- Seeded teams are mid-flight fixtures: like the production backfill, teams
 -- that already have members run with the assessment window open.
 update public.teams set session_state = 'assessment_open'

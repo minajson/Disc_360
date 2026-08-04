@@ -4,6 +4,7 @@ import { requireOnboarded } from "@/lib/auth/guards";
 import { startAssessment } from "@/lib/actions/assessment";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { Button } from "@/components/ui/Button";
+import { RetakePanel } from "@/components/app/RetakePanel";
 
 export const metadata: Metadata = { title: "Assessments" };
 
@@ -25,6 +26,9 @@ export default async function AssessmentsPage() {
 
   const open = (sessions ?? []).filter((s) => s.status === "in_progress");
   const completed = (sessions ?? []).filter((s) => s.status === "completed");
+  // Most recent completion, used to confirm a retake rather than start one
+  // silently. Completed sessions arrive newest-first from the query above.
+  const lastCompletedAt = completed.find((s) => s.completed_at)?.completed_at ?? null;
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-5 py-12 sm:px-8">
@@ -58,6 +62,10 @@ export default async function AssessmentsPage() {
             </div>
           ))}
         </section>
+      ) : lastCompletedAt ? (
+        /* A completed result already exists — starting again is a deliberate
+           retake, confirmed and reasoned, never a one-click accident. */
+        <RetakePanel lastCompletedAt={lastCompletedAt} />
       ) : (
         <div className="flex flex-wrap items-center gap-4">
           <form action={startAssessment}>
@@ -99,13 +107,12 @@ export default async function AssessmentsPage() {
               );
             })}
           </div>
-          {open.length === 0 && completed.length > 0 ? (
-            <form action={startAssessment}>
-              <button type="submit" className="text-sm text-slate underline-offset-2 hover:text-ink hover:underline">
-                Retake the assessment
-              </button>
-            </form>
-          ) : null}
+          <Link
+            href="/app/history"
+            className="self-start text-sm text-slate underline-offset-2 hover:text-ink hover:underline"
+          >
+            See all of your results over time →
+          </Link>
         </section>
       ) : null}
     </div>

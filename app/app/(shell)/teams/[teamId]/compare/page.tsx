@@ -44,6 +44,7 @@ export default async function TeamComparePage({
       members={members}
       teamName={data.teamName}
       named={data.named}
+      teamId={teamId}
     />
   );
 }

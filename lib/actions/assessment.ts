@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireOnboarded } from "@/lib/auth/guards";
 import { facilitatedProductState, requireProductAllowed } from "@/lib/teams/session-guard";
 import { computeResult } from "@/lib/scoring/compute-result";
+import { buildResultSnapshot } from "@/lib/history/snapshot";
 import { insightMap } from "@/data/insight-maps";
 import {
   sendReportReady,
@@ -22,8 +23,29 @@ import type { Question } from "@/lib/types";
  * The attempt binds to the authorized team (facilitated) or to none
  * (individual) — resume NEVER picks up an attempt from another team.
  */
+/** Retake reasons a participant may choose. Mirrors the SQL enum in 00020. */
+const RETAKE_REASONS = [
+  "first_attempt",
+  "new_role",
+  "new_team",
+  "annual_reassessment",
+  "leadership_programme",
+  "personal_review",
+  "other",
+] as const;
+
+const retakeReasonSchema = z.enum(RETAKE_REASONS);
+
 export async function startAssessment(formData?: FormData): Promise<void> {
   const requestedTeam = (formData?.get("team_id") as string | null) || null;
+  // Captured when the attempt starts, so an abandoned retake still records
+  // why it began. Anything unrecognised is dropped rather than trusted.
+  const reasonInput = (formData?.get("retake_reason") as string | null) || null;
+  const parsedReason = reasonInput ? retakeReasonSchema.safeParse(reasonInput) : null;
+  const retakeReason = parsedReason?.success ? parsedReason.data : null;
+  const retakeNote = ((formData?.get("retake_note") as string | null) ?? "")
+    .trim()
+    .slice(0, 280) || null;
   // Backend lock: facilitator-led participants can only start the
   // assessment their facilitator selected — never gated on session state.
   const { context, teamId } = await requireProductAllowed("disc", requestedTeam);
@@ -51,7 +73,13 @@ export async function startAssessment(formData?: FormData): Promise<void> {
 
   const { data: session, error } = await supabase
     .from("assessment_sessions")
-    .insert({ profile_id: user.id, version_id: version.id, team_id: teamId })
+    .insert({
+      profile_id: user.id,
+      version_id: version.id,
+      team_id: teamId,
+      retake_reason: retakeReason,
+      retake_note: retakeNote,
+    })
     .select("id")
     .single();
   if (error || !session) throw new Error("Could not start the assessment");
@@ -154,7 +182,7 @@ export async function submitAssessment(sessionId: string): Promise<SubmitResult>
 
   const { data: session } = await supabase
     .from("assessment_sessions")
-    .select("id, status, profile_id, version_id, campaign_id, team_id")
+    .select("id, status, profile_id, version_id, campaign_id, team_id, retake_reason, retake_note")
     .eq("id", sessionId)
     .maybeSingle();
   if (!session || session.profile_id !== user.id) {
@@ -222,9 +250,20 @@ export async function submitAssessment(sessionId: string): Promise<SubmitResult>
     return { ok: false, error: "Your answers could not be scored — please review them" };
   }
 
+  // Frozen at completion so this row stays readable as it was on the day —
+  // never resolved from mutable current fields at read time.
+  const snapshot = await buildResultSnapshot({
+    profileId: user.id,
+    teamId: session.team_id ?? null,
+    table: "assessment_results",
+  });
+
   const { data: resultRow, error: resultError } = await supabase
     .from("assessment_results")
     .insert({
+      ...snapshot,
+      retake_reason: session.retake_reason ?? (snapshot.attempt_number > 1 ? "other" : "first_attempt"),
+      retake_note: session.retake_note ?? null,
       session_id: sessionId,
       profile_id: user.id,
       team_id: session.team_id ?? null,

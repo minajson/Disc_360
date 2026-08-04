@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
 import { Eyebrow } from "@/components/ui/Eyebrow";
@@ -45,6 +46,13 @@ interface ComparisonWorkspaceProps {
   teamName: string;
   named: boolean;
   /**
+   * Enables the Members / Departments / History switch. History lives on its
+   * own surface rather than sharing this canvas — member comparison and
+   * period comparison answer different questions and reading them together
+   * makes both harder.
+   */
+  teamId?: string;
+  /**
    * Rendered inside the presentation deck, which already owns the
    * anonymize toggle, department filter, print and full-screen controls.
    * Suppresses this component's duplicates of them.
@@ -62,6 +70,7 @@ export function ComparisonWorkspace({
   members,
   teamName,
   named,
+  teamId,
   embedded = false,
 }: ComparisonWorkspaceProps) {
   const reduced = useReducedMotion();
@@ -173,6 +182,35 @@ export function ComparisonWorkspace({
           This team reports anonymously — participants appear as letters, never
           names. The setting is controlled in Team settings.
         </p>
+      ) : null}
+
+      {/* Members · Departments · History — three distinct questions, kept on
+          separate canvases rather than stacked into one dense screen. */}
+      {teamId ? (
+        <nav
+          aria-label="Comparison mode"
+          className="flex gap-1 overflow-x-auto rule-b pb-px print:hidden"
+        >
+          {[
+            { href: `/app/teams/${teamId}/compare`, label: "Members", active: true },
+            { href: `/app/teams/${teamId}/compare?scope=departments`, label: "Departments", active: false },
+            { href: `/app/teams/${teamId}/history`, label: "History", active: false },
+          ].map((mode) => (
+            <Link
+              key={mode.label}
+              href={mode.href}
+              aria-current={mode.active ? "page" : undefined}
+              className={cn(
+                "whitespace-nowrap border-b-2 px-4 py-2.5 text-sm transition-colors",
+                mode.active
+                  ? "border-botanical font-medium text-botanical"
+                  : "border-transparent text-slate hover:text-ink",
+              )}
+            >
+              {mode.label}
+            </Link>
+          ))}
+        </nav>
       ) : null}
 
       {/* scope + presentation controls */}
