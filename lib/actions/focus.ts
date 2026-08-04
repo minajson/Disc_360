@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireOnboarded } from "@/lib/auth/guards";
 import { facilitatedProductState, requireProductAllowed } from "@/lib/teams/session-guard";
 import { computeFocusResult, type FocusAnswerInput } from "@/lib/scoring/focus";
+import { buildResultSnapshot } from "@/lib/history/snapshot";
 
 /**
  * Focus Pulse flow actions. Mirror the DISC actions: RLS restricts
@@ -155,7 +156,7 @@ export async function submitFocusAssessment(sessionId: string): Promise<SubmitFo
 
   const { data: session } = await supabase
     .from("focus_sessions")
-    .select("id, status, profile_id, version_id, team_id")
+    .select("id, status, profile_id, version_id, team_id, retake_reason, retake_note")
     .eq("id", sessionId)
     .maybeSingle();
   if (!session || session.profile_id !== user.id) {
@@ -197,9 +198,21 @@ export async function submitFocusAssessment(sessionId: string): Promise<SubmitFo
     return { ok: false, error: "Your answers could not be scored — please review them" };
   }
 
+  // Same contract as the DISC writer: the context is frozen onto the row at
+  // completion so a Focus record stays readable as it was on the day.
+  const snapshot = await buildResultSnapshot({
+    profileId: user.id,
+    teamId: session.team_id ?? null,
+    table: "focus_results",
+  });
+
   const { data: resultRow, error: resultError } = await supabase
     .from("focus_results")
     .insert({
+      ...snapshot,
+      retake_reason:
+        session.retake_reason ?? (snapshot.attempt_number > 1 ? "other" : "first_attempt"),
+      retake_note: session.retake_note ?? null,
       session_id: sessionId,
       profile_id: user.id,
       team_id: session.team_id ?? null,

@@ -58,3 +58,9 @@ next-env.d.ts
 /assets-src/media/
 /assets-src/brand/mark.png
 /.playwright-mcp/
+
+# Ad-hoc production verification scripts and their temporary credentials.
+# These are created during a release check and deleted afterwards; they must
+# never reach a commit.
+__*.mjs
+__prodcreds.json
