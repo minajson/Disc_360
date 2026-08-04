@@ -27,6 +27,8 @@ const ROW_HEIGHT = 44;
 const OVERSCAN = 6;
 const VIEWPORT_HEIGHT = 396; // 9 rows
 
+const ALL_DEPARTMENTS = "__all__";
+
 interface ComparisonTrayProps {
   members: ComparisonMember[];
   selected: string[];
@@ -43,13 +45,30 @@ export function ComparisonTray({
   className,
 }: ComparisonTrayProps) {
   const [query, setQuery] = useState("");
+  const [department, setDepartment] = useState<string>(ALL_DEPARTMENTS);
   const [scrollTop, setScrollTop] = useState(0);
   const viewportRef = useRef<HTMLDivElement>(null);
 
-  const visibleMembers = useMemo(
-    () => filterMembers(members, query),
-    [members, query],
+  const departments = useMemo(
+    () =>
+      [...new Set(members.map((member) => member.department).filter(Boolean))]
+        .sort((a, b) => a!.localeCompare(b!))
+        .map((name) => name as string),
+    [members],
   );
+
+  /*
+   * Department narrows the roster before the search does. filterMembers is the
+   * tested search — it is not re-implemented here, only fed a smaller list, so
+   * the matching rules stay in one place.
+   */
+  const visibleMembers = useMemo(() => {
+    const scoped =
+      department === ALL_DEPARTMENTS
+        ? members
+        : members.filter((member) => member.department === department);
+    return filterMembers(scoped, query);
+  }, [members, department, query]);
 
   const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
   const last = Math.min(
@@ -100,6 +119,30 @@ export function ComparisonTray({
           className="w-full rounded-full border border-hairline bg-mineral px-4 py-2.5 text-sm text-ink placeholder:text-faint focus:border-botanical focus:outline-none"
         />
       </label>
+
+      {departments.length > 0 ? (
+        <label className="flex flex-col gap-1.5">
+          <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-faint">
+            Department
+          </span>
+          <select
+            value={department}
+            onChange={(event) => {
+              setDepartment(event.target.value);
+              setScrollTop(0);
+              viewportRef.current?.scrollTo({ top: 0 });
+            }}
+            className="w-full rounded-full border border-hairline bg-mineral px-4 py-2.5 text-sm text-ink focus:border-botanical focus:outline-none"
+          >
+            <option value={ALL_DEPARTMENTS}>All departments</option>
+            {departments.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       <div
         ref={viewportRef}

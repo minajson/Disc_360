@@ -9,7 +9,7 @@ import { DiscRadarOverlay } from "@/components/charts/DiscRadarOverlay";
 import { ComparisonCard } from "@/components/teams/comparison/ComparisonCard";
 import { ComparisonTray } from "@/components/teams/comparison/ComparisonTray";
 import { dimensionMeta } from "@/data/dimension-meta";
-import { DIMENSIONS } from "@/lib/types";
+import { DIMENSION_KEY, DIMENSIONS } from "@/lib/types";
 import {
   MAX_CARDS_PER_VIEW,
   buildBatches,
@@ -94,6 +94,12 @@ export function ComparisonWorkspace({
     if (scope === "departments") return buildCohorts(members);
     if (scope === "selection") {
       if (committedMembers.length === 0) return [];
+      // Batched on the same ceiling as every other scope. A selection is
+      // capped at ten in the tray today, but batching here means a wider
+      // ceiling later cannot put an unbounded number of cards on one page.
+      if (committedMembers.length > MAX_CARDS_PER_VIEW) {
+        return buildBatches(committedMembers, MAX_CARDS_PER_VIEW, "Selection");
+      }
       return [
         {
           id: "selection",
@@ -200,7 +206,15 @@ export function ComparisonWorkspace({
   }
 
   return (
-    <div className="flex flex-col gap-7">
+    <div
+      className={cn(
+        "flex flex-col gap-7",
+        // Only the standalone page takes the screen. Inside the deck the slide
+        // owns the width, and a surface that stepped out of it would break the
+        // canvas the rest of the presentation is composed against.
+        !embedded && !presentation && "board-surface",
+      )}
+    >
       {!named && !embedded ? (
         <p className="rounded-2xl border border-sage bg-sage/20 px-5 py-3 text-sm text-slate">
           This team reports anonymously — participants appear as letters, never
@@ -297,20 +311,40 @@ export function ComparisonWorkspace({
       <div
         className={cn(
           "grid gap-6",
-          presentation ? "presentation-scale grid-cols-1" : "lg:grid-cols-[320px_1fr]",
+          presentation
+            ? "presentation-scale grid-cols-1"
+            : "lg:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]",
         )}
       >
+        {/*
+         * The selector stays pinned while the board scrolls: choosing who to
+         * compare and reading the comparison are the same task, and a panel
+         * that scrolls away turns it into two.
+         *
+         * Two details make it actually pin. The wrapper is `self-start`, so it
+         * stays its own height instead of stretching to the row — a sticky box
+         * that fills its containing block has nowhere to travel and simply
+         * scrolls away. And the panel's roster scrolls inside a capped height,
+         * so the panel is never taller than the screen it is pinned to.
+         */}
         {!presentation ? (
-          <ComparisonTray
-            members={members}
-            selected={selected}
-            onSelectedChange={setSelected}
-            onCompare={compare}
-            className="h-fit lg:sticky lg:top-6 print:hidden"
-          />
+          <div className="lg:sticky lg:top-6 lg:self-start print:hidden">
+            <ComparisonTray
+              members={members}
+              selected={selected}
+              onSelectedChange={setSelected}
+              onCompare={compare}
+              className="lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto"
+            />
+          </div>
         ) : null}
 
-        <div className="flex min-w-0 flex-col gap-6">
+        <div
+          className={cn(
+            "flex min-w-0 flex-col gap-6",
+            !presentation && "comparison-board",
+          )}
+        >
           {/* set switcher */}
           {sets.length > 1 ? (
             <div className="flex flex-wrap items-center gap-2 print:hidden">
@@ -356,74 +390,125 @@ export function ComparisonWorkspace({
                 transition={{ duration: 0.25, ease: [0.32, 0.94, 0.6, 1] }}
                 className="flex flex-col gap-6"
               >
-                <header className="flex flex-col gap-1.5">
+                <header className="flex flex-col gap-2">
                   <Eyebrow>
                     {teamName} · {activeSet.detail}
                   </Eyebrow>
                   <h2
                     className={cn(
                       "font-display font-semibold text-ink",
-                      presentation ? "text-h2" : "text-h3",
+                      presentation ? "text-h2" : "cmp-heading",
                     )}
                   >
                     {readout.headline}
                   </h2>
                 </header>
 
-                {/* the cards — same anatomy at every set size */}
-                <div className="paper-card p-6 lg:p-7">
-                  {projectedLayout.scrolls && !presentation ? (
-                    <div className="-mx-6 overflow-x-auto px-6 pb-2 lg:-mx-7 lg:px-7">
-                      <div
-                        className="grid gap-7"
-                        style={{
-                          gridTemplateColumns: `repeat(${cards.length}, minmax(240px, 1fr))`,
-                          minWidth: `${cards.length * 252}px`,
-                        }}
-                      >
-                        {projected.map((member) => (
-                          <ComparisonCard
-                            key={member.id}
-                            member={member}
-                            reach={member}
-                            presentation={presentation}
-                          />
-                        ))}
+                {/*
+                 * Executive summary, above the members.
+                 *
+                 * The set's shape — its average profile, who leads, how the
+                 * behaviours spread — before any individual card. A reader
+                 * arrives with the group's picture already formed, which is
+                 * how an executive report reads and how a spreadsheet does not.
+                 */}
+                {!presentation ? (
+                  <section
+                    aria-label="Set summary"
+                    className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]"
+                  >
+                    <div className="paper-card flex flex-col gap-4 p-(--cmp-pad)">
+                      <h3 className="cmp-eyebrow font-mono uppercase tracking-[0.2em] text-teal">
+                        Set average
+                      </h3>
+                      <DiscRadarOverlay
+                        series={[
+                          { label: "Set average", scores: averages },
+                          ...cards.slice(0, 6).map((member) => ({
+                            label: member.label,
+                            scores: member.scores,
+                            color: `var(--color-disc-${member.primary.toLowerCase()})`,
+                          })),
+                        ]}
+                        className="mx-auto w-full max-w-(--cmp-radar)"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-5">
+                      <div className="paper-card flex flex-col gap-4 p-(--cmp-pad)">
+                        <h3 className="cmp-eyebrow font-mono uppercase tracking-[0.2em] text-teal">
+                          Team averages and behaviour spread
+                        </h3>
+                        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+                          {DIMENSIONS.map((dim) => (
+                            <div key={dim} className="flex flex-col gap-1">
+                              <dt className="cmp-mono font-mono uppercase tracking-[0.14em] text-faint">
+                                {dimensionMeta[dim].label}
+                              </dt>
+                              <dd
+                                className="cmp-metric font-mono tabular-nums"
+                                style={{ color: `var(--color-disc-${dim.toLowerCase()})` }}
+                              >
+                                {averages[DIMENSION_KEY[dim]]}
+                              </dd>
+                              <dd className="cmp-mono font-mono text-faint">
+                                {counts[dim]} lead · {highBands[dim]} strong
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </div>
+
+                      <div className="paper-card flex flex-col gap-3 p-(--cmp-pad)">
+                        <h3 className="cmp-eyebrow font-mono uppercase tracking-[0.2em] text-teal">
+                          Facilitator read
+                        </h3>
+                        <ul className="flex flex-col gap-3">
+                          {readout.points.map((point) => (
+                            <li
+                              key={point}
+                              className="cmp-body flex items-start gap-3 text-slate"
+                            >
+                              <span
+                                aria-hidden
+                                className="mt-[0.55em] size-2 shrink-0 rounded-full bg-teal"
+                              />
+                              {point}
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     </div>
-                  ) : (
-                    <div
-                      className={cn(
-                        "grid gap-7",
-                        projectedLayout.mode === "duo"
-                          ? "sm:grid-cols-2"
-                          : projectedLayout.columns === 3
-                            ? "sm:grid-cols-2 lg:grid-cols-3"
-                            : "sm:grid-cols-2 lg:grid-cols-4",
-                      )}
-                    >
-                      {projected.map((member, index) => (
-                        <ComparisonCard
-                          key={member.id}
-                          member={member}
-                          /* In a pair, each column teaches you to reach the
-                             person opposite — exactly as the two-member
-                             comparison has always read. */
-                          reach={
-                            projectedLayout.mode === "duo"
-                              ? (projected[index === 0 ? 1 : 0] ?? member)
-                              : member
-                          }
-                          presentation={presentation}
-                        />
-                      ))}
-                    </div>
-                  )}
-                  {projectedLayout.scrolls && !presentation ? (
-                    <p className="pt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-faint print:hidden">
-                      Scroll sideways for the rest of this set
-                    </p>
-                  ) : null}
+                  </section>
+                ) : null}
+
+                {/*
+                 * The board. Cards flow down the page in rows and the page
+                 * scrolls vertically — never sideways. Columns are added only
+                 * when the board is wide enough to give each card a readable
+                 * width, so a wider screen buys width per card, not density.
+                 */}
+                <div className={cn(presentation && "paper-card p-6 lg:p-7")}>
+                  <div
+                    className="comparison-grid"
+                    data-duo={projectedLayout.mode === "duo" ? "true" : undefined}
+                  >
+                    {projected.map((member, index) => (
+                      <ComparisonCard
+                        key={member.id}
+                        member={member}
+                        /* In a pair, each column teaches you to reach the
+                           person opposite — exactly as the two-member
+                           comparison has always read. */
+                        reach={
+                          projectedLayout.mode === "duo"
+                            ? (projected[index === 0 ? 1 : 0] ?? member)
+                            : member
+                        }
+                        presentation={presentation}
+                      />
+                    ))}
+                  </div>
 
                   {/* Projected sets advance a slide at a time rather than
                       squeezing ten cards across one screen. */}
@@ -455,92 +540,46 @@ export function ComparisonWorkspace({
                   ) : null}
                 </div>
 
-                {/* set intelligence */}
-                <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-                  <div className="paper-card flex flex-col gap-4 p-6">
-                    <h3 className="font-mono text-[11px] uppercase tracking-[0.2em] text-teal">
-                      Set profile
-                    </h3>
-                    <DiscRadarOverlay
-                      series={[
-                        { label: "Set average", scores: averages },
-                        ...cards.slice(0, 6).map((member) => ({
-                          label: member.label,
-                          scores: member.scores,
-                          color: `var(--color-disc-${member.primary.toLowerCase()})`,
-                        })),
-                      ]}
-                      className="mx-auto max-w-[300px]"
-                    />
-                    <div className="flex flex-wrap gap-x-4 gap-y-1.5 rule-t pt-3">
-                      {DIMENSIONS.map((dim) => (
-                        <span key={dim} className="flex items-center gap-1.5 text-xs text-slate">
-                          <span
-                            aria-hidden
-                            className="size-2 rounded-full"
-                            style={{ background: `var(--color-disc-${dim.toLowerCase()})` }}
-                          />
-                          {dimensionMeta[dim].label}
-                          <span className="font-mono text-faint">
-                            {counts[dim]} lead · {highBands[dim]} strong
+                {/*
+                 * Overall observations, after the members.
+                 *
+                 * Divergence is the one reading that only makes sense once the
+                 * individual cards have been seen — it says how far apart the
+                 * people above actually are. The set's summary stays at the
+                 * top; this closes the report rather than repeating it.
+                 */}
+                <section
+                  aria-label="Overall observations"
+                  className="paper-card flex flex-col gap-4 p-(--cmp-pad)"
+                >
+                  <h3 className="cmp-eyebrow font-mono uppercase tracking-[0.2em] text-teal">
+                    Where this set diverges
+                  </h3>
+                  <ul className="grid gap-4 sm:grid-cols-2">
+                    {divergences.map((entry) => (
+                      <li key={entry.dimension} className="flex flex-col gap-2">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span className="cmp-label font-medium text-ink">
+                            {dimensionMeta[entry.dimension].label}
                           </span>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-5">
-                    <div className="paper-card flex flex-col gap-3.5 p-6">
-                      <h3 className="font-mono text-[11px] uppercase tracking-[0.2em] text-teal">
-                        Where this set diverges
-                      </h3>
-                      <ul className="flex flex-col gap-2.5">
-                        {divergences.map((entry) => (
-                          <li key={entry.dimension} className="flex flex-col gap-1">
-                            <div className="flex items-baseline justify-between gap-3">
-                              <span className="text-sm font-medium text-ink">
-                                {dimensionMeta[entry.dimension].label}
-                              </span>
-                              <span className="font-mono text-xs text-faint">
-                                {entry.low}–{entry.high} · {entry.range} pts
-                              </span>
-                            </div>
-                            <div className="h-1.5 overflow-hidden rounded-full bg-ink/8">
-                              <div
-                                className="h-full rounded-full"
-                                style={{
-                                  marginLeft: `${entry.low}%`,
-                                  width: `${Math.max(1.5, entry.range)}%`,
-                                  background: `var(--color-disc-${entry.dimension.toLowerCase()})`,
-                                }}
-                              />
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="paper-card flex flex-col gap-3 p-6">
-                      <h3 className="font-mono text-[11px] uppercase tracking-[0.2em] text-teal">
-                        Facilitator read
-                      </h3>
-                      <ul className="flex flex-col gap-2.5">
-                        {readout.points.map((point) => (
-                          <li
-                            key={point}
-                            className="flex items-start gap-3 text-sm leading-relaxed text-slate"
-                          >
-                            <span
-                              aria-hidden
-                              className="mt-1.5 size-1.5 shrink-0 rounded-full bg-teal"
-                            />
-                            {point}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
+                          <span className="cmp-mono font-mono tabular-nums text-faint">
+                            {entry.low}\u2013{entry.high} \u00b7 {entry.range} pts
+                          </span>
+                        </div>
+                        <div className="h-2 overflow-hidden rounded-full bg-ink/8">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              marginLeft: `${entry.low}%`,
+                              width: `${Math.max(1.5, entry.range)}%`,
+                              background: `var(--color-disc-${entry.dimension.toLowerCase()})`,
+                            }}
+                          />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               </motion.section>
             </AnimatePresence>
           ) : null}

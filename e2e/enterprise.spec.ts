@@ -66,12 +66,14 @@ test("a five-member cohort shows everyone at once", async ({ page }) => {
   await expect(page.getByRole("button", { name: /^Batch 1/ })).toHaveCount(0);
 });
 
-test("a ten-member cohort fills exactly one screen", async ({ page }) => {
+test("a ten-member cohort flows down the board, never sideways", async ({ page }) => {
   await signIn(page, FACILITATOR);
   await page.goto(`/app/teams/${TEAM_10}/compare`);
 
   await expect(memberCards(page)).toHaveCount(10);
-  await expect(page.getByText("Scroll sideways for the rest of this set")).toBeVisible();
+  // The horizontal rail is gone: ten members read as rows, not as a strip
+  // the facilitator has to drag through.
+  await expect(page.getByText("Scroll sideways for the rest of this set")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Batch 1/ })).toHaveCount(0);
 });
 
