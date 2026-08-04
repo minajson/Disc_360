@@ -91,7 +91,9 @@ test("team tabs carry Compare and AI Insights for an authorized facilitator", as
 
 test("the admin team list offers Open, Brief, Compare and Insights", async ({ page }) => {
   await signIn(page, SUPER_ADMIN);
-  await page.goto("/admin/teams");
+  // Search rather than trusting page 1: the admin list paginates by 20 and
+  // every e2e run that creates a team pushes older rows off the first page.
+  await page.goto("/admin/teams?q=Product+Leadership");
 
   const row = page.getByRole("row").filter({ hasText: "Product Leadership" }).first();
   for (const action of ["Open", "Brief", "Compare", "Insights"]) {
