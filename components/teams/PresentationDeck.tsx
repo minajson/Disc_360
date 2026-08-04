@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
 import { cn } from "@/lib/utils/cn";
@@ -20,6 +21,35 @@ import type { TeamIntelligence } from "@/lib/insights/team";
 
 const AUTO_ADVANCE_MS = 25_000;
 
+/**
+ * Compare and AI Insights are the two heavy tabs — a full comparison
+ * workspace and eight generated insight cards. Code splitting them keeps the
+ * deck's first paint to the slides a facilitator opens on.
+ */
+const CompareTab = dynamic(
+  () => import("@/components/teams/tabs/CompareTab").then((m) => m.CompareTab),
+  { loading: () => <TabSkeleton label="Loading comparison…" /> },
+);
+
+const InsightsTab = dynamic(
+  () => import("@/components/teams/tabs/InsightsTab").then((m) => m.InsightsTab),
+  { loading: () => <TabSkeleton label="Loading insights…" /> },
+);
+
+function TabSkeleton({ label }: { label: string }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex min-h-64 items-center justify-center rounded-2xl border border-hairline bg-mineral"
+    >
+      <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-faint">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 const TABS = [
   { id: "overview", label: "Overview", Component: OverviewTab },
   { id: "distribution", label: "Distribution", Component: DistributionTab },
@@ -28,6 +58,8 @@ const TABS = [
   { id: "conflict", label: "Conflict", Component: ConflictTab },
   { id: "pressure", label: "Pressure", Component: PressureTab },
   { id: "pairings", label: "Pairings", Component: PairingsTab },
+  { id: "compare", label: "Compare", Component: CompareTab },
+  { id: "insights", label: "AI Insights", Component: InsightsTab },
   { id: "recommendations", label: "Recommendations", Component: RecommendationsTab },
 ] as const;
 
@@ -47,6 +79,8 @@ interface PresentationDeckProps {
   teamCode: string;
   isLocalBase: boolean;
   facilitator: FacilitatorInfo | null;
+  /** Server-resolved ISO timestamp, stamped on generated insights. */
+  generatedAt: string;
 }
 
 export function PresentationDeck({
@@ -57,6 +91,7 @@ export function PresentationDeck({
   teamCode,
   isLocalBase,
   facilitator,
+  generatedAt,
 }: PresentationDeckProps) {
   const reduced = useReducedMotion();
   const [tabIndex, setTabIndex] = useState(0);
@@ -87,8 +122,9 @@ export function PresentationDeck({
         })),
       },
       profiles,
+      generatedAt,
     }),
-    [data, profiles, showNames],
+    [data, profiles, showNames, generatedAt],
   );
 
   const go = useCallback(
@@ -278,9 +314,12 @@ export function PresentationDeck({
         )}
       </main>
 
-      {/* print: all sections stacked */}
+      {/* Print: the narrative sections stacked. Compare and AI Insights are
+          excluded deliberately — they are interactive workspaces with their
+          own Export PDF, and mounting them here would load both code-split
+          chunks on every deck open just to fill a hidden container. */}
       <div className="hidden print:block">
-        {TABS.map((tab) => (
+        {TABS.filter((tab) => tab.id !== "compare" && tab.id !== "insights").map((tab) => (
           <section key={tab.id} className="mb-8 break-inside-avoid">
             <h2 className="mb-3 font-display text-xl font-semibold">{tab.label}</h2>
             <tab.Component {...context} />

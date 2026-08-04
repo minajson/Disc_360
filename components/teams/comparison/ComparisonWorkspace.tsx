@@ -44,6 +44,12 @@ interface ComparisonWorkspaceProps {
   members: ComparisonMember[];
   teamName: string;
   named: boolean;
+  /**
+   * Rendered inside the presentation deck, which already owns the
+   * anonymize toggle, department filter, print and full-screen controls.
+   * Suppresses this component's duplicates of them.
+   */
+  embedded?: boolean;
 }
 
 const SCOPE_LABEL: Record<Scope, string> = {
@@ -56,6 +62,7 @@ export function ComparisonWorkspace({
   members,
   teamName,
   named,
+  embedded = false,
 }: ComparisonWorkspaceProps) {
   const reduced = useReducedMotion();
   const [scope, setScope] = useState<Scope>("all");
@@ -161,7 +168,7 @@ export function ComparisonWorkspace({
 
   return (
     <div className="flex flex-col gap-7">
-      {!named ? (
+      {!named && !embedded ? (
         <p className="rounded-2xl border border-sage bg-sage/20 px-5 py-3 text-sm text-slate">
           This team reports anonymously — participants appear as letters, never
           names. The setting is controlled in Team settings.
@@ -199,26 +206,30 @@ export function ComparisonWorkspace({
           {members.length} completed · {MAX_CARDS_PER_VIEW} per screen
         </span>
 
-        <button
-          type="button"
-          onClick={() => setPresentation((value) => !value)}
-          aria-pressed={presentation}
-          className={cn(
-            "ml-auto rounded-full border px-4 py-1.5 text-xs transition-colors",
-            presentation
-              ? "border-botanical text-botanical"
-              : "border-hairline text-slate hover:border-botanical hover:text-botanical",
-          )}
-        >
-          Presentation {presentation ? "on" : "off"}
-        </button>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="rounded-full border border-hairline px-4 py-1.5 text-xs text-slate transition-colors hover:border-botanical hover:text-botanical"
-        >
-          Export PDF
-        </button>
+        {!embedded ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setPresentation((value) => !value)}
+              aria-pressed={presentation}
+              className={cn(
+                "ml-auto rounded-full border px-4 py-1.5 text-xs transition-colors",
+                presentation
+                  ? "border-botanical text-botanical"
+                  : "border-hairline text-slate hover:border-botanical hover:text-botanical",
+              )}
+            >
+              Presentation {presentation ? "on" : "off"}
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="rounded-full border border-hairline px-4 py-1.5 text-xs text-slate transition-colors hover:border-botanical hover:text-botanical"
+            >
+              Export PDF
+            </button>
+          </>
+        ) : null}
       </div>
 
       <div

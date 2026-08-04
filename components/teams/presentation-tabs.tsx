@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { cn } from "@/lib/utils/cn";
 import { dimensionMeta } from "@/data/dimension-meta";
 import { insightMap } from "@/data/insight-maps";
@@ -18,6 +18,12 @@ import type { TeamIntelligence, TeamMemberProfile } from "@/lib/insights/team";
 export interface TabContext {
   data: TeamIntelligence;
   profiles: TeamMemberProfile[]; // display-labeled + department-filtered
+  /**
+   * ISO timestamp resolved on the server. Tabs that stamp a generation date
+   * read it from here rather than calling `new Date()` during render, which
+   * would differ between the server and client passes.
+   */
+  generatedAt: string;
 }
 
 /* ── shared bits ────────────────────────────────────────────────────── */
@@ -386,15 +392,7 @@ export function PressureTab({ data, profiles }: TabContext) {
 
 /* ── 7 · Pairings ──────────────────────────────────────────────────── */
 
-export function PairingsTab({ data, profiles }: TabContext) {
-  const [aIndex, setAIndex] = useState(0);
-  const [bIndex, setBIndex] = useState(Math.min(1, Math.max(0, profiles.length - 1)));
-  const a = profiles[aIndex];
-  const b = profiles[bIndex];
-
-  const selectClass =
-    "rounded-full border border-hairline bg-paper px-4 py-2 text-sm text-ink focus:border-botanical focus:outline-none";
-
+export function PairingsTab({ data }: TabContext) {
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <Panel title="Complementary pairings">
@@ -430,62 +428,19 @@ export function PairingsTab({ data, profiles }: TabContext) {
         )}
       </Panel>
 
-      {profiles.length >= 2 ? (
-        <Panel title="Compare two members" className="lg:col-span-2">
-          <div className="flex flex-wrap items-center gap-3 print:hidden">
-            <select
-              aria-label="First member"
-              value={aIndex}
-              onChange={(event) => setAIndex(Number(event.target.value))}
-              className={selectClass}
-            >
-              {profiles.map((profile, index) => (
-                <option key={profile.label} value={index}>
-                  {profile.label}
-                </option>
-              ))}
-            </select>
-            <span className="text-sm text-faint">vs</span>
-            <select
-              aria-label="Second member"
-              value={bIndex}
-              onChange={(event) => setBIndex(Number(event.target.value))}
-              className={selectClass}
-            >
-              {profiles.map((profile, index) => (
-                <option key={profile.label} value={index}>
-                  {profile.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          {a && b ? (
-            <div className="grid gap-6 pt-2 sm:grid-cols-2">
-              {[
-                { member: a, other: b },
-                { member: b, other: a },
-              ].map(({ member, other }, index) => (
-                <div key={index} className="flex flex-col gap-3">
-                  <span className="font-display text-lg font-semibold text-ink">
-                    {member.label}
-                    <span className="ml-2 font-mono text-xs text-faint">{member.archetypeName}</span>
-                  </span>
-                  <DiscRadarChart scores={member.scores} showScores={false} className="max-w-[200px]" />
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-slate">
-                      Reaching {other.label} ({dimensionMeta[other.primary].label}):
-                    </span>
-                    <Bullets
-                      items={insightMap[other.primary].communication.do.slice(0, 2)}
-                      color={discColor(other.primary)}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </Panel>
-      ) : null}
+      {/* Member comparison used to live here as a two-select panel. It moved
+          to the Compare tab, which does the same job for any number of
+          participants — one comparison experience, not two. */}
+      <Panel title="Safe collaboration guidance" className="lg:col-span-2">
+        <Bullets
+          items={[
+            "Pair on one real deliverable, not a discussion — complementary styles reveal themselves in delivery, not in theory.",
+            "Name the decision runway up front: who decides, by when, and what would change the call.",
+            "Ask the quieter style first. The room hears the loudest preference by default, not the best one.",
+            "These are working-style pairings, not judgements about people or performance.",
+          ]}
+        />
+      </Panel>
     </div>
   );
 }

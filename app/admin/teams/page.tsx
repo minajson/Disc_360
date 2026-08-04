@@ -109,6 +109,12 @@ export default async function AdminTeamsPage({
                       >
                         Compare
                       </Link>
+                      <Link
+                        href={`/app/teams/${team.id}/insights`}
+                        className="rounded-full border border-hairline px-3 py-1 text-xs text-slate transition-colors hover:border-botanical hover:text-botanical"
+                      >
+                        Insights
+                      </Link>
                       {!team.archived_at ? (
                         <form action={archiveTeamAsAdmin.bind(null, team.id)}>
                           <button type="submit" className="rounded-full border border-hairline px-3 py-1 text-xs text-slate hover:border-disc-d hover:text-disc-d">

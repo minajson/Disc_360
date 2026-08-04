@@ -408,8 +408,13 @@ begin
 
       -- Departments only where the cohort is large enough for the split to
       -- mean anything; the small cohorts stay single-department.
+      --
+      -- The 20-cohort carries a deliberately tiny "Executive" department so
+      -- the privacy-suppression path (fewer than three completed profiles →
+      -- coverage only, no group interpretation) is exercisable locally.
       v_dept := case
         when v_size < 20 then 'Leadership'
+        when v_size = 20 and n < 2 then 'Executive'
         when n % 5 = 0 then 'Leadership'
         when n % 5 = 1 then 'Operations'
         when n % 5 = 2 then 'Engineering'

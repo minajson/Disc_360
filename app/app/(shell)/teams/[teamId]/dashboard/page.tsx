@@ -161,6 +161,12 @@ export default async function TeamDashboardPage({
             >
               Compare members
             </Link>
+            <Link
+              href={`/app/teams/${teamId}/insights`}
+              className="rounded-full border border-hairline bg-paper px-4 py-2 font-mono text-xs text-slate transition-colors hover:border-botanical hover:text-botanical"
+            >
+              AI Insights
+            </Link>
           </>
         ) : null}
         <Link

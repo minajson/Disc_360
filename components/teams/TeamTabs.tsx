@@ -27,6 +27,7 @@ export function TeamTabs({ teamId, isAdmin, isDisc = true }: TeamTabsProps) {
           ? [
               { href: `${base}/executive`, label: "Executive brief", exact: false },
               { href: `${base}/compare`, label: "Compare", exact: false },
+              { href: `${base}/insights`, label: "AI Insights", exact: false },
             ]
           : []),
         { href: `${base}/presentation`, label: "Presentation", exact: false },

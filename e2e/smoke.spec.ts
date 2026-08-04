@@ -225,7 +225,13 @@ test("presentation dashboard tabs, keyboard and anonymize toggle work", async ({
   await page.getByRole("tab", { name: "Pairings" }).click();
   await expect(panel.getByRole("heading").first()).toBeVisible();
   await expect(panel.getByText(/Amara/)).toHaveCount(0);
-  await expect(panel.getByRole("combobox").first()).toContainText("Member A");
+
+  // Member selection moved from the Pairings selects to the Compare
+  // workspace; anonymization has to reach it too.
+  await page.getByRole("tab", { name: "Compare" }).click();
+  const tray = panel.getByRole("complementary", { name: "Compare members" });
+  await expect(tray.getByText("Member A")).toBeVisible();
+  await expect(panel.getByText(/Amara/)).toHaveCount(0);
 
   await page.getByRole("tab", { name: "Recommendations" }).click();
   await expect(panel.getByText(/Five team actions/i)).toBeVisible();

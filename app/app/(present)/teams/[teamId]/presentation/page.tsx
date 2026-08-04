@@ -68,6 +68,7 @@ export default async function TeamPresentationPage({
       teamCode={team?.team_code ?? ""}
       isLocalBase={base.isLocal}
       facilitator={facilitator}
+      generatedAt={new Date().toISOString()}
     />
   );
 }

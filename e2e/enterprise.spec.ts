@@ -26,30 +26,32 @@ const SUPER_ADMIN = "admin@disc360.dev";
 const memberCards = (scope: Page | Locator) =>
   scope.getByRole("img", { name: /^DISC profile — Dominant/ });
 
-/* ── 1 · the existing two-member comparison is untouched ────────────── */
+/* ── 1 · two members read exactly as the pair they replaced ─────────── */
 
-test("the two-member comparison on the Pairings tab is unchanged", async ({ page }) => {
+test("a two-member set keeps the original one-to-one reading", async ({ page }) => {
+  // The old Pairings block is gone (see facilitator-nav.spec.ts), but its
+  // reading order survives: two columns, and each column teaches you to reach
+  // the person opposite rather than themselves.
   await signIn(page, FACILITATOR);
-  await page.goto(`/app/teams/${TEAM_PRODUCT}/presentation`);
+  await page.goto(`/app/teams/${TEAM_5}/compare`);
 
-  await page.getByRole("tab", { name: "Pairings" }).click();
+  const tray = page.getByRole("complementary", { name: "Compare members" });
+  await tray.getByRole("checkbox").nth(0).check();
+  await tray.getByRole("checkbox").nth(1).check();
+  await tray.getByRole("button", { name: "Compare", exact: true }).click();
 
-  const panel = page.getByRole("tabpanel", { name: "Pairings" });
-  await expect(panel.getByText("Compare two members")).toBeVisible();
+  await expect(memberCards(page)).toHaveCount(2);
 
-  // Two selects, an explicit "vs", and exactly two member columns.
-  const first = panel.getByLabel("First member");
-  const second = panel.getByLabel("Second member");
-  await expect(first).toBeVisible();
-  await expect(second).toBeVisible();
-  await expect(panel.getByText("vs", { exact: true })).toBeVisible();
-  await expect(memberCards(panel)).toHaveCount(2);
+  const names = await page.getByRole("img", { name: /^DISC profile — Dominant/ })
+    .evaluateAll((nodes) =>
+      nodes.map((node) => node.closest("div")?.parentElement?.textContent ?? ""),
+    );
+  expect(names).toHaveLength(2);
 
-  // Changing a select swaps the column — the original interaction model.
-  const options = await first.locator("option").allTextContents();
-  expect(options.length).toBeGreaterThan(1);
-  await first.selectOption({ index: 1 });
-  await expect(memberCards(panel)).toHaveCount(2);
+  // Cross-referenced guidance: the first column names the second member.
+  const reaching = await page.getByText(/^Reaching /).allTextContents();
+  expect(reaching).toHaveLength(2);
+  expect(reaching[0]).not.toEqual(reaching[1]);
 });
 
 /* ── 2 · the same interface at 5, 10, 20 and 100 ────────────────────── */
