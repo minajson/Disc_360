@@ -32,7 +32,7 @@ export function JoinForm({ token, invitedEmail }: JoinFormProps) {
       />
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField label="Job title (optional)" id="join-title" name="job_title" />
-        <TextField label="Department (optional)" id="join-dept" name="department" />
+        <TextField label="Sub Team" id="join-dept" name="department" required />
       </div>
       <TextField
         label="Employee / reference ID (optional)"

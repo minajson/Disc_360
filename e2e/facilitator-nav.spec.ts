@@ -186,10 +186,10 @@ test("departments below the threshold report coverage but no interpretation", as
     .first();
   await expect(page.getByText(/Too little data for a reliable group interpretation/).first())
     .toBeVisible();
-  await expect(executive.getByRole("button", { name: /Read this department/ })).toHaveCount(0);
+  await expect(executive.getByRole("button", { name: /Read this sub team/ })).toHaveCount(0);
 
   // A department that clears the threshold still opens.
-  await expect(page.getByRole("button", { name: "Read this department" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Read this sub team" }).first()).toBeVisible();
 });
 
 test("insights carry evidence, sample size and a signal strength", async ({ page }) => {

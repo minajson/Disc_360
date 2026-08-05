@@ -216,12 +216,12 @@ export function ExecutiveBrief({ data }: { data: ExecutiveBriefData }) {
       <div className="flex flex-wrap items-center gap-2.5 print:hidden">
         {departments.length > 1 ? (
           <select
-            aria-label="Filter by department"
+            aria-label="Filter by sub team"
             value={department ?? ""}
             onChange={(event) => setDepartment(event.target.value || null)}
             className="rounded-full border border-hairline bg-paper px-4 py-1.5 text-xs text-slate focus:border-botanical focus:outline-none"
           >
-            <option value="">All departments</option>
+            <option value="">All sub teams</option>
             {departments.map((dept) => (
               <option key={dept} value={dept}>
                 {dept}

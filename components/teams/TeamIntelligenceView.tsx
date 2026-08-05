@@ -83,7 +83,7 @@ export function TeamIntelligenceView({ data }: { data: TeamIntelligence }) {
         </div>
 
         {data.departments.length > 1 ? (
-          <div role="group" aria-label="Filter map by department" className="flex flex-wrap gap-1.5">
+          <div role="group" aria-label="Filter map by sub team" className="flex flex-wrap gap-1.5">
             <button
               type="button"
               aria-pressed={department === null}
@@ -95,7 +95,7 @@ export function TeamIntelligenceView({ data }: { data: TeamIntelligence }) {
                   : "border-hairline text-slate hover:text-ink",
               )}
             >
-              All departments
+              All sub teams
             </button>
             {data.departments.map((dept) => (
               <button

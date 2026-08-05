@@ -24,7 +24,7 @@ export function parseMemberCsv(text: string): {
     const cells = line.split(",").map((cell) => cell.trim().replace(/^"|"$/g, ""));
     const [name, email, department] = cells;
     if (!name || !email || !EMAIL_PATTERN.test(email)) {
-      errors.push(`Line ${index + 1}: expected "name, email[, department]"`);
+      errors.push(`Line ${index + 1}: expected "name, email[, sub team]"`);
       continue;
     }
     const normalized = email.toLowerCase();

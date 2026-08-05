@@ -56,14 +56,14 @@ function SignalMeter({ signal }: { signal: SignalStrength }) {
             key={step}
             className="w-1 rounded-full"
             style={{
-              height: `${4 + step * 2}px`,
+              height: `${6 + step * 3}px`,
               background: step <= steps ? SIGNAL_TONE[signal] : "var(--color-hairline-strong)",
             }}
           />
         ))}
       </span>
       <span
-        className="font-mono text-[10px] uppercase tracking-[0.14em]"
+        className="ins-badge font-mono uppercase tracking-[0.14em]"
         style={{ color: SIGNAL_TONE[signal] }}
       >
         {SIGNAL_LABEL[signal]}
@@ -74,16 +74,16 @@ function SignalMeter({ signal }: { signal: SignalStrength }) {
 
 function EvidenceChips({ insight }: { insight: FacilitatorInsight }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-2.5">
       {insight.evidence.map((chip) => (
         <span
           key={chip.label}
-          className="inline-flex items-baseline gap-1.5 rounded-full border border-hairline bg-mineral px-2.5 py-1"
+          className="inline-flex items-baseline gap-2 rounded-full border border-hairline bg-mineral px-3.5 py-1.5"
         >
-          <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+          <span className="ins-chip font-mono uppercase tracking-[0.12em] text-faint">
             {chip.label}
           </span>
-          <span className="font-mono text-xs text-ink">{chip.value}</span>
+          <span className="ins-chip font-mono text-ink">{chip.value}</span>
         </span>
       ))}
     </div>
@@ -118,7 +118,7 @@ function InsightCard({
   return (
     <motion.article
       data-reveal
-      className="paper-card flex flex-col gap-4 p-6 lg:p-7"
+      className="paper-card flex flex-col gap-(--ins-gap) p-(--ins-pad)"
       initial={reduced ? false : { opacity: 0, y: 14 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
@@ -132,7 +132,7 @@ function InsightCard({
         <span
           className={cn(
             "font-mono uppercase tracking-[0.2em] text-teal",
-            presentation ? "pres-mono" : "text-[11px]",
+            presentation ? "pres-mono" : "ins-chip",
           )}
         >
           {CATEGORY_TITLE[insight.category]}
@@ -142,8 +142,8 @@ function InsightCard({
 
       <h3
         className={cn(
-          "font-display font-semibold leading-snug text-ink",
-          presentation ? "pres-h2" : "text-lg lg:text-xl",
+          "font-display font-semibold text-ink",
+          presentation ? "pres-h2" : "ins-title",
         )}
       >
         {insight.title}
@@ -152,26 +152,26 @@ function InsightCard({
       <p
         className={cn(
           "text-slate",
-          presentation ? "pres-body pres-measure" : "text-sm leading-relaxed",
+          presentation ? "pres-body pres-measure" : "ins-body ins-measure",
         )}
       >
         {insight.observation}
       </p>
 
       <div className="flex flex-col gap-2 rule-t pt-4">
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint">
+        <span className="ins-chip font-mono uppercase tracking-[0.16em] text-faint">
           {INTERPRETATION_HEADING}
         </span>
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-3">
           {insight.interpretation.map((line) => (
             <li
               key={line}
               className={cn(
-                "flex items-start gap-2.5 text-ink",
-                presentation ? "pres-body pres-measure" : "text-sm leading-relaxed",
+                "flex items-start gap-3 text-ink",
+                presentation ? "pres-body pres-measure" : "ins-bullet ins-measure",
               )}
             >
-              <span aria-hidden className="mt-[0.6em] size-1.5 shrink-0 rounded-full bg-sage" />
+              <span aria-hidden className="mt-[0.55em] size-2 shrink-0 rounded-full bg-sage" />
               {line}
             </li>
           ))}
@@ -182,7 +182,7 @@ function InsightCard({
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="self-start font-mono text-[10px] uppercase tracking-[0.16em] text-teal transition-colors hover:text-botanical print:hidden"
+        className="ins-chip self-start font-mono uppercase tracking-[0.16em] text-teal transition-colors hover:text-botanical print:hidden"
       >
         {open ? "Hide evidence" : "Show evidence and questions"}
       </button>
@@ -195,24 +195,24 @@ function InsightCard({
           transition={{ duration: 0.25, ease: [0.32, 0.94, 0.6, 1] }}
         >
           <div className="flex flex-col gap-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint">
+            <span className="ins-chip font-mono uppercase tracking-[0.16em] text-faint">
               Evidence
             </span>
             <EvidenceChips insight={insight} />
           </div>
           <div className="flex flex-col gap-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint">
+            <span className="ins-chip font-mono uppercase tracking-[0.16em] text-faint">
               Ask the room
             </span>
             <ul className="flex flex-col gap-2">
               {insight.questions.map((question) => (
-                <li key={question} className="text-sm leading-relaxed text-slate">
+                <li key={question} className="ins-bullet ins-measure text-slate">
                   “{question}”
                 </li>
               ))}
             </ul>
           </div>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 rule-t pt-3 font-mono text-[10px] uppercase tracking-[0.12em]">
+          <dl className="ins-chip grid grid-cols-2 gap-x-6 gap-y-2 rule-t pt-4 font-mono uppercase tracking-[0.12em]">
             <dt className="text-faint">Based on</dt>
             <dd className="text-slate">
               {insight.sampleSize} of {insight.populationSize} · {coverage}%
@@ -235,11 +235,11 @@ function InsightCard({
 function Suppressed({ message }: { message: string }) {
   return (
     <div className="paper-card flex flex-col items-start gap-3 p-8">
-      <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-disc-i">
+      <span className="ins-badge font-mono uppercase tracking-[0.2em] text-disc-i">
         Insufficient data
       </span>
-      <p className="max-w-xl text-sm leading-relaxed text-slate">{message}</p>
-      <p className="max-w-xl text-xs leading-relaxed text-faint">
+      <p className="ins-body max-w-xl text-slate">{message}</p>
+      <p className="ins-chip max-w-xl leading-relaxed text-faint">
         Group patterns are suppressed below {MIN_GROUP_SIZE} completed profiles.
         With fewer than that, a “team pattern” describes individuals rather than
         a group, and would identify them.
@@ -251,13 +251,13 @@ function Suppressed({ message }: { message: string }) {
 function DepartmentRow({ department }: { department: DepartmentInsight }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="paper-card flex flex-col gap-4 p-6">
+    <div className="paper-card flex flex-col gap-(--ins-gap) p-(--ins-pad)">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
         <div className="flex flex-col gap-0.5">
-          <span className="font-display text-base font-semibold text-ink">
+          <span className="ins-heading font-display font-semibold text-ink">
             {department.department}
           </span>
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">
+          <span className="ins-chip font-mono uppercase tracking-[0.14em] text-faint">
             {department.completedCount} of {department.memberCount} completed
           </span>
         </div>
@@ -266,7 +266,7 @@ function DepartmentRow({ department }: { department: DepartmentInsight }) {
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {DIMENSIONS.map((dim) => (
-          <span key={dim} className="flex items-center gap-1.5 font-mono text-xs">
+          <span key={dim} className="ins-chip flex items-center gap-2 font-mono">
             <span style={{ color: `var(--color-disc-${dim.toLowerCase()})` }}>
               {dimensionMeta[dim].displayCode}
             </span>
@@ -274,7 +274,7 @@ function DepartmentRow({ department }: { department: DepartmentInsight }) {
           </span>
         ))}
         <span
-          className="rounded-full px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em]"
+          className="ins-chip rounded-full px-3 py-1 font-mono uppercase tracking-[0.12em]"
           style={{
             background: `var(--color-disc-${department.lead.toLowerCase()}-soft)`,
             color: `var(--color-disc-${department.lead.toLowerCase()})`,
@@ -282,13 +282,13 @@ function DepartmentRow({ department }: { department: DepartmentInsight }) {
         >
           {dimensionMeta[department.lead].label}
         </span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+        <span className="ins-chip font-mono uppercase tracking-[0.12em] text-faint">
           Balance {department.balanceIndex}
         </span>
       </div>
 
       {department.suppressed ? (
-        <p className="rule-t pt-3 text-sm leading-relaxed text-slate">
+        <p className="ins-body rule-t pt-4 text-slate">
           {department.suppressed}
         </p>
       ) : (
@@ -297,19 +297,19 @@ function DepartmentRow({ department }: { department: DepartmentInsight }) {
             type="button"
             onClick={() => setOpen((value) => !value)}
             aria-expanded={open}
-            className="self-start font-mono text-[10px] uppercase tracking-[0.16em] text-teal transition-colors hover:text-botanical print:hidden"
+            className="ins-chip self-start font-mono uppercase tracking-[0.16em] text-teal transition-colors hover:text-botanical print:hidden"
           >
-            {open ? "Hide department read" : "Read this department"}
+            {open ? "Hide sub team read" : "Read this sub team"}
           </button>
           {open ? (
             <div className="flex flex-col gap-3 rule-t pt-4">
               {(department.insights ?? []).slice(0, 3).map((insight) => (
                 <div key={insight.category} className="flex flex-col gap-1">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint">
+                  <span className="ins-chip font-mono uppercase tracking-[0.16em] text-faint">
                     {CATEGORY_TITLE[insight.category]}
                   </span>
-                  <span className="text-sm font-medium text-ink">{insight.title}</span>
-                  <span className="text-sm leading-relaxed text-slate">
+                  <span className="ins-heading font-medium text-ink">{insight.title}</span>
+                  <span className="ins-body text-slate">
                     {insight.observation}
                   </span>
                 </div>
@@ -376,14 +376,21 @@ export function FacilitatorInsightsView({
   const card = total > 0 ? set.insights[Math.min(slide, total - 1)]! : null;
 
   return (
-    <div className="flex flex-col gap-8">
+    <div
+      className={cn(
+        "flex flex-col gap-(--ins-gap)",
+        // The boardroom scale applies to the analytical surface. Presentation
+        // mode has its own projector scale and is left exactly as it was.
+        !presentation && "insight-scale",
+      )}
+    >
       {!embedded ? (
         <header className="flex flex-col gap-3">
           <Eyebrow>Facilitator insights · {teamName}</Eyebrow>
           <h1 className="font-display text-h2 font-semibold">
             What this team&apos;s data supports
           </h1>
-          <p className="max-w-3xl text-sm leading-relaxed text-slate">
+          <p className="ins-body max-w-3xl text-slate">
             An interpretation layer over the team&apos;s completed profiles. It
             reads results — it never changes them, never recalculates a score
             and never alters a participant&apos;s profile.
@@ -394,13 +401,13 @@ export function FacilitatorInsightsView({
       <div className="flex flex-wrap items-center gap-2.5">
         <span
           className={cn(
-            "rounded-full px-3.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em]",
+            "ins-badge rounded-full px-4 py-1.5 font-mono uppercase tracking-[0.16em]",
             aiGenerated ? "bg-ink text-mineral" : "border border-hairline text-slate",
           )}
         >
           {aiGenerated ? "AI-generated" : "Generated from team data"}
         </span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-faint">
+        <span className="ins-badge font-mono uppercase tracking-[0.16em] text-faint">
           {completedCount} of {memberCount} completed · {set.scope.basis} data ·{" "}
           {generatedAt}
         </span>
@@ -489,15 +496,15 @@ export function FacilitatorInsightsView({
       )}
 
       {departments.length > 1 ? (
-        <section className="flex flex-col gap-5">
-          <div className="flex flex-col gap-1.5">
-            <Eyebrow>Departments in this team</Eyebrow>
-            <h2 className="font-display text-h3 font-semibold">
-              Where the departments differ
+        <section className="flex flex-col gap-(--ins-gap)">
+          <div className="flex flex-col gap-2">
+            <Eyebrow>Sub teams in this team</Eyebrow>
+            <h2 className="ins-title font-display font-semibold">
+              Where the sub teams differ
             </h2>
-            <p className="max-w-3xl text-sm leading-relaxed text-slate">
-              {reportable} of {departments.length} departments carry enough
-              completed profiles for a group read. Departments below{" "}
+            <p className="ins-body max-w-3xl text-slate">
+              {reportable} of {departments.length} sub teams carry enough
+              completed profiles for a group read. Sub teams below{" "}
               {MIN_GROUP_SIZE} completed profiles show coverage only.
             </p>
           </div>
@@ -509,7 +516,7 @@ export function FacilitatorInsightsView({
         </section>
       ) : null}
 
-      <p className="max-w-3xl text-xs leading-relaxed text-faint">
+      <p className="ins-chip max-w-3xl leading-relaxed text-faint">
         These insights describe behavioural preferences expressed in a work
         context, in aggregate. They are not a psychological, medical or clinical
         assessment, are not a measure of ability or performance, and must not be

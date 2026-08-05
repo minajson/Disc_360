@@ -115,7 +115,7 @@ export function ComparisonTray({
             setScrollTop(0);
             viewportRef.current?.scrollTo({ top: 0 });
           }}
-          placeholder="Search participant, department or style…"
+          placeholder="Search participant, sub team or style…"
           className="w-full rounded-full border border-hairline bg-mineral px-4 py-2.5 text-sm text-ink placeholder:text-faint focus:border-botanical focus:outline-none"
         />
       </label>
@@ -123,7 +123,7 @@ export function ComparisonTray({
       {departments.length > 0 ? (
         <label className="flex flex-col gap-1.5">
           <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-faint">
-            Department
+            Sub Team
           </span>
           <select
             value={department}
@@ -134,7 +134,7 @@ export function ComparisonTray({
             }}
             className="w-full rounded-full border border-hairline bg-mineral px-4 py-2.5 text-sm text-ink focus:border-botanical focus:outline-none"
           >
-            <option value={ALL_DEPARTMENTS}>All departments</option>
+            <option value={ALL_DEPARTMENTS}>All sub teams</option>
             {departments.map((name) => (
               <option key={name} value={name}>
                 {name}

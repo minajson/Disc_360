@@ -152,6 +152,8 @@ test("QR join opens the Focus assessment for a Focus team", async ({ page, brows
   await expect(participant.getByText(/QR Focus/).first()).toBeVisible();
   await participant.getByLabel("Full name").fill("Focus Joiner");
   await participant.getByLabel(/email/i).first().fill(`pw-join-${Date.now()}@atlasdemo.dev`);
+  // Sub team is required on registration.
+  await participant.getByLabel("Sub Team").fill("Platform");
   await participant.getByText(/I consent/i).click();
   await participant.getByRole("button", { name: /Start|Join|Begin/i }).first().click();
 

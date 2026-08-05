@@ -9,14 +9,14 @@ import { MotionSection } from "@/components/motion/MotionSection";
 export const metadata: Metadata = {
   title: "For organizations",
   description:
-    "Departments, roles, anonymization and audit trails — DISC360 for HR and L&D teams running behavioral development at scale.",
+    "Sub teams, roles, anonymization and audit trails — DISC360 for HR and L&D teams running behavioral development at scale.",
 };
 
 const pillars = [
   {
     title: "Structure that matches yours",
     detail:
-      "Organizations hold teams and departments; admins manage the whole account.",
+      "Organizations hold teams and sub teams; admins manage the whole account.",
   },
   {
     title: "Privacy by design",
@@ -83,7 +83,7 @@ export default function OrganizationsPage() {
       </section>
 
       <CtaBand
-        title="Start with one department."
+        title="Start with one sub team."
         lead="Pilot with one team's debrief — the map does the rest."
         primary={{ href: "/contact", label: "Contact us" }}
         secondary={{ href: "/teams", label: "See the team experience" }}

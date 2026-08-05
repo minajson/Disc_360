@@ -63,7 +63,7 @@ interface ComparisonWorkspaceProps {
 
 const SCOPE_LABEL: Record<Scope, string> = {
   all: "All members",
-  departments: "By department",
+  departments: "By sub team",
   selection: "Selected members",
 };
 
@@ -231,7 +231,7 @@ export function ComparisonWorkspace({
         >
           {[
             { href: `/app/teams/${teamId}/compare`, label: "Members", active: true },
-            { href: `/app/teams/${teamId}/compare?scope=departments`, label: "Departments", active: false },
+            { href: `/app/teams/${teamId}/compare?scope=departments`, label: "Sub Teams", active: false },
             { href: `/app/teams/${teamId}/history`, label: "History", active: false },
           ].map((mode) => (
             <Link
@@ -558,14 +558,13 @@ export function ComparisonWorkspace({
                   <ul className="grid gap-4 sm:grid-cols-2">
                     {divergences.map((entry) => (
                       <li key={entry.dimension} className="flex flex-col gap-2">
-                        <div className="flex items-baseline justify-between gap-3">
-                          <span className="cmp-label font-medium text-ink">
-                            {dimensionMeta[entry.dimension].label}
-                          </span>
-                          <span className="cmp-mono font-mono tabular-nums text-faint">
-                            {entry.low}\u2013{entry.high} \u00b7 {entry.range} pts
-                          </span>
-                        </div>
+                        {/* The dimension and its bar, and nothing else. The
+                            numeric span that used to sit here read as an
+                            implementation value on a projected screen — the bar
+                            already says how far apart the set is. */}
+                        <span className="cmp-label font-medium text-ink">
+                          {dimensionMeta[entry.dimension].label}
+                        </span>
                         <div className="h-2 overflow-hidden rounded-full bg-ink/8">
                           <div
                             className="h-full rounded-full"

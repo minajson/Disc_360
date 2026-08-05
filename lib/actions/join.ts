@@ -16,7 +16,10 @@ const joinSchema = z.object({
   full_name: z.string().min(2, "Please enter your full name").max(120),
   email: z.email("Please use a valid email address").transform((v) => v.toLowerCase()),
   job_title: z.string().max(120).optional().or(z.literal("")),
-  department: z.string().max(120).optional().or(z.literal("")),
+  // Required, at the product's request: a participant's sub team is what every
+  // group comparison is later built from, and a blank one is invisible until a
+  // facilitator wonders why someone is missing from a set.
+  department: z.string().trim().min(1, "Please enter your sub team").max(120),
   reference_id: z.string().max(60).optional().or(z.literal("")),
   consent: z.literal("on", {
     error: "Consent to data processing is required to take the assessment.",

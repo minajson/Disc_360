@@ -106,7 +106,7 @@ test("wizard back-navigation preserves every entered value", async ({ page }) =>
   const teamName = `Back Nav ${Date.now() % 10_000}`;
   await page.getByLabel("Team name").fill(teamName);
   await page.getByLabel("Organization or company").fill("Reversible Ltd");
-  await page.getByLabel(/Department/).fill("Research");
+  await page.getByLabel(/Sub Team/).fill("Research");
   await page.getByRole("button", { name: "Continue" }).click();
 
   // Step 2 → Back → step 1 still holds everything.
@@ -114,7 +114,7 @@ test("wizard back-navigation preserves every entered value", async ({ page }) =>
   await page.getByRole("button", { name: "← Back" }).click();
   await expect(page.getByLabel("Team name")).toHaveValue(teamName);
   await expect(page.getByLabel("Organization or company")).toHaveValue("Reversible Ltd");
-  await expect(page.getByLabel(/Department/)).toHaveValue("Research");
+  await expect(page.getByLabel(/Sub Team/)).toHaveValue("Research");
 
   // And a full reload restores from the server draft, not browser memory.
   await page.reload();

@@ -44,7 +44,7 @@ const intents: { id: Intent; title: string; detail: string }[] = [
   {
     id: "setup_organization",
     title: "Set up an organization",
-    detail: "Roll DISC360 out across departments.",
+    detail: "Roll DISC360 out across sub teams.",
   },
 ];
 
@@ -200,7 +200,7 @@ function InvitedFlow({
     {
       id: "organization",
       title: "Set up an organization",
-      detail: "Roll DISC360 out across departments.",
+      detail: "Roll DISC360 out across sub teams.",
     },
   ];
   const leavingPathway = pathway !== "participant";

@@ -36,7 +36,7 @@ export function AddMemberForm({ teamId }: { teamId: string }) {
       <div className="grid gap-4 sm:grid-cols-3">
         <TextField label="Full name" id="add-name" name="display_name" required />
         <TextField label="Email" id="add-email" name="email" type="email" required />
-        <TextField label="Department (optional)" id="add-dept" name="department" />
+        <TextField label="Sub Team (optional)" id="add-dept" name="department" />
       </div>
       <StateMessage state={state} />
       <Button type="submit" disabled={pending} className="self-start">
@@ -55,7 +55,7 @@ export function ImportCsvForm({ teamId }: { teamId: string }) {
         Bulk import (CSV)
       </label>
       <p className="text-xs text-slate">
-        One person per line: <code className="font-mono">name, email, department</code> — department optional, header row allowed.
+        One person per line: <code className="font-mono">name, email, sub team</code> — sub team optional, header row allowed.
       </p>
       <textarea
         id="csv"
@@ -110,7 +110,7 @@ export function MemberEditor({
             required
           />
           <TextField
-            label="Department"
+            label="Sub Team"
             id={`dept-${member.id}`}
             name="department"
             defaultValue={member.department ?? ""}

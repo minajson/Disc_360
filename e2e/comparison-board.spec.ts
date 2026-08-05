@@ -197,16 +197,16 @@ test("the selector stays pinned while the board scrolls", async ({ page }) => {
   await expect(tray.getByRole("button", { name: "Compare", exact: true })).toBeInViewport();
 });
 
-test("the selector filters by department without leaving the page", async ({ page }) => {
+test("the selector filters by sub team without leaving the page", async ({ page }) => {
   await signIn(page, FACILITATOR);
   await board(page, TEAM_20, 1920);
 
   const tray = page.getByRole("complementary", { name: "Compare members" });
-  const select = tray.getByLabel("Department");
+  const select = tray.getByLabel("Sub Team");
   await expect(select).toBeVisible();
 
   const options = await select.locator("option").allTextContents();
-  expect(options[0]).toBe("All departments");
+  expect(options[0]).toBe("All sub teams");
   expect(options.length).toBeGreaterThan(1);
 
   await select.selectOption({ index: 1 });

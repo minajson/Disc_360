@@ -18,7 +18,7 @@ const adminFeatures = [
   "Deadlines with automatic reminders",
   "Live tracking: invited, started, completed",
   "Named or anonymized results — decided by you, per team",
-  "Department grouping and filters",
+  "Sub team grouping and filters",
   "A presentation mode built for the conference room",
 ];
 

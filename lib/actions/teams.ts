@@ -351,7 +351,7 @@ export async function importMembers(
     team_id: formData.get("team_id"),
     csv: formData.get("csv"),
   });
-  if (!parsed.success) return fail("Paste rows as: name, email, department (optional).");
+  if (!parsed.success) return fail("Paste rows as: name, email, sub team (optional).");
 
   const { supabase, user, profile } = await requireTeamAdmin(parsed.data.team_id);
   const { rows, errors } = parseMemberCsv(parsed.data.csv);

@@ -35,7 +35,7 @@ export function TeamSettingsForm({ team }: { team: TeamSettings }) {
       <input type="hidden" name="team_id" value={team.id} />
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField label="Team name" id="team-name" name="name" defaultValue={team.name} required />
-        <TextField label="Department" id="team-dept" name="department" defaultValue={team.department ?? ""} />
+        <TextField label="Sub Team" id="team-dept" name="department" defaultValue={team.department ?? ""} />
       </div>
       <div className="flex flex-col gap-1.5">
         <label htmlFor="team-description" className="text-sm font-medium text-ink">

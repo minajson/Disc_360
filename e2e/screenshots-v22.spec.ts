@@ -65,7 +65,7 @@ test("capture 11+12: participant join page and registration form", async ({ page
   await page.getByLabel("Full name").fill("Jordan Participant");
   await page.getByLabel("Email address").fill("jordan@example.com");
   await page.getByLabel("Job title (optional)").fill("Design Lead");
-  await page.getByLabel("Department (optional)").fill("Product Design");
+  await page.getByLabel("Sub Team").fill("Product Design");
   const form = page.locator("form", {
     has: page.getByRole("button", { name: /Join team and start assessment/ }),
   });

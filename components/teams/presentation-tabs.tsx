@@ -7,6 +7,7 @@ import { insightMap } from "@/data/insight-maps";
 import { DonutChart } from "@/components/charts/DonutChart";
 import { DiscRadarChart } from "@/components/charts/DiscRadarChart";
 import { TeamQuadrantMap } from "@/components/teams/TeamQuadrantMap";
+import { DiscBadge } from "@/components/teams/DiscBadge";
 import { DIMENSION_KEY, DIMENSIONS, type Dimension } from "@/lib/types";
 import { leadSentences } from "@/lib/insights/board";
 import type { TeamIntelligence, TeamMemberProfile } from "@/lib/insights/team";
@@ -127,7 +128,7 @@ export function DistributionTab({ data, profiles }: TabContext) {
   const departmentCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const profile of profiles) {
-      const key = profile.department ?? "No department";
+      const key = profile.department ?? "No sub team";
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
     return [...counts.entries()];
@@ -152,7 +153,7 @@ export function DistributionTab({ data, profiles }: TabContext) {
         <TeamQuadrantMap profiles={profiles} presentation className="mx-auto w-full max-w-[var(--pres-chart-lg,42rem)]" />
       </Panel>
       {departmentCounts.length > 1 ? (
-        <Panel title="By department" className="lg:col-span-2">
+        <Panel title="By sub team" className="lg:col-span-2">
           <div className="flex flex-wrap gap-3">
             {departmentCounts.map(([department, count]) => (
               <span key={department} className="pres-label rounded-full border border-hairline bg-paper px-4 py-2 text-ink">
@@ -287,6 +288,39 @@ export function LeadershipTab({ data, profiles }: TabContext) {
   );
 }
 
+/**
+ * One pairing, as a facilitator reads it: two badged names and the reason.
+ *
+ * The badges carry the styles, so the "why" of a pairing is visible before the
+ * sentence under it. `joiner` is "+" for a complement and "↔" for friction.
+ */
+function PairRow({
+  a,
+  b,
+  joiner,
+  reason,
+}: {
+  a: TeamMemberProfile | undefined;
+  b: TeamMemberProfile | undefined;
+  joiner: string;
+  reason: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="pres-h3 flex flex-wrap items-center gap-x-2.5 gap-y-1 font-display font-semibold text-ink">
+        {a ? <DiscBadge dimension={a.primary} presentation /> : null}
+        {a?.label}
+        <span aria-hidden className="text-faint">
+          {joiner}
+        </span>
+        {b ? <DiscBadge dimension={b.primary} presentation /> : null}
+        {b?.label}
+      </span>
+      <span className="pres-label leading-snug text-slate">{reason}</span>
+    </div>
+  );
+}
+
 /* ── 5 · Conflict ──────────────────────────────────────────────────── */
 
 export function ConflictTab({ data, profiles }: TabContext) {
@@ -312,12 +346,13 @@ export function ConflictTab({ data, profiles }: TabContext) {
         {data.frictionPairs.length > 0 ? (
           <div className="flex flex-col gap-3">
             {data.frictionPairs.map((pair) => (
-              <div key={`${pair.aIndex}-${pair.bIndex}`} className="flex flex-col gap-0.5">
-                <span className="pres-h3 font-display font-semibold text-ink">
-                  {data.profiles[pair.aIndex]?.label} ↔ {data.profiles[pair.bIndex]?.label}
-                </span>
-                <span className="pres-label leading-snug text-slate">{pair.reason}</span>
-              </div>
+              <PairRow
+                key={`${pair.aIndex}-${pair.bIndex}`}
+                a={data.profiles[pair.aIndex]}
+                b={data.profiles[pair.bIndex]}
+                joiner="↔"
+                reason={pair.reason}
+              />
             ))}
           </div>
         ) : (
@@ -398,12 +433,13 @@ export function PairingsTab({ data }: TabContext) {
         {data.complementaryPairs.length > 0 ? (
           <div className="flex flex-col gap-3">
             {data.complementaryPairs.map((pair) => (
-              <div key={`${pair.aIndex}-${pair.bIndex}`} className="flex flex-col gap-0.5">
-                <span className="pres-h3 font-display font-semibold text-ink">
-                  {data.profiles[pair.aIndex]?.label} + {data.profiles[pair.bIndex]?.label}
-                </span>
-                <span className="pres-label leading-snug text-slate">{pair.reason}</span>
-              </div>
+              <PairRow
+                key={`${pair.aIndex}-${pair.bIndex}`}
+                a={data.profiles[pair.aIndex]}
+                b={data.profiles[pair.bIndex]}
+                joiner="+"
+                reason={pair.reason}
+              />
             ))}
           </div>
         ) : (
@@ -414,12 +450,13 @@ export function PairingsTab({ data }: TabContext) {
         {data.frictionPairs.length > 0 ? (
           <div className="flex flex-col gap-3">
             {data.frictionPairs.map((pair) => (
-              <div key={`${pair.aIndex}-${pair.bIndex}`} className="flex flex-col gap-0.5">
-                <span className="pres-h3 font-display font-semibold text-ink">
-                  {data.profiles[pair.aIndex]?.label} ↔ {data.profiles[pair.bIndex]?.label}
-                </span>
-                <span className="pres-label leading-snug text-slate">{pair.reason}</span>
-              </div>
+              <PairRow
+                key={`${pair.aIndex}-${pair.bIndex}`}
+                a={data.profiles[pair.aIndex]}
+                b={data.profiles[pair.bIndex]}
+                joiner="↔"
+                reason={pair.reason}
+              />
             ))}
           </div>
         ) : (

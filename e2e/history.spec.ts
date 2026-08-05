@@ -232,12 +232,12 @@ test("Compare and AI Insights still behave exactly as Phase 1 shipped them", asy
   await expect(page.getByRole("complementary", { name: "Compare members" })).toBeVisible();
 });
 
-test("Compare offers Members, Departments and History as separate canvases", async ({ page }) => {
+test("Compare offers Members, Sub Teams and History as separate canvases", async ({ page }) => {
   await signIn(page, FACILITATOR);
   await page.goto(`/app/teams/${TEAM_2027}/compare`);
 
   const modes = page.getByRole("navigation", { name: "Comparison mode" });
-  for (const label of ["Members", "Departments", "History"]) {
+  for (const label of ["Members", "Sub Teams", "History"]) {
     await expect(modes.getByRole("link", { name: label, exact: true })).toBeVisible();
   }
   await modes.getByRole("link", { name: "History", exact: true }).click();

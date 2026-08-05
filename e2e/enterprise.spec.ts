@@ -108,11 +108,11 @@ test("a hundred-participant programme batches into readable sets", async ({ page
   expect(lastCount).toBeLessThanOrEqual(10);
 });
 
-test("departments become comparison sets on a large programme", async ({ page }) => {
+test("sub teams become comparison sets on a large programme", async ({ page }) => {
   await signIn(page, FACILITATOR);
   await page.goto(`/app/teams/${TEAM_100}/compare`);
 
-  await page.getByRole("button", { name: "By department" }).click();
+  await page.getByRole("button", { name: "By sub team" }).click();
   for (const department of ["Leadership", "Operations", "Engineering", "Commercial", "People"]) {
     await expect(page.getByRole("button", { name: new RegExp(`^${department}`) }).first()).toBeVisible();
   }
@@ -200,7 +200,7 @@ test("executive analytics renders for a facilitator's workspace", async ({ page 
     "What leadership needs to know",
     "Coverage across the organisation",
     "How behaviour is distributed",
-    "Department, team and business unit",
+    "Sub team, team and business unit",
     "Assessment activity over twelve months",
     "Which behaviour profiles dominate",
     "Every team in scope",
@@ -215,7 +215,7 @@ test("executive analytics renders for a facilitator's workspace", async ({ page 
   await expect(page.getByRole("img", { name: /Assessment completions and average/ })).toBeVisible({
     timeout: 15_000,
   });
-  await expect(page.getByRole("table", { name: /Average DISC intensity by department/ })).toBeVisible();
+  await expect(page.getByRole("table", { name: /Average DISC intensity by sub team/ })).toBeVisible();
 
   // Switching the comparison lens re-keys the table and heat map.
   await page.getByRole("button", { name: "Team", exact: true }).click();

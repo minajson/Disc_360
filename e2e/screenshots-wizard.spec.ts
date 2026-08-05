@@ -48,7 +48,7 @@ test("capture 31-34: wizard steps, review, and back-navigation", async ({ page }
   await page.getByLabel("Team name").fill(teamName);
   await page.getByLabel("Organization or company").fill("Northwind Group");
   await page.getByLabel(/Session or event name/).fill("Q4 Kickoff");
-  await page.getByLabel(/Department/).fill("Operations");
+  await page.getByLabel(/Sub Team/).fill("Operations");
   await page.getByLabel(/Approximate team size/).fill("14");
   await page.screenshot({ path: `${OUT}/31-wizard-step1-team.png`, fullPage: true });
   await page.getByRole("button", { name: "Continue" }).click();
@@ -72,7 +72,7 @@ test("capture 31-34: wizard steps, review, and back-navigation", async ({ page }
   await page.getByRole("button", { name: "← Back" }).click();
   await expect(page.getByLabel("Team name")).toHaveValue(teamName);
   await expect(page.getByLabel("Organization or company")).toHaveValue("Northwind Group");
-  await expect(page.getByLabel(/Department/)).toHaveValue("Operations");
+  await expect(page.getByLabel(/Sub Team/)).toHaveValue("Operations");
   await page.screenshot({ path: `${OUT}/34-wizard-back-preserved.png`, fullPage: true });
 });
 

@@ -202,7 +202,7 @@ export function TeamWizard({
               placeholder="e.g. Q3 Leadership Offsite"
             />
             <TextField
-              label="Department (optional)"
+              label="Sub Team (optional)"
               id="wizard-dept"
               name="department"
               defaultValue={values.department}
@@ -336,7 +336,7 @@ export function TeamWizard({
                 ["Team name", values.teamName],
                 ["Organization", values.organizationName],
                 ["Session", values.sessionName || "—"],
-                ["Department", values.department || "—"],
+                ["Sub Team", values.department || "—"],
                 ["Approximate size", values.approximateSize ? String(values.approximateSize) : "—"],
                 ["Deadline", values.deadlineAt || "No deadline"],
                 ["Timezone", values.timezone || detectedTimezone],

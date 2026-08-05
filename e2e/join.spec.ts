@@ -48,6 +48,7 @@ test("A: QR join — register, assess, appear once on the dashboard", async ({ p
   await expect(page.getByText("Engineering Core")).toBeVisible();
   await page.getByLabel("Full name").fill("Quinn Scanner");
   await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Sub Team").fill("Platform");
   await page.getByLabel("Job title (optional)").fill("Platform Engineer");
   await page.getByText(/I consent to DISC360 processing/).click();
   await page.getByRole("button", { name: /Join team and start assessment/ }).click();
@@ -80,6 +81,7 @@ test("B: team isolation — joining Alpha never attaches Beta", async ({ page })
   await page.goto(joinUrl);
   await page.getByLabel("Full name").fill("Iso Later");
   await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Sub Team").fill("Platform");
   await page.getByText(/I consent to DISC360 processing/).click();
   await page.getByRole("button", { name: /Join team and start assessment/ }).click();
   await page.waitForURL("**/app/assessments/**", { timeout: 20_000 });
@@ -99,6 +101,7 @@ test("C: existing accounts are never auto-logged-in from the join form", async (
   await page.goto(joinUrl);
   await page.getByLabel("Full name").fill("Sam Okonkwo");
   await page.getByLabel("Email address").fill("solo@disc360.dev");
+  await page.getByLabel("Sub Team").fill("Platform");
   await page.getByText(/I consent to DISC360 processing/).click();
   await page.getByRole("button", { name: /Join team and start assessment/ }).click();
   await expect(page.getByText(/An account already exists/i)).toBeVisible();

@@ -129,7 +129,7 @@ function Kpi({ value, label, detail }: { value: string; label: string; detail?: 
 type GroupLens = "departments" | "teams" | "units";
 
 const LENS_LABEL: Record<GroupLens, string> = {
-  departments: "Department",
+  departments: "Sub Team",
   teams: "Team",
   units: "Business unit",
 };
@@ -392,7 +392,7 @@ export function ExecutiveAnalyticsView({
       </Section>
 
       {/* 04 — group comparison */}
-      <Section index={4} eyebrow="Comparison" title="Department, team and business unit">
+      <Section index={4} eyebrow="Comparison" title="Sub team, team and business unit">
         <div
           role="group"
           aria-label="Comparison lens"
@@ -466,7 +466,7 @@ export function ExecutiveAnalyticsView({
                 <tr className="rule-b font-mono text-[10px] uppercase tracking-[0.14em] text-faint">
                   <th scope="col" className="py-2 pr-4 font-medium">Team</th>
                   <th scope="col" className="px-3 py-2 font-medium">Organisation</th>
-                  <th scope="col" className="px-3 py-2 font-medium">Department</th>
+                  <th scope="col" className="px-3 py-2 font-medium">Sub Team</th>
                   <th scope="col" className="px-3 py-2 text-right font-medium">Completed</th>
                   <th scope="col" className="py-2 pl-3 text-right font-medium">Rate</th>
                 </tr>
