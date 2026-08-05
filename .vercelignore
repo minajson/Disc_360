@@ -1,0 +1,17 @@
+# Local build and test artefacts. Vercel builds from source, so none of this
+# needs to travel — and uploading it is what started aborting the deploy once
+# the local .next grew past a gigabyte.
+.next
+.next-test
+test-results
+playwright-report
+blob-report
+coverage
+
+# Screenshot corpora: committed for review, useless to the running app.
+docs/screenshots
+e2e/screenshots
+
+# Local Supabase scratch state.
+supabase/.temp
+supabase/.branches
