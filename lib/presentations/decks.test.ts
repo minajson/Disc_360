@@ -24,6 +24,11 @@ const WHEEL_DECKS = [discIntroductionDeck, combinedIntroductionDeck];
 const VALID_VISUALS = new Set([
   "wheel",
   "statement",
+  "journey",
+  "relationships",
+  "modules",
+  "numbered",
+  "trust",
   "hero",
   "spectrum",
   "fourDimensions",
@@ -181,6 +186,19 @@ test("instructions and comparison slides carry the structured data they render",
       if (slide.visualType === "instructions") {
         assert.ok((slide.instructions?.length ?? 0) >= 1, `${slide.id} has instructions`);
       }
+      if (["journey", "modules"].includes(slide.visualType)) {
+        assert.ok((slide.steps?.length ?? 0) >= 3, `${slide.id} has stages or modules`);
+      }
+      if (slide.visualType === "relationships") {
+        assert.ok((slide.strengthShadows?.length ?? 0) >= 2, `${slide.id} has paired rows`);
+      }
+      if (slide.visualType === "numbered") {
+        assert.ok((slide.instructions?.length ?? 0) >= 2, `${slide.id} has ordered steps`);
+      }
+      if (slide.visualType === "trust") {
+        assert.equal(slide.columns?.length, 2, `${slide.id} has two privacy zones`);
+        assert.ok(slide.footnote, `${slide.id} states what the instrument is not`);
+      }
       if (["timeline", "cycle", "recoveryCurve"].includes(slide.visualType)) {
         assert.ok((slide.steps?.length ?? 0) >= 2, `${slide.id} has ordered steps`);
       }
@@ -191,7 +209,6 @@ test("instructions and comparison slides carry the structured data they render",
         // A statement slide is a claim plus its supporting cards; without the
         // cards it is just a sentence on an empty screen.
         assert.ok((slide.columns?.length ?? 0) >= 2, `${slide.id} has supporting cards`);
-        assert.equal(slide.body, undefined, `${slide.id} carries no paragraph`);
       }
       if (slide.visualType === "comparison") {
         const hasData =

@@ -17,6 +17,11 @@ export type PresentationDeckType = "disc" | "focus" | "combined";
 export type SlideVisualType =
   | "wheel" // the DISC wheel, full-bleed and chrome-free: the opening slide
   | "statement" // one large centred claim, then three supporting cards
+  | "journey" // an evenly weighted four-stage horizontal progression
+  | "relationships" // strength → consequence, as paired rows
+  | "modules" // a modular grid of short titled results
+  | "numbered" // ordered instructions as distinct numbered rows
+  | "trust" // two privacy zones and a standing footnote
   | "hero" // opening: oversized headline over an ambient field
   | "spectrum" // the four-point behavioural field / calm word reveal
   | "fourDimensions" // D/I/S/A as four regions
@@ -87,6 +92,11 @@ export interface PresentationSlide {
   points?: string[];
   /** How-to-answer lines (instructions). */
   instructions?: string[];
+  /**
+   * A standing line under the slide's content — the trust slide's scope
+   * statement. Not a caption for any one element.
+   */
+  footnote?: string;
 
   /* ── facilitator notes (facilitator device only) ── */
 

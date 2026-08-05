@@ -339,14 +339,14 @@ export function PresentationPlayer({
                     type="button"
                     onClick={start}
                     disabled={pending}
-                    className="inline-flex min-h-12 items-center justify-center rounded-full bg-botanical px-8 text-base font-medium text-mineral transition-colors hover:bg-botanical-deep disabled:opacity-60"
+                    className="inline-flex min-h-12 items-center justify-center rounded-full bg-botanical px-8 text-[length:var(--pres-caption,1rem)] font-medium text-mineral transition-colors hover:bg-botanical-deep disabled:opacity-60"
                   >
                     {pending ? "Starting…" : startLabel}
                   </button>
                   {dashboardHref ? (
                     <Link
                       href={dashboardHref}
-                      className="inline-flex min-h-12 items-center justify-center rounded-full border border-hairline-strong px-8 text-base font-medium text-ink transition-colors hover:border-botanical hover:text-botanical"
+                      className="inline-flex min-h-12 items-center justify-center rounded-full border border-hairline-strong px-8 text-[length:var(--pres-caption,1rem)] font-medium text-ink transition-colors hover:border-botanical hover:text-botanical"
                     >
                       {dashboardLabel ?? "Return to facilitator dashboard"}
                     </Link>

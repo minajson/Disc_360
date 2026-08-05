@@ -772,6 +772,319 @@ function StatementVisual({ slide, reduced }: SlideVisualProps) {
   );
 }
 
+/* ── keynote patterns ─────────────────────────────────────────────────── */
+
+/**
+ * A slide heading used by the patterns below.
+ *
+ * Every pattern opens the same way — eyebrow, then title — so a deck built
+ * from different layouts still reads as one keynote. Sizes come from the slide
+ * engine, never hard-coded, so a 4K wall scales with the canvas.
+ */
+function PatternHead({ slide, reduced }: { slide: PresentationSlide; reduced: boolean }) {
+  const t = slideTransition(reduced);
+  return (
+    <motion.div
+      variants={staggerContainer(reduced, 0.08)}
+      initial="hidden"
+      animate="visible"
+      className="flex flex-col items-center gap-[calc(var(--pres-gap)*0.4)] text-center"
+    >
+      {slide.eyebrow ? (
+        <motion.span
+          variants={t.variants}
+          transition={t.transition}
+          className="font-mono text-[length:var(--pres-eyebrow)] uppercase tracking-[0.28em] text-teal"
+        >
+          {slide.eyebrow}
+        </motion.span>
+      ) : null}
+      <motion.h2
+        variants={t.variants}
+        transition={t.transition}
+        className="max-w-[24ch] font-display text-[length:var(--pres-title)] font-semibold leading-[1.06] tracking-[-0.015em] text-balance text-ink"
+      >
+        {slide.title}
+      </motion.h2>
+      {slide.body ? (
+        <motion.p
+          variants={t.variants}
+          transition={t.transition}
+          className="max-w-[52ch] text-pretty text-[length:var(--pres-body)] leading-snug text-slate"
+        >
+          {slide.body}
+        </motion.p>
+      ) : null}
+    </motion.div>
+  );
+}
+
+/** The outer shell every pattern sits in: centred, inside the safe area. */
+function PatternFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-full flex-col items-center justify-center gap-[calc(var(--pres-gap)*1.2)] px-[var(--pres-pad)] py-[calc(var(--pres-pad)*0.6)]">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Four stages on one line, evenly weighted.
+ *
+ * The timeline this replaces drew a curved path with labels hung off it, and
+ * the first and last labels ran past the canvas — which in strict 16:9 means
+ * they are simply gone. Equal columns cannot clip at the ends, because there
+ * are no ends to overhang: the rule runs behind the row and every stage owns
+ * the same width.
+ */
+function JourneyVisual({ slide, reduced }: SlideVisualProps) {
+  const t = slideTransition(reduced);
+  const steps = slide.steps ?? [];
+  return (
+    <PatternFrame>
+      <PatternHead slide={slide} reduced={reduced} />
+      <motion.ol
+        variants={staggerContainer(reduced, 0.1)}
+        initial="hidden"
+        animate="visible"
+        style={{ ["--journey-cols" as string]: String(Math.max(1, steps.length)) }}
+        className="relative grid w-full max-w-[88cqw] grid-cols-2 gap-[var(--pres-gap)] sm:[grid-template-columns:repeat(var(--journey-cols),minmax(0,1fr))]"
+      >
+        {/* The connecting line, behind the row and inset so it never reaches
+            the canvas edge. */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-[12%] top-[calc(var(--pres-gap)*0.55)] hidden h-px bg-hairline-strong sm:block"
+        />
+        {steps.map((step, index) => (
+          <motion.li
+            key={step.label}
+            variants={t.variants}
+            transition={t.transition}
+            className="relative flex flex-col items-center gap-[calc(var(--pres-gap)*0.4)] text-center"
+          >
+            <span
+              className="flex size-[calc(var(--pres-gap)*1.1)] items-center justify-center rounded-full border border-hairline bg-paper font-mono text-[length:var(--pres-caption)] text-teal"
+              aria-hidden
+            >
+              {index + 1}
+            </span>
+            <span className="font-display text-[length:var(--pres-body)] font-semibold leading-tight text-ink">
+              {step.label}
+            </span>
+            {step.note ? (
+              <span className="max-w-[22ch] text-pretty text-[length:var(--pres-caption)] leading-snug text-slate">
+                {step.note}
+              </span>
+            ) : null}
+          </motion.li>
+        ))}
+      </motion.ol>
+    </PatternFrame>
+  );
+}
+
+/**
+ * Strength → consequence, as paired rows.
+ *
+ * The relationship is the point, so the arrow sits between two typed halves
+ * rather than the pair being a sentence. Each row takes one DISC accent as a
+ * hairline; four accents on four rows is an identifier set, not a rainbow.
+ */
+function RelationshipsVisual({ slide, reduced }: SlideVisualProps) {
+  const t = slideTransition(reduced);
+  const pairs = slide.strengthShadows ?? [];
+  const accents: DisplayDimension[] = ["D", "I", "S", "A"];
+  return (
+    <PatternFrame>
+      <PatternHead slide={slide} reduced={reduced} />
+      <motion.ul
+        variants={staggerContainer(reduced, 0.09)}
+        initial="hidden"
+        animate="visible"
+        className="flex w-full max-w-[86cqw] flex-col gap-[calc(var(--pres-gap)*0.6)]"
+      >
+        {pairs.map((pair, index) => (
+          <motion.li
+            key={pair.strength}
+            variants={t.variants}
+            transition={t.transition}
+            className="paper-card grid grid-cols-[1fr_auto_1.25fr] items-center gap-[var(--pres-gap)] px-[calc(var(--pres-pad)*0.45)] py-[calc(var(--pres-pad)*0.3)]"
+          >
+            <span className="flex items-center gap-[calc(var(--pres-gap)*0.4)]">
+              <span
+                aria-hidden
+                className="h-[1.6em] w-1 shrink-0 rounded-full"
+                style={{ background: DISC_COLOR[accents[index % 4]!] }}
+              />
+              <span className="font-display text-[length:var(--pres-body)] font-semibold leading-tight text-ink">
+                {pair.strength}
+              </span>
+            </span>
+            <span aria-hidden className="text-[length:var(--pres-body)] text-faint">
+              →
+            </span>
+            <span className="text-pretty text-[length:var(--pres-caption)] leading-snug text-slate">
+              {pair.shadow}
+            </span>
+          </motion.li>
+        ))}
+      </motion.ul>
+    </PatternFrame>
+  );
+}
+
+/** A modular grid of short titled results — the report, previewed. */
+function ModulesVisual({ slide, reduced }: SlideVisualProps) {
+  const t = slideTransition(reduced);
+  const modules = slide.steps ?? [];
+  return (
+    <PatternFrame>
+      <PatternHead slide={slide} reduced={reduced} />
+      <motion.ul
+        variants={staggerContainer(reduced, 0.07)}
+        initial="hidden"
+        animate="visible"
+        className="grid w-full max-w-[88cqw] gap-[calc(var(--pres-gap)*0.7)] sm:grid-cols-2 lg:grid-cols-3"
+      >
+        {modules.map((module) => (
+          <motion.li
+            key={module.label}
+            variants={t.variants}
+            transition={t.transition}
+            className="paper-card flex flex-col gap-[calc(var(--pres-gap)*0.3)] px-[calc(var(--pres-pad)*0.38)] py-[calc(var(--pres-pad)*0.34)]"
+          >
+            <span aria-hidden className="h-1 w-8 rounded-full bg-teal" />
+            <span className="text-balance font-display text-[length:var(--pres-body)] font-semibold leading-tight text-ink">
+              {module.label}
+            </span>
+            {module.note ? (
+              <span className="text-pretty text-[length:var(--pres-caption)] leading-snug text-slate">
+                {module.note}
+              </span>
+            ) : null}
+          </motion.li>
+        ))}
+      </motion.ul>
+    </PatternFrame>
+  );
+}
+
+/**
+ * Numbered instructions as distinct rows.
+ *
+ * MOST and LEAST are the only words on this slide a participant has to carry
+ * into the assessment, so they are set apart rather than left inside a
+ * sentence.
+ */
+function NumberedVisual({ slide, reduced }: SlideVisualProps) {
+  const t = slideTransition(reduced);
+  const lines = slide.instructions ?? [];
+  return (
+    <PatternFrame>
+      <PatternHead slide={slide} reduced={reduced} />
+      <motion.ol
+        variants={staggerContainer(reduced, 0.09)}
+        initial="hidden"
+        animate="visible"
+        className="flex w-full max-w-[74cqw] flex-col gap-[calc(var(--pres-gap)*0.55)]"
+      >
+        {lines.map((line, index) => (
+          <motion.li
+            key={line}
+            variants={t.variants}
+            transition={t.transition}
+            className="flex items-start gap-[var(--pres-gap)] rule-t pt-[calc(var(--pres-gap)*0.55)] first:border-t-0 first:pt-0"
+          >
+            <span
+              aria-hidden
+              className="font-mono text-[length:var(--pres-body)] leading-none text-sage"
+            >
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <span className="text-pretty text-[length:var(--pres-body)] leading-snug text-ink">
+              {line.split(/\b(MOST|LEAST)\b/).map((part, partIndex) =>
+                part === "MOST" || part === "LEAST" ? (
+                  <strong
+                    key={partIndex}
+                    className="font-mono font-semibold tracking-[0.06em] text-botanical"
+                  >
+                    {part}
+                  </strong>
+                ) : (
+                  <span key={partIndex}>{part}</span>
+                ),
+              )}
+            </span>
+          </motion.li>
+        ))}
+      </motion.ol>
+    </PatternFrame>
+  );
+}
+
+/**
+ * Two privacy zones and the standing scope line.
+ *
+ * The zones are visually separate because the promises are different: what a
+ * participant gets, and what a team sees. The footnote states what the
+ * instrument is not — it is a scope statement, not a legal claim.
+ */
+function TrustVisual({ slide, reduced }: SlideVisualProps) {
+  const t = slideTransition(reduced);
+  const zones = slide.columns ?? [];
+  return (
+    <PatternFrame>
+      <PatternHead slide={slide} reduced={reduced} />
+      <motion.div
+        variants={staggerContainer(reduced, 0.1)}
+        initial="hidden"
+        animate="visible"
+        className="grid w-full max-w-[84cqw] gap-[var(--pres-gap)] sm:grid-cols-2"
+      >
+        {zones.map((zone) => {
+          const accent = ACCENT[zone.accent ?? "teal"] ?? "var(--color-teal)";
+          return (
+            <motion.div
+              key={zone.heading}
+              variants={t.variants}
+              transition={t.transition}
+              className="paper-card flex flex-col gap-[calc(var(--pres-gap)*0.45)] px-[calc(var(--pres-pad)*0.42)] py-[calc(var(--pres-pad)*0.38)]"
+            >
+              <span
+                className="font-mono text-[length:var(--pres-caption)] uppercase tracking-[0.2em]"
+                style={{ color: accent }}
+              >
+                {zone.heading}
+              </span>
+              <ul className="flex flex-col gap-[calc(var(--pres-gap)*0.35)]">
+                {zone.points.map((point) => (
+                  <li
+                    key={point}
+                    className="flex items-start gap-[calc(var(--pres-gap)*0.4)] text-pretty text-[length:var(--pres-caption)] leading-snug text-ink"
+                  >
+                    <span
+                      aria-hidden
+                      className="mt-[0.55em] size-[0.4em] shrink-0 rounded-full"
+                      style={{ background: accent }}
+                    />
+                    {point}
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          );
+        })}
+      </motion.div>
+      {slide.footnote ? (
+        <p className="max-w-[70ch] text-center text-[length:var(--pres-caption)] leading-snug text-faint">
+          {slide.footnote}
+        </p>
+      ) : null}
+    </PatternFrame>
+  );
+}
+
 /* ── dispatch ─────────────────────────────────────────────────────────── */
 
 export function SlideVisual(props: SlideVisualProps) {
@@ -785,6 +1098,16 @@ export function SlideVisual(props: SlideVisualProps) {
       return <OvertureSlide alt={OVERTURE_ALT} priority={false} />;
     case "statement":
       return <StatementVisual {...props} />;
+    case "journey":
+      return <JourneyVisual {...props} />;
+    case "relationships":
+      return <RelationshipsVisual {...props} />;
+    case "modules":
+      return <ModulesVisual {...props} />;
+    case "numbered":
+      return <NumberedVisual {...props} />;
+    case "trust":
+      return <TrustVisual {...props} />;
     case "hero":
       return <HeroVisual {...props} />;
     case "spectrum":
