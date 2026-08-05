@@ -121,23 +121,33 @@ test("a badge shows the display letter and its own DISC colour", async ({ page }
 
 /* ── 6 · no implementation values on a projected screen ─────────────── */
 
-test("the divergence panel shows dimensions and bars, nothing technical", async ({ page }) => {
+test("behavioural variation reads as a boardroom panel, not a chart to decode", async ({
+  page,
+}) => {
   await signIn(page, FACILITATOR);
   await page.goto(`/app/teams/${TEAM_10}/compare`);
 
-  const panel = page.getByRole("region", { name: "Overall observations" });
+  const panel = page.getByRole("region", { name: "Behavioural variation" });
   await expect(panel).toBeVisible();
 
-  const text = (await panel.innerText()).trim();
-  // No escaped unicode, no point strings, no numeric ranges.
-  expect(text).not.toMatch(/\\u[0-9a-f]{4}/i);
-  expect(text).not.toMatch(/\bpts\b/);
-  expect(text).not.toMatch(/\d+\s*[–-]\s*\d+/);
-
-  // The four dimensions, and the bars, remain.
+  // A row per style, each with its band, its span and a bar.
   for (const label of ["Dominant", "Influence", "Stable", "Analytical"]) {
     await expect(panel.getByText(label, { exact: true })).toBeVisible();
   }
+  // The band pattern, not the panel heading, which also ends in "variation".
+  const bandText = /^(Low|Moderate|High|Very high) variation$/;
+  await expect(panel.getByText(bandText)).toHaveCount(4);
+  await expect(panel.getByText(/^\d+ point spread$/)).toHaveCount(4);
+  await expect(panel.getByText(/^Lowest \d+ · Highest \d+$/)).toHaveCount(4);
+
+  // One facilitator takeaway, and nothing that reads as an implementation value.
+  const text = await panel.innerText();
+  expect(text).not.toMatch(/\\u[0-9a-f]{4}/i);
+  expect(text).not.toMatch(/\bpts\b/);
+
+  // Each bar is described for a screen reader rather than left as decoration.
+  const bars = panel.getByRole("img", { name: /lowest \d+, highest \d+, spread \d+ points/ });
+  await expect(bars).toHaveCount(4);
 });
 
 /* ── 7–8 · boardroom typography ─────────────────────────────────────── */

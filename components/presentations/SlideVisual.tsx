@@ -687,6 +687,91 @@ function RecoveryCurveSlide({ slide, reduced, children }: SlideVisualProps) {
   );
 }
 
+/* ── statement ────────────────────────────────────────────────────────── */
+
+/**
+ * One claim, then the three things a room can do something about.
+ *
+ * This replaced a black poster slide: a high-contrast panel with a sentence
+ * and a paragraph on it, which read as a web callout rather than a keynote
+ * beat. The claim now owns the upper half at display size on the deck's own
+ * ivory, and the three cards underneath arrive after it — so the room hears
+ * the statement, then sees where it lands, instead of reading both at once.
+ *
+ * Each card takes a DISC tint as a hairline accent only: identity colour used
+ * as an identifier, never as chrome.
+ */
+function StatementVisual({ slide, reduced }: SlideVisualProps) {
+  const t = slideTransition(reduced);
+  const cards = slide.columns ?? [];
+
+  return (
+    <div className="flex min-h-full flex-col items-center justify-center gap-[calc(var(--pres-gap)*1.6)] px-[var(--pres-pad)] py-[calc(var(--pres-pad)*0.8)] text-center">
+      <motion.div
+        variants={staggerContainer(reduced, 0.14)}
+        initial="hidden"
+        animate="visible"
+        className="flex flex-col items-center gap-[var(--pres-gap)]"
+      >
+        {slide.eyebrow ? (
+          <motion.span
+            variants={t.variants}
+            transition={t.transition}
+            className="font-mono text-[length:var(--pres-eyebrow)] uppercase tracking-[0.28em] text-teal"
+          >
+            {slide.eyebrow}
+          </motion.span>
+        ) : null}
+        <motion.h2
+          variants={t.variants}
+          transition={t.transition}
+          className="max-w-[26ch] font-display text-[length:var(--pres-title)] font-semibold leading-[1.06] tracking-[-0.015em] text-balance text-ink"
+        >
+          {slide.title}
+        </motion.h2>
+      </motion.div>
+
+      {cards.length > 0 ? (
+        <motion.div
+          variants={staggerContainer(reduced, 0.1)}
+          initial="hidden"
+          animate="visible"
+          className="grid w-full max-w-[86cqw] gap-[var(--pres-gap)] sm:grid-cols-3"
+        >
+          {cards.map((card) => {
+            const accent = ACCENT[card.accent ?? "teal"] ?? "var(--color-teal)";
+            return (
+              <motion.div
+                key={card.heading}
+                variants={t.variants}
+                transition={{ ...t.transition, delay: reduced ? 0 : 0.22 }}
+                className="paper-card flex flex-col items-center gap-[calc(var(--pres-gap)*0.5)] px-[calc(var(--pres-pad)*0.42)] py-[calc(var(--pres-pad)*0.5)]"
+              >
+                <span
+                  aria-hidden
+                  className="h-1 w-10 rounded-full"
+                  style={{ background: accent }}
+                />
+                <span className="text-balance font-display text-[length:var(--pres-body)] font-semibold leading-tight text-ink">
+                  {card.heading}
+                </span>
+                {card.points.map((point) => (
+                  <span
+                    key={point}
+                    className="text-pretty text-[length:var(--pres-caption)] leading-snug text-slate"
+                  >
+                    {point}
+                  </span>
+                ))}
+              </motion.div>
+            );
+          })}
+        </motion.div>
+      ) : null}
+    </div>
+  );
+}
+
 /* ── dispatch ─────────────────────────────────────────────────────────── */
 
 export function SlideVisual(props: SlideVisualProps) {
@@ -698,6 +783,8 @@ export function SlideVisual(props: SlideVisualProps) {
     // rather than a blank canvas.
     case "wheel":
       return <OvertureSlide alt={OVERTURE_ALT} priority={false} />;
+    case "statement":
+      return <StatementVisual {...props} />;
     case "hero":
       return <HeroVisual {...props} />;
     case "spectrum":

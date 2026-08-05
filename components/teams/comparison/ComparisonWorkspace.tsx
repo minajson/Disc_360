@@ -8,6 +8,7 @@ import { Eyebrow } from "@/components/ui/Eyebrow";
 import { DiscRadarOverlay } from "@/components/charts/DiscRadarOverlay";
 import { ComparisonCard } from "@/components/teams/comparison/ComparisonCard";
 import { ComparisonTray } from "@/components/teams/comparison/ComparisonTray";
+import { BehaviouralVariation } from "@/components/teams/comparison/BehaviouralVariation";
 import { dimensionMeta } from "@/data/dimension-meta";
 import { DIMENSION_KEY, DIMENSIONS } from "@/lib/types";
 import {
@@ -541,44 +542,13 @@ export function ComparisonWorkspace({
                 </div>
 
                 {/*
-                 * Overall observations, after the members.
+                 * Behavioural variation, after the members.
                  *
-                 * Divergence is the one reading that only makes sense once the
-                 * individual cards have been seen — it says how far apart the
-                 * people above actually are. The set's summary stays at the
-                 * top; this closes the report rather than repeating it.
+                 * Spread only makes sense once the individual cards have been
+                 * seen — it says how far apart the people above actually are.
+                 * The set's summary stays at the top; this closes the report.
                  */}
-                <section
-                  aria-label="Overall observations"
-                  className="paper-card flex flex-col gap-4 p-(--cmp-pad)"
-                >
-                  <h3 className="cmp-eyebrow font-mono uppercase tracking-[0.2em] text-teal">
-                    Where this set diverges
-                  </h3>
-                  <ul className="grid gap-4 sm:grid-cols-2">
-                    {divergences.map((entry) => (
-                      <li key={entry.dimension} className="flex flex-col gap-2">
-                        {/* The dimension and its bar, and nothing else. The
-                            numeric span that used to sit here read as an
-                            implementation value on a projected screen — the bar
-                            already says how far apart the set is. */}
-                        <span className="cmp-label font-medium text-ink">
-                          {dimensionMeta[entry.dimension].label}
-                        </span>
-                        <div className="h-2 overflow-hidden rounded-full bg-ink/8">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              marginLeft: `${entry.low}%`,
-                              width: `${Math.max(1.5, entry.range)}%`,
-                              background: `var(--color-disc-${entry.dimension.toLowerCase()})`,
-                            }}
-                          />
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
+                <BehaviouralVariation divergences={divergences} />
               </motion.section>
             </AnimatePresence>
           ) : null}

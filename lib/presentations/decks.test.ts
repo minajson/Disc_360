@@ -23,6 +23,7 @@ const WHEEL_DECKS = [discIntroductionDeck, combinedIntroductionDeck];
 
 const VALID_VISUALS = new Set([
   "wheel",
+  "statement",
   "hero",
   "spectrum",
   "fourDimensions",
@@ -185,6 +186,12 @@ test("instructions and comparison slides carry the structured data they render",
       }
       if (slide.visualType === "ripple") {
         assert.ok((slide.words?.length ?? 0) >= 3, `${slide.id} has interruption markers`);
+      }
+      if (slide.visualType === "statement") {
+        // A statement slide is a claim plus its supporting cards; without the
+        // cards it is just a sentence on an empty screen.
+        assert.ok((slide.columns?.length ?? 0) >= 2, `${slide.id} has supporting cards`);
+        assert.equal(slide.body, undefined, `${slide.id} carries no paragraph`);
       }
       if (slide.visualType === "comparison") {
         const hasData =

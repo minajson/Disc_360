@@ -248,7 +248,7 @@ export function PresentationPlayer({
           onClick={goNext}
           className="absolute inset-0 z-30 cursor-default bg-paper"
         >
-          <OvertureSlide alt={OVERTURE_ALT} />
+          <OvertureSlide alt={OVERTURE_ALT} hero />
           <span className="sr-only">Continue to the presentation</span>
         </button>
       ) : null}

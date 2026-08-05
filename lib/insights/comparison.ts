@@ -127,6 +127,57 @@ export function comparisonLayout(count: number): ComparisonLayout {
   return { mode: "rail", columns: 5, scrolls: true };
 }
 
+/* ── behavioural variation ──────────────────────────────────────────── */
+
+/**
+ * How far apart a set is on one dimension, said in words.
+ *
+ * This classifies a spread that `dimensionDivergence` already computed — it
+ * adds a reading, never a number. A boardroom needs "how different are we"
+ * answered before it can use the figure, and a band answers it in one glance
+ * where a range of points does not.
+ */
+export type VariationBand = "low" | "moderate" | "high" | "very-high";
+
+/** Points of spread at which each band begins. */
+export const VARIATION_THRESHOLDS = { moderate: 20, high: 40, veryHigh: 60 } as const;
+
+export const VARIATION_LABEL: Record<VariationBand, string> = {
+  low: "Low",
+  moderate: "Moderate",
+  high: "High",
+  "very-high": "Very high",
+};
+
+export function variationBand(range: number): VariationBand {
+  if (range >= VARIATION_THRESHOLDS.veryHigh) return "very-high";
+  if (range >= VARIATION_THRESHOLDS.high) return "high";
+  if (range >= VARIATION_THRESHOLDS.moderate) return "moderate";
+  return "low";
+}
+
+/**
+ * One line a facilitator can say out loud about the set's variation.
+ *
+ * Phrased as a working consequence, never as a judgement: a wide spread is a
+ * difference in preference to plan around, not a problem with anybody.
+ */
+export function variationTakeaway(divergences: readonly DimensionDivergence[]): string {
+  if (divergences.length === 0) return "";
+  const widest = divergences[0]!;
+  const tightest = divergences[divergences.length - 1]!;
+  const band = variationBand(widest.range);
+
+  if (band === "low") {
+    return `This set reads alike on every style — the widest gap is only ${widest.range} points. Expect easy agreement, and check that a shared blind spot is not being mistaken for consensus.`;
+  }
+  const shared =
+    tightest.range < VARIATION_THRESHOLDS.moderate
+      ? ` ${dimensionMeta[tightest.dimension].label} is the shared baseline, so start there when you need common ground.`
+      : "";
+  return `${dimensionMeta[widest.dimension].label} is where this set differs most — ${widest.range} points between its lowest and highest. Expect that gap to show up as pace and expectation rather than intent.${shared}`;
+}
+
 /* ── set building ───────────────────────────────────────────────────── */
 
 export function chunk<T>(items: T[], size: number): T[][] {

@@ -18,6 +18,10 @@ import {
   styleCounts,
   toggleSelection,
   type ComparisonMember,
+  VARIATION_LABEL,
+  VARIATION_THRESHOLDS,
+  variationBand,
+  variationTakeaway
 } from "./comparison.ts";
 import type { Dimension, DiscScores } from "../types/index.ts";
 
@@ -316,4 +320,50 @@ test("every member appears on exactly one slide", () => {
     }
     assert.equal(seen.size, total, `total ${total}`);
   }
+});
+
+/* ── behavioural variation ──────────────────────────────────────────── */
+
+test("variation bands begin exactly at their thresholds", () => {
+  assert.equal(variationBand(0), "low");
+  assert.equal(variationBand(VARIATION_THRESHOLDS.moderate - 1), "low");
+  assert.equal(variationBand(VARIATION_THRESHOLDS.moderate), "moderate");
+  assert.equal(variationBand(VARIATION_THRESHOLDS.high - 1), "moderate");
+  assert.equal(variationBand(VARIATION_THRESHOLDS.high), "high");
+  assert.equal(variationBand(VARIATION_THRESHOLDS.veryHigh - 1), "high");
+  assert.equal(variationBand(VARIATION_THRESHOLDS.veryHigh), "very-high");
+  assert.equal(variationBand(100), "very-high");
+});
+
+test("every band has a label a slide can print", () => {
+  for (const range of [0, 25, 45, 80]) {
+    assert.ok(VARIATION_LABEL[variationBand(range)].length > 0);
+  }
+});
+
+test("the takeaway names the widest dimension and its gap", () => {
+  const divergences = dimensionDivergence([
+    member("a", "Ada", { d: 80, i: 30, s: 40, c: 55 }, "D"),
+    member("b", "Bo", { d: 20, i: 70, s: 45, c: 60 }, "I"),
+    member("c", "Cy", { d: 45, i: 50, s: 42, c: 58 }, "C"),
+  ]);
+  const line = variationTakeaway(divergences);
+  const widest = divergences[0]!;
+  assert.ok(line.includes(String(widest.range)), line);
+  assert.ok(line.length > 0);
+  // A reading, never a judgement about people.
+  assert.doesNotMatch(line, /\b(problem|weak|poor|bad|difficult)\b/i);
+});
+
+test("a set that reads alike says so rather than naming a widest gap", () => {
+  const alike = variationTakeaway([
+    { dimension: "D", low: 50, high: 58, range: 8, lowestLabel: "A", highestLabel: "B" },
+    { dimension: "I", low: 50, high: 55, range: 5, lowestLabel: "A", highestLabel: "B" },
+  ]);
+  assert.match(alike, /reads alike/);
+  assert.match(alike, /blind spot/);
+});
+
+test("an empty set produces no takeaway rather than a broken sentence", () => {
+  assert.equal(variationTakeaway([]), "");
 });

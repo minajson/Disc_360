@@ -140,10 +140,28 @@ const slides: PresentationSlide[] = [
     deckType: "combined",
     order: 8,
     section: "Team patterns",
-    eyebrow: "Not only individual",
+    eyebrow: "Team patterns",
     title: "Focus is not only an individual issue.",
-    body: "Meeting design, communication norms, notification habits and unclear priorities can shape the attention environment of an entire team.",
-    visualType: "quote",
+    visualType: "statement",
+    // Three forces a team can actually change, one line each. The claim above
+    // is the slide; these are what a room can do something about.
+    columns: [
+      {
+        heading: "Meetings",
+        points: ["The calendar decides how much focused time exists at all."],
+        accent: "D",
+      },
+      {
+        heading: "Communication",
+        points: ["Reply-now expectations set the whole team's baseline."],
+        accent: "I",
+      },
+      {
+        heading: "Environment",
+        points: ["Notification norms pull attention before anyone chooses to give it."],
+        accent: "A",
+      },
+    ],
     facilitatorPrompt: "Widen the lens from the person to the system. This is where teams can act.",
     audienceQuestion: "What team habit most shapes your attention environment?",
     estimatedSeconds: 60,
