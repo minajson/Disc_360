@@ -63,29 +63,50 @@ export function OvertureSlide({
       transition={{ duration: reduced ? 0 : OVERTURE_FADE_SECONDS, ease }}
     >
       {/*
-       * No radial wash and no drop shadow behind the wheel, deliberately.
+       * The square is owned rather than hidden.
        *
-       * Both were tried. The asset is an opaque square with a near-white
-       * background (#FCFCFD), so anything drawn behind it — a tint, a shadow —
-       * stops at the square and turns the wheel into a visible pasted box,
-       * which is the exact impression the hero treatment exists to remove. On
-       * pure white the square edge is imperceptible, so the depth here comes
-       * from scale and restraint instead: the wheel is given the middle 65% of
-       * the slide and nothing competes with it.
+       * Depth behind a bare opaque image reveals its rectangular background and
+       * reads as a pasted box — that is why an earlier attempt at a wash and a
+       * drop shadow was removed. So the wheel now sits in a card: the card's
+       * rounded edge and soft shadow ARE the square, deliberately, and the
+       * asset's near-white ground (#FCFCFD) blends into the card's paper. That
+       * gives the floating depth a keynote wants while staying honest about the
+       * artwork we have.
        *
-       * Depth and a per-quadrant reveal both need an asset with transparency
-       * (or four layers). See MEDIA-DECK-WHEEL-01.
+       * It also fixes the real ultrawide problem. At 65% of height the wheel is
+       * correctly sized, but on a 3440 panel it covers only ~27% of the width,
+       * so the eye read a small object in a wide void. A card turns that void
+       * into margin around a deliberate object.
        */}
+      {hero ? (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(60% 55% at 50% 46%, rgba(191,210,200,0.16), rgba(255,255,255,0) 72%)",
+          }}
+        />
+      ) : null}
+
       <motion.div
         className={cn(
           "relative flex items-center justify-center",
-          // ~65% of the slide's short edge, so the wheel is the centrepiece
-          // with room to breathe rather than a full-bleed image.
-          hero ? "h-[65%] w-[65%] max-h-[65cqh] max-w-[65cqw]" : "h-full w-full",
+          hero
+            ? "aspect-square h-[65%] max-w-[86%] rounded-[2.5rem] p-[2.5%] shadow-[0_48px_120px_-44px_rgba(23,32,29,0.30),0_4px_14px_-6px_rgba(23,32,29,0.08)]"
+            : "h-full w-full",
         )}
-        initial={reduced || !hero ? false : { opacity: 0, scale: 0.965 }}
+        initial={reduced || !hero ? false : { opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: reduced ? 0 : 0.9, ease, delay: reduced ? 0 : 0.12 }}
+        transition={{ duration: reduced ? 0 : 0.9, ease, delay: reduced ? 0 : 0.1 }}
+        /*
+         * The card's ground is the artwork's own ground, not paper white. Three
+         * levels of grey apart is invisible on its own but visible as an inner
+         * rectangle once the image sits inside a white card — matching it makes
+         * the padding and the artwork one surface. Not a new palette colour:
+         * the value belongs to the asset.
+         */
+        style={hero ? { background: "#fcfcfd" } : undefined}
       >
         <Image
           src={OVERTURE_IMAGE}
