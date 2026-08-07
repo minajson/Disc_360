@@ -88,12 +88,6 @@ export function SessionCard({
           </LinkButton>
         ) : null}
 
-        {view.cta === "waiting" ? (
-          <span className="inline-flex min-h-11 items-center rounded-full bg-sand/70 px-5 font-mono text-xs uppercase tracking-[0.14em] text-ink">
-            Waiting for facilitator
-          </span>
-        ) : null}
-
         {review ? (
           <Link
             href={`/app/teams/${team.id}/live?mode=review`}

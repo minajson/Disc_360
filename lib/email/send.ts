@@ -18,6 +18,13 @@ export type EmailCategory =
   | "report_notifications"
   | "product_updates";
 
+export interface EmailAttachment {
+  filename: string;
+  /** Base64-encoded payload. */
+  content: string;
+  contentType?: string;
+}
+
 interface SendEmailInput {
   to: string;
   /** Profile of the recipient when known — enables preference gating + log linkage. */
@@ -26,6 +33,24 @@ interface SendEmailInput {
   subject: string;
   category: EmailCategory;
   react: ReactElement;
+  attachments?: EmailAttachment[];
+}
+
+/**
+ * What actually happened, so a caller can tell the truth to the person waiting.
+ *
+ * `logged` is the important one: without a provider key (or for a real address
+ * outside production) the message is recorded and never dispatched. Reporting
+ * that as success would put "Your report has been sent." in front of someone
+ * whose report is not coming.
+ */
+export type EmailSendStatus = "sent" | "logged" | "skipped" | "failed";
+
+export interface EmailSendResult {
+  status: EmailSendStatus;
+  /** Provider message id when one exists. */
+  providerId?: string | null;
+  error?: string;
 }
 
 const DEV_SAFE_DOMAINS = ["disc360.dev", "atlasdemo.dev", "example.com"];
@@ -35,7 +60,7 @@ function isDevSafeRecipient(email: string): boolean {
   return DEV_SAFE_DOMAINS.includes(domain);
 }
 
-export async function sendEmail(input: SendEmailInput): Promise<void> {
+export async function sendEmail(input: SendEmailInput): Promise<EmailSendResult> {
   const admin = createSupabaseAdminClient();
 
   // Preference gate (service role: read-only preference check for the recipient).
@@ -54,7 +79,7 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
         status: "skipped",
         error: "recipient preference",
       });
-      return;
+      return { status: "skipped", error: "recipient preference" };
     }
   }
 
@@ -63,15 +88,16 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
 
   // Dev safety: no key → log only; key in non-production → dev domains only.
   if (!apiKey || (!production && !isDevSafeRecipient(input.to))) {
+    const reason = apiKey ? "non-production recipient guard" : "no email provider configured";
     await admin.from("notification_logs").insert({
       profile_id: input.profileId ?? null,
       email: input.to,
       template: input.template,
       subject: input.subject,
       status: "logged",
-      error: apiKey ? "non-production recipient guard" : null,
+      error: apiKey ? reason : null,
     });
-    return;
+    return { status: "logged", error: reason };
   }
 
   try {
@@ -88,6 +114,15 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
       subject: input.subject,
       react: input.react,
       ...(replyTo ? { replyTo } : {}),
+      ...(input.attachments?.length
+        ? {
+            attachments: input.attachments.map((attachment) => ({
+              filename: attachment.filename,
+              content: attachment.content,
+              ...(attachment.contentType ? { contentType: attachment.contentType } : {}),
+            })),
+          }
+        : {}),
     });
     await admin.from("notification_logs").insert({
       profile_id: input.profileId ?? null,
@@ -98,14 +133,19 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
       provider_id: data?.id ?? null,
       error: error?.message ?? null,
     });
+    return error
+      ? { status: "failed", error: error.message }
+      : { status: "sent", providerId: data?.id ?? null };
   } catch (caught) {
+    const message = caught instanceof Error ? caught.message : "unknown send failure";
     await admin.from("notification_logs").insert({
       profile_id: input.profileId ?? null,
       email: input.to,
       template: input.template,
       subject: input.subject,
       status: "failed",
-      error: caught instanceof Error ? caught.message : "unknown send failure",
+      error: message,
     });
+    return { status: "failed", error: message };
   }
 }

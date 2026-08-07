@@ -72,32 +72,25 @@ export interface ParticipantSessionView {
   /** Card headline status line. */
   status: string;
   /** Which primary call-to-action the card shows. */
-  cta: "begin_assessment" | "continue_assessment" | "view_result" | "waiting";
+  cta: "begin_assessment" | "continue_assessment" | "view_result";
   /** The deck is live right now — offer the join link alongside the CTA. */
   joinLive: boolean;
 }
 
 /**
  * What a participant's single session card shows. The assessment is ALWAYS
- * startable or resumable — the card is driven by the participant's own
- * progress. The facilitator's session_state only adds the live-deck link
- * while presenting and flips submitted attempts to results once released;
- * it never blocks entry.
+ * startable or resumable, and a finished one ALWAYS opens its own result —
+ * the card is driven entirely by the participant's own progress. The
+ * facilitator's session_state only adds the live-deck link while presenting;
+ * it never blocks entry and never withholds a personal report.
  */
 export function participantView(
   state: SessionState,
   progress: { hasOpenSession: boolean; hasResult: boolean },
 ): ParticipantSessionView {
   const joinLive = state === "presentation";
-  const released = state === "results" || state === "ended";
   if (progress.hasResult) {
-    return released
-      ? { status: "Your result is ready", cta: "view_result", joinLive }
-      : {
-          status: "Assessment submitted · waiting for your facilitator to release results",
-          cta: "waiting",
-          joinLive,
-        };
+    return { status: "Your result is ready", cta: "view_result", joinLive };
   }
   if (progress.hasOpenSession) {
     return { status: "Assessment in progress", cta: "continue_assessment", joinLive };

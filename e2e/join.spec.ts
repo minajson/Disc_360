@@ -61,9 +61,11 @@ test("A: QR join — register, assess, appear once on the dashboard", async ({ p
     await options.nth(1).click();
   }
   await page.getByRole("button", { name: "Submit assessment" }).click();
-  // Facilitated participants wait for release — submission lands on the card.
-  await page.waitForURL(/\/app(\?|$)/, { timeout: 30_000 });
-  await expect(page.getByText("Assessment submitted")).toBeVisible({ timeout: 15_000 });
+  // A QR-joined participant owns their result immediately — no facilitator step.
+  await page.waitForURL("**/app/complete/disc/**", { timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: /Your assessment is complete/ })).toBeVisible({
+    timeout: 15_000,
+  });
 
   // Dashboard reflects the new participant exactly once, completed with a type.
   await signOut(page);

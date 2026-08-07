@@ -42,18 +42,27 @@ test("the assessment is startable in EVERY session state — no facilitator gate
   }
 });
 
-test("participant card reflects progress; results wait on the facilitator's release", () => {
+test("a completed result opens in EVERY session state — no facilitator release gate", () => {
   const none = { hasOpenSession: false, hasResult: false };
   // The live deck is offered alongside the assessment while presenting.
   assert.equal(participantView("presentation", none).joinLive, true);
   assert.equal(participantView("assessment_open", none).joinLive, false);
-  // Submitted → waiting until the facilitator releases; then the result opens.
+
+  // A finished assessment belongs to the person who took it. session_state
+  // sequences the room; it never withholds someone's own report.
   const done = { hasOpenSession: false, hasResult: true };
-  assert.match(participantView("assessment_open", done).status, /Assessment submitted/);
-  assert.equal(participantView("assessment_open", done).cta, "waiting");
-  assert.equal(participantView("assessment_closed", done).cta, "waiting");
-  assert.equal(participantView("results", done).cta, "view_result");
-  assert.equal(participantView("ended", done).cta, "view_result");
+  const states = [
+    "draft",
+    "presentation",
+    "assessment_open",
+    "assessment_closed",
+    "results",
+    "ended",
+  ] as const;
+  for (const state of states) {
+    assert.equal(participantView(state, done).cta, "view_result", `own result in ${state}`);
+    assert.equal(participantView(state, done).status, "Your result is ready", `status in ${state}`);
+  }
 });
 
 test("review access respects the coach's presentation setting", () => {

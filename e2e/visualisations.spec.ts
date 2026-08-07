@@ -74,6 +74,8 @@ test("compass, lens and fusion render across the full viewport matrix", async ({
   await page.goto("/focus/assessment");
   await page.waitForURL("**/focus/assessment/**", { timeout: 20_000 });
   await completeFocus(page);
+  await page.waitForURL("**/app/complete/focus/**", { timeout: 20_000 });
+  await page.getByRole("link", { name: "View my results" }).click();
   await page.waitForURL("**/focus/results/**", { timeout: 20_000 });
   const focusUrl = new URL(page.url()).pathname;
 
@@ -94,6 +96,8 @@ test("compass, lens and fusion render across the full viewport matrix", async ({
   await page.getByRole("button", { name: "Submit assessment" }).click();
   await page.waitForURL("**/focus/assessment/**", { timeout: 30_000 });
   await completeFocus(page);
+  await page.waitForURL("**/app/complete/combined/**", { timeout: 30_000 });
+  await page.getByRole("link", { name: "View my results" }).click();
   await page.waitForURL("**/combined/results/**", { timeout: 30_000 });
   const combinedUrl = new URL(page.url()).pathname;
 

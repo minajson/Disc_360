@@ -46,7 +46,6 @@ interface TeamMembershipRow {
 const NOTICES: Record<string, string> = {
   wrong_assessment: "This assessment is not part of your current session.",
   wrong_team: "This invitation belongs to another team.",
-  result_not_released: "Your facilitator has not released results yet.",
   attempt_failed: "We could not create your assessment attempt. Please try again.",
 };
 

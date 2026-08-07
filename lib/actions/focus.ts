@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOnboarded } from "@/lib/auth/guards";
-import { facilitatedProductState, requireProductAllowed } from "@/lib/teams/session-guard";
+import { requireProductAllowed } from "@/lib/teams/session-guard";
 import { computeFocusResult, type FocusAnswerInput } from "@/lib/scoring/focus";
 import { buildResultSnapshot } from "@/lib/history/snapshot";
 
@@ -169,7 +169,7 @@ export async function submitFocusAssessment(sessionId: string): Promise<SubmitFo
       .select("id")
       .eq("session_id", sessionId)
       .maybeSingle();
-    if (existing) redirect(`/focus/results/${existing.id}?new=1`);
+    if (existing) redirect(`/app/complete/focus/${existing.id}`);
     return { ok: false, error: "Session already closed" };
   }
 
@@ -248,7 +248,6 @@ export async function submitFocusAssessment(sessionId: string): Promise<SubmitFo
     .maybeSingle();
   if (combined) redirect("/combined/assessment");
 
-  // Facilitator-led participants wait until results are released.
-  if ((await facilitatedProductState(supabase, user.id, "focus")) === "held") redirect("/app");
-  redirect(`/focus/results/${resultRow.id}?new=1`);
+  // Their own result, immediately — never gated on facilitator session state.
+  redirect(`/app/complete/focus/${resultRow.id}`);
 }

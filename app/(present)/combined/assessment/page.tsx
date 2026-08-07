@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { requireOnboarded } from "@/lib/auth/guards";
-import { facilitatedProductState } from "@/lib/teams/session-guard";
 
 /**
  * Combined controller. Each visit advances the flow: DISC first, then Focus,
@@ -110,10 +109,7 @@ export default async function CombinedAssessmentController() {
     redirect(`/focus/assessment/${focusId}`);
   }
 
-  // ── Both done: finalize. Facilitated participants wait on the session
-  // card until the facilitator releases; everyone else sees the result. ──
+  // ── Both done: finalize and hand the participant their own result. ──
   await supabase.from("combined_sessions").update({ status: "completed" }).eq("id", combined.id);
-  const release = await facilitatedProductState(supabase, user.id, "combined");
-  if (release === "held") redirect("/app");
-  redirect(`/combined/results/${combined.id}`);
+  redirect(`/app/complete/combined/${combined.id}`);
 }

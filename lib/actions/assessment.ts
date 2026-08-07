@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOnboarded } from "@/lib/auth/guards";
-import { facilitatedProductState, requireProductAllowed } from "@/lib/teams/session-guard";
+import { requireProductAllowed } from "@/lib/teams/session-guard";
 import { computeResult } from "@/lib/scoring/compute-result";
 import { buildResultSnapshot } from "@/lib/history/snapshot";
 import { insightMap } from "@/data/insight-maps";
@@ -196,7 +196,7 @@ export async function submitAssessment(sessionId: string): Promise<SubmitResult>
       .select("id")
       .eq("session_id", sessionId)
       .maybeSingle();
-    if (existing) redirect(`/app/results/${existing.id}?new=1`);
+    if (existing) redirect(`/app/complete/disc/${existing.id}`);
     return { ok: false, error: "Session already closed" };
   }
 
@@ -369,7 +369,7 @@ export async function submitAssessment(sessionId: string): Promise<SubmitResult>
     }
   }
 
-  // Facilitator-led participants wait until results are released.
-  if ((await facilitatedProductState(supabase, user.id, "disc")) === "held") redirect("/app");
-  redirect(`/app/results/${resultRow.id}?new=1`);
+  // Their own result, immediately — the facilitator sequences the room, not
+  // a participant's access to a report about themselves.
+  redirect(`/app/complete/disc/${resultRow.id}`);
 }

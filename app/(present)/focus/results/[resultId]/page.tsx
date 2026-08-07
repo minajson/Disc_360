@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOnboarded } from "@/lib/auth/guards";
-import { requireResultReleased } from "@/lib/teams/session-guard";
+import { maskEmail } from "@/lib/reports/identity";
+import { ReportActionBar } from "@/components/report/ReportActionBar";
 import { FocusResultView, type FocusResultData } from "@/components/focus/FocusResultView";
 import type {
   EnergyKey,
@@ -20,9 +21,7 @@ interface PageProps {
 
 export default async function FocusResultPage({ params }: PageProps) {
   const { resultId } = await params;
-  const { supabase, user } = await requireOnboarded();
-  // Facilitator-led release gate: held results bounce to the session card.
-  await requireResultReleased("focus");
+  const { supabase, user, profile } = await requireOnboarded();
 
   const { data: result } = await supabase
     .from("focus_results")
@@ -32,7 +31,8 @@ export default async function FocusResultPage({ params }: PageProps) {
     .eq("id", resultId)
     .maybeSingle();
 
-  // Own-row only (RLS also enforces this).
+  // Own-row only (RLS also enforces this). Completion and ownership are the
+  // whole authorization — no facilitator state is consulted.
   if (!result || result.profile_id !== user.id) notFound();
 
   const data: FocusResultData = {
@@ -51,8 +51,14 @@ export default async function FocusResultPage({ params }: PageProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-5 py-10 sm:px-8 sm:py-14">
+      <ReportActionBar
+        product="focus"
+        reportId={result.id}
+        maskedEmail={maskEmail(profile.email)}
+        hasAccountEmail={Boolean(profile.email)}
+      />
       <FocusResultView data={data} />
-      <div className="flex flex-wrap gap-3 border-t border-hairline pt-6">
+      <div className="flex flex-wrap gap-3 border-t border-hairline pt-6 print:hidden">
         <Link
           href="/app"
           className="inline-flex min-h-11 items-center rounded-full bg-botanical px-6 text-sm font-medium text-mineral transition-colors hover:bg-botanical-deep"

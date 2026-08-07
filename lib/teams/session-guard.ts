@@ -24,8 +24,7 @@ interface MembershipTeamRow {
 export type AssessmentDenialReason =
   | "not_team_member"
   | "wrong_team"
-  | "wrong_assessment"
-  | "result_not_released";
+  | "wrong_assessment";
 
 export interface AssessmentAuthorization {
   ok: boolean;
@@ -132,41 +131,21 @@ export async function requireProductAllowed(
   return { context: auth.context, teamId: auth.teamId };
 }
 
-type FacilitatedProductState = "free" | "released" | "held";
-
-/**
- * Whether this user's facilitator has released results for a product.
- * "free": no facilitator-led membership runs this product. "released": at
- * least one such team is in results/ended. "held": not released yet.
+/*
+ * There is deliberately no release gate for a participant's OWN result.
+ *
+ * `teams.session_state` sequences what the facilitator does in the room —
+ * present, open the assessment, close it, walk the room through results. It
+ * was previously also read as permission to see one's own report, which meant
+ * a participant who had finished their assessment was told to wait for their
+ * facilitator before they could open, download or email a report about
+ * themselves. That coupled a personal artefact to a presentation state that
+ * was never about withholding it, and it had no off switch: a facilitator who
+ * never advanced the session locked participants out permanently.
+ *
+ * Completion plus ownership is now the whole authorization for an individual
+ * result (`lib/reports/loader.ts`). Team-scoped surfaces — the live deck, the
+ * roster, comparisons, team analytics and facilitator insights — keep every
+ * check they had; see `requireTeamAdmin` / `requireTeamAccess` and
+ * `reviewAllowed`.
  */
-export async function facilitatedProductState(
-  supabase: AuthContext["supabase"],
-  userId: string,
-  product: AssessmentProduct,
-): Promise<FacilitatedProductState> {
-  const facilitated = await loadFacilitatedMemberships(supabase, userId);
-  const relevant = facilitated.filter((row) => row.teams!.assessment_type === product);
-  if (relevant.length === 0) return "free";
-  return relevant.some((row) => ["results", "ended"].includes(row.teams!.session_state))
-    ? "released"
-    : "held";
-}
-
-/**
- * Server-side release gate for OWN-result pages: a facilitator-led
- * participant sees their result only after the facilitator releases.
- */
-export async function requireResultReleased(product: AssessmentProduct): Promise<AuthContext> {
-  const context = await requireOnboarded();
-  const state = await facilitatedProductState(context.supabase, context.user.id, product);
-  if (state === "held") {
-    logRouteDiagnostic({
-      route: `result:${product}`,
-      userId: context.user.id,
-      step: "requireResultReleased",
-      message: "result_not_released",
-    });
-    redirect("/app?notice=result_not_released");
-  }
-  return context;
-}

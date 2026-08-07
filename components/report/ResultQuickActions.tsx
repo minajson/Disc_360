@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
-import { emailMyReport } from "@/lib/actions/reports";
+import { emailMyIndividualReport } from "@/lib/actions/reports";
 
 interface ResultQuickActionsProps {
   resultId: string;
@@ -36,7 +36,7 @@ export function ResultQuickActions({ resultId, shareUrl }: ResultQuickActionsPro
 
   const email = () => {
     startTransition(async () => {
-      const result = await emailMyReport(resultId);
+      const result = await emailMyIndividualReport({ product: "disc", id: resultId });
       flash(result.message);
     });
   };
@@ -53,9 +53,9 @@ export function ResultQuickActions({ resultId, shareUrl }: ResultQuickActionsPro
         >
           View details
         </Link>
-        <Link href={`/app/results/${resultId}?autoprint=1`} className={chip}>
+        <a href={`/api/reports/disc/${resultId}`} download className={chip}>
           Download PDF
-        </Link>
+        </a>
         <button type="button" onClick={email} disabled={pending} className={cn(chip, "disabled:opacity-50")}>
           {pending ? "Sending…" : "Email report"}
         </button>

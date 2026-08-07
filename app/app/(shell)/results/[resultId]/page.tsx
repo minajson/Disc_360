@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireOnboarded } from "@/lib/auth/guards";
-import { requireResultReleased } from "@/lib/teams/session-guard";
 import { insightMap, type ArchetypeInsight } from "@/data/insight-maps";
 import { dimensionMeta } from "@/data/dimension-meta";
 import { contrastingTendency } from "@/lib/scoring/archetype";
 import { displayArchetypeCode } from "@/lib/utils/display";
 import { buildSharedReportUrl, getPublicBaseUrl } from "@/lib/utils/site-url";
+import { maskEmail } from "@/lib/reports/identity";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { DimensionMark } from "@/components/ui/DimensionMark";
 import { ExpandableSection } from "@/components/ui/ExpandableSection";
@@ -116,25 +116,23 @@ function Section({
 
 export default async function ResultPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ resultId: string }>;
-  searchParams: Promise<{ autoprint?: string }>;
 }) {
   const { resultId } = await params;
-  const { autoprint } = await searchParams;
-  const { supabase } = await requireOnboarded();
-  // Facilitator-led release gate: held results bounce to the session card.
-  await requireResultReleased("disc");
+  const { supabase, user, profile } = await requireOnboarded();
 
   const { data: result } = await supabase
     .from("assessment_results")
     .select(
-      "id, share_token, score_d, score_i, score_s, score_c, archetype_code, primary_dimension, secondary_dimension, raw_most, raw_least, net, created_at, result_insights (insight_snapshot)",
+      "id, profile_id, share_token, score_d, score_i, score_s, score_c, archetype_code, primary_dimension, secondary_dimension, raw_most, raw_least, net, created_at, result_insights (insight_snapshot)",
     )
     .eq("id", resultId)
     .maybeSingle();
-  if (!result) notFound();
+  // Completion + ownership is the whole authorization for an own result. RLS
+  // scopes the row already; the explicit comparison keeps that true even if a
+  // policy is ever widened. Not-found and not-yours answer identically.
+  if (!result || result.profile_id !== user.id) notFound();
 
   const scores: DiscScores = {
     d: result.score_d,
@@ -157,9 +155,11 @@ export default async function ResultPage({
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-5 py-8 sm:px-8">
       <ReportActionBar
-        resultId={result.id}
+        product="disc"
+        reportId={result.id}
+        maskedEmail={maskEmail(profile.email)}
+        hasAccountEmail={Boolean(profile.email)}
         shareUrl={buildSharedReportUrl(getPublicBaseUrl(), result.share_token)}
-        autoprint={autoprint === "1"}
       />
 
       {/* top summary — Behaviour Compass hero; the radar remains available in

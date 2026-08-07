@@ -171,10 +171,16 @@ test("individual assessment completes end to end", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: /Ready to see your profile/i })).toBeVisible();
   await page.getByRole("button", { name: "Submit assessment" }).click();
+
+  // Completion lands on the participant's own completion screen.
+  await page.waitForURL("**/app/complete/disc/**", { timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: /Your assessment is complete/ })).toBeVisible();
+  await page.getByRole("link", { name: "View my results" }).click();
+
   await page.waitForURL("**/app/results/**", { timeout: 30_000 });
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Download PDF/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Email report/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Download PDF/i }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /Email My Report/i })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Share$/i })).toBeVisible();
 });
 

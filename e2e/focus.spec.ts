@@ -69,6 +69,8 @@ test("Focus starts independently, saves, scores and stores its own result", asyn
   }
   await page.getByRole("button", { name: /See my Focus profile/i }).click();
 
+  await page.waitForURL("**/app/complete/focus/**", { timeout: 20_000 });
+  await page.getByRole("link", { name: "View my results" }).click();
   await page.waitForURL("**/focus/results/**", { timeout: 20_000 });
   await expect(page.getByText(FOCUS_PATTERN).first()).toBeVisible();
   await expect(page.getByText("Automaticity")).toBeVisible();
@@ -161,9 +163,11 @@ test("QR join opens the Focus assessment for a Focus team", async ({ page, brows
   await participant.waitForURL("**/focus/assessment/**", { timeout: 30_000 });
   await expect(participant.getByText("Question 1 of 6")).toBeVisible();
   await completeFocus(participant);
-  // Facilitated participants wait for release; submission lands on the card.
-  await participant.waitForURL(/\/app(\?|$)/, { timeout: 20_000 });
-  await expect(participant.getByText("Assessment submitted")).toBeVisible();
+  // The participant gets their own result immediately — no facilitator release.
+  await participant.waitForURL("**/app/complete/focus/**", { timeout: 20_000 });
+  await expect(
+    participant.getByRole("heading", { name: /Your assessment is complete/ }),
+  ).toBeVisible();
   await participantContext.close();
 
   // The facilitator's Focus summary now reflects the participant's completion
@@ -199,6 +203,8 @@ test("Combined runs DISC then Focus and the result shows both", async ({ page })
   await completeFocus(page);
 
   // Stage 3: the combined result shows both profiles.
+  await page.waitForURL("**/app/complete/combined/**", { timeout: 30_000 });
+  await page.getByRole("link", { name: "View my results" }).click();
   await page.waitForURL("**/combined/results/**", { timeout: 30_000 });
   await expect(page.getByText(/behaviour × attention/i).first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Behaviour" }).first()).toBeVisible();

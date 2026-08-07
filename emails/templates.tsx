@@ -180,6 +180,34 @@ export function ReportReadyEmail({
   );
 }
 
+/**
+ * The report a participant asked us to send them, with the PDF attached.
+ * Individual scope only: no team figures, no roster, no facilitator notes.
+ */
+export function IndividualReportEmail({
+  firstName,
+  reportUrl,
+}: {
+  firstName: string;
+  reportUrl: string;
+}) {
+  return (
+    <EmailShell
+      preview="Your DISC360 report is ready"
+      heading={`Hello ${firstName},`}
+      cta={{ href: reportUrl, label: "View my results" }}
+      footerNote="You asked us to send this report to you from your DISC360 results page."
+    >
+      <EmailText>Your DISC360 assessment is complete.</EmailText>
+      <EmailText>
+        Your individual report is attached and includes insights into your
+        behavioural style, attention patterns and practical recommendations.
+      </EmailText>
+      <EmailText>Your PDF report is also attached for your records.</EmailText>
+    </EmailShell>
+  );
+}
+
 export function TeamCampaignCompletedEmail({
   teamName,
   campaignName,

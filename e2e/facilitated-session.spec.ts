@@ -374,7 +374,7 @@ test("15: the backend rejects assessments the facilitator did not select", async
   expect(discSessions).toBe("1");
 });
 
-test("16: combined facilitated flow — DISC then Focus, wait for release, then view result", async ({
+test("16: combined facilitated flow — DISC then Focus, then the participant's own result", async ({
   page,
 }) => {
   test.slow();
@@ -409,26 +409,24 @@ test("16: combined facilitated flow — DISC then Focus, wait for release, then 
   }
   await page.getByRole("button", { name: /See my Focus profile|Submit/i }).click();
 
-  // Results are HELD: the participant lands on the waiting card, and even a
-  // deep link to the combined result bounces back.
-  await page.waitForURL("**/app", { timeout: 30000 });
-  await expect(page.getByText("Assessment submitted")).toBeVisible();
+  // The team session is still `assessment_open` — the facilitator has not
+  // released anything. The participant's OWN result is theirs regardless.
+  await page.waitForURL("**/app/complete/combined/**", { timeout: 30000 });
+  await expect(page.getByRole("heading", { name: /Your assessment is complete/ })).toBeVisible();
+  await page.getByRole("link", { name: "View my results" }).click();
+  await page.waitForURL("**/combined/results/**", { timeout: 20000 });
+  await expect(page.getByText(/Behaviour|Focus/i).first()).toBeVisible();
+
+  expect(sql(`select session_state from teams where id='${team.id}'`)).toBe("assessment_open");
+
+  // Returning later opens the same result from the dashboard card.
   const combinedId = sql(
     `select id from combined_sessions where profile_id='${uid}' order by created_at desc limit 1`,
   );
-  await page.goto(`/combined/results/${combinedId}`);
-  await page.waitForURL(/\/app\?notice=result_not_released/, { timeout: 15000 });
-  await expect(
-    page.getByText("Your facilitator has not released results yet."),
-  ).toBeVisible();
-
-  // Facilitator releases → the card flips and the result opens.
-  sql(`update teams set session_state='results' where id='${team.id}'`);
   await page.goto("/app");
   await expect(page.getByText("Your result is ready")).toBeVisible();
   await page.getByRole("link", { name: "View result" }).click();
-  await page.waitForURL("**/combined/results/**", { timeout: 20000 });
-  await expect(page.getByText(/Behaviour|Focus/i).first()).toBeVisible();
+  await page.waitForURL(`**/combined/results/${combinedId}`, { timeout: 20000 });
 
   sql(`delete from combined_sessions where profile_id='${uid}'`);
   sql(`delete from focus_results where profile_id='${uid}'`);
@@ -470,8 +468,10 @@ test("17: two teams, two participants — attempts and reports are fully isolate
     await options.nth(1).click();
   }
   await pageA.getByRole("button", { name: "Submit assessment" }).click();
-  await pageA.waitForURL(/\/app(\?|$)/, { timeout: 30000 });
-  await expect(pageA.getByText("Assessment submitted")).toBeVisible({ timeout: 15000 });
+  await pageA.waitForURL("**/app/complete/disc/**", { timeout: 30000 });
+  await expect(pageA.getByRole("heading", { name: /Your assessment is complete/ })).toBeVisible({
+    timeout: 15000,
+  });
 
   // A's attempt/result is bound to exactly ONE team.
   const aAttemptTeams = sql(

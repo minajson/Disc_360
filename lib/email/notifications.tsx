@@ -1,9 +1,10 @@
 import "server-only";
-import { sendEmail } from "@/lib/email/send";
+import { sendEmail, type EmailSendResult } from "@/lib/email/send";
 import {
   AssessmentCompletionEmail,
   CampaignInvitationEmail,
   CampaignReminderEmail,
+  IndividualReportEmail,
   PasswordChangedEmail,
   ReportReadyEmail,
   TeamCampaignCompletedEmail,
@@ -136,6 +137,43 @@ export async function sendReportReady(options: {
         reportUrl={`${siteUrl()}/app/results/${options.resultId}`}
       />
     ),
+  });
+}
+
+/**
+ * A participant asking for their own report, PDF attached.
+ *
+ * `essential` on purpose: this is not a broadcast the recipient may have
+ * muted, it is a request they just made about themselves — silently dropping
+ * it on a notification preference would look exactly like a bug. The result is
+ * returned so the caller can report what actually happened.
+ */
+export async function sendIndividualReport(options: {
+  to: string;
+  profileId: string;
+  firstName: string;
+  reportPath: string;
+  attachment: { filename: string; content: string };
+}): Promise<EmailSendResult> {
+  return sendEmail({
+    to: options.to,
+    profileId: options.profileId,
+    template: "individual_report",
+    subject: "Your DISC360 Report Is Ready",
+    category: "essential",
+    react: (
+      <IndividualReportEmail
+        firstName={options.firstName}
+        reportUrl={`${siteUrl()}${options.reportPath}`}
+      />
+    ),
+    attachments: [
+      {
+        filename: options.attachment.filename,
+        content: options.attachment.content,
+        contentType: "application/pdf",
+      },
+    ],
   });
 }
 
