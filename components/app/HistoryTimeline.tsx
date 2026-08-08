@@ -98,6 +98,7 @@ function TrendLines({ points }: { points: ReturnType<typeof trendSeries> }) {
           strokeLinecap="round"
           strokeLinejoin="round"
           initial={reduced ? false : { pathLength: 0, opacity: 0 }}
+          data-print-reveal="path"
           whileInView={{ pathLength: 1, opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.7, delay: index * 0.08, ease: [0.32, 0.94, 0.6, 1] }}

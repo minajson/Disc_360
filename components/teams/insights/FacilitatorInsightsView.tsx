@@ -187,6 +187,12 @@ function InsightCard({
         {open ? "Hide evidence" : "Show evidence and questions"}
       </button>
 
+      {/* Evidence and questions.
+          Collapsed on screen is a reading choice, but an exported report is
+          the whole card — so when it is closed the same content is still
+          rendered, hidden, and revealed for print. The open state keeps its
+          height animation exactly as before; the closed state is static
+          markup, so nothing about the on-screen expand/collapse changes. */}
       {open ? (
         <motion.div
           className="flex flex-col gap-4"
@@ -194,41 +200,84 @@ function InsightCard({
           animate={{ opacity: 1, height: "auto" }}
           transition={{ duration: 0.25, ease: [0.32, 0.94, 0.6, 1] }}
         >
-          <div className="flex flex-col gap-2">
-            <span className="ins-chip font-mono uppercase tracking-[0.16em] text-faint">
-              Evidence
-            </span>
-            <EvidenceChips insight={insight} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <span className="ins-chip font-mono uppercase tracking-[0.16em] text-faint">
-              Ask the room
-            </span>
-            <ul className="flex flex-col gap-2">
-              {insight.questions.map((question) => (
-                <li key={question} className="ins-bullet ins-measure text-slate">
-                  “{question}”
-                </li>
-              ))}
-            </ul>
-          </div>
-          <dl className="ins-chip grid grid-cols-2 gap-x-6 gap-y-2 rule-t pt-4 font-mono uppercase tracking-[0.12em]">
-            <dt className="text-faint">Based on</dt>
-            <dd className="text-slate">
-              {insight.sampleSize} of {insight.populationSize} · {coverage}%
-            </dd>
-            <dt className="text-faint">Scope</dt>
-            <dd className="truncate text-slate" title={scopeLabel}>
-              {scopeLabel}
-            </dd>
-            <dt className="text-faint">Basis</dt>
-            <dd className="text-slate">{basis} data</dd>
-            <dt className="text-faint">Generated</dt>
-            <dd className="text-slate">{generatedAt}</dd>
-          </dl>
+          <EvidenceDetail
+            insight={insight}
+            coverage={coverage}
+            scopeLabel={scopeLabel}
+            basis={basis}
+            generatedAt={generatedAt}
+          />
         </motion.div>
-      ) : null}
+      ) : (
+        <div className="hidden flex-col gap-4 print:flex">
+          <EvidenceDetail
+            insight={insight}
+            coverage={coverage}
+            scopeLabel={scopeLabel}
+            basis={basis}
+            generatedAt={generatedAt}
+          />
+        </div>
+      )}
     </motion.article>
+  );
+}
+
+/**
+ * Evidence, questions and provenance for one insight card.
+ *
+ * Shared by the expanded and collapsed states so an exported report always
+ * carries them: on screen the collapsed card renders this hidden, and print
+ * reveals it. One definition, so the two can never drift apart.
+ */
+function EvidenceDetail({
+  insight,
+  coverage,
+  scopeLabel,
+  basis,
+  generatedAt,
+}: {
+  insight: FacilitatorInsight;
+  coverage: number;
+  scopeLabel: string;
+  basis: string;
+  generatedAt: string;
+}) {
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        <span className="ins-chip font-mono uppercase tracking-[0.16em] text-faint">
+          Evidence
+        </span>
+        <EvidenceChips insight={insight} />
+      </div>
+      <div className="flex flex-col gap-2">
+        <span className="ins-chip font-mono uppercase tracking-[0.16em] text-faint">
+          Ask the room
+        </span>
+        <ul className="flex flex-col gap-2">
+          {insight.questions.map((question) => (
+            <li key={question} className="ins-bullet ins-measure text-slate">
+              “{question}”
+            </li>
+          ))}
+        </ul>
+      </div>
+      <dl className="ins-chip grid grid-cols-2 gap-x-6 gap-y-2 rule-t pt-4 font-mono uppercase tracking-[0.12em]">
+        <dt className="text-faint">Based on</dt>
+        <dd className="text-slate">
+          {insight.sampleSize} of {insight.populationSize} · {coverage}%
+        </dd>
+        <dt className="text-faint">Scope</dt>
+        <dd className="truncate text-slate" title={scopeLabel}>
+          {scopeLabel}
+        </dd>
+        <dt className="text-faint">Basis</dt>
+        <dd className="text-slate">{basis} data</dd>
+        <dt className="text-faint">Generated</dt>
+        <dd className="text-slate">{generatedAt}</dd>
+      </dl>
+    </>
   );
 }
 

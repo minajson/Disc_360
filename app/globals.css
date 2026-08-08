@@ -176,6 +176,20 @@ body {
   body {
     background: #ffffff !important;
   }
+
+  /* Print the colours.
+     The DISC identifiers are drawn as backgrounds — a bar IS its colour — and
+     browsers drop backgrounds unless the reader finds and ticks "Background
+     graphics". Without this, a facilitator who exports from the print dialog
+     gets correctly-sized bars in white. Programmatic export already passes
+     printBackground; this makes the two paths agree. */
+  html,
+  body,
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   * {
     opacity: 1 !important;
     animation: none !important;
@@ -224,7 +238,36 @@ body {
     display: contents !important;
   }
 
-  section {
+  /* Pagination.
+     Deliberately NOT `section { break-inside: avoid }` — a report section is
+     usually taller than a page, so asking the whole thing to stay together
+     just pushes it to the next page and leaves half the previous one empty.
+     Keep the units that actually must not split — a card, a chart, a heading
+     and the thing it introduces — and let sections flow. */
+  .paper-card,
+  figure,
+  svg,
+  table,
+  dl {
+    break-inside: avoid;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  .print-keep-next {
+    break-after: avoid;
+  }
+  /* An editorial section opens with an eyebrow and a heading in one wrapper.
+     Left alone the page can break between them, stranding "03 · DISTRIBUTION"
+     at the foot of a page. Scoped to that opening block only — applying it to
+     any div holding a heading also catches whole cards, and "don't break
+     after this card" then drags the next one along and costs pages. */
+  section > :first-child:is(div, header):has(> h1, > h2, > h3) {
+    break-inside: avoid;
+    break-after: avoid;
+  }
+  li {
     break-inside: avoid;
   }
 }
