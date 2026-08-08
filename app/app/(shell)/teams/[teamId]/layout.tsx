@@ -25,8 +25,12 @@ export default async function TeamLayout({
   if (!team) notFound();
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-7 px-5 py-10 sm:px-8">
-      <div className="flex items-center gap-5">
+    // `print:contents` drops the page padding for print so a designed report
+    // can own the whole sheet; the screen layout is untouched.
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-7 px-5 py-10 sm:px-8 print:contents">
+      {/* The team identity block belongs to the app, not to an exported
+          report — a designed report carries its own cover. */}
+      <div className="flex items-center gap-5 print:hidden">
         {team.logo_url ? (
           <Image
             src={team.logo_url}
@@ -62,7 +66,7 @@ export default async function TeamLayout({
         isDisc={(team.assessment_type ?? "disc") === "disc"}
       />
 
-      <div className="flex flex-col gap-8">{children}</div>
+      <div className="flex flex-col gap-8 print:contents">{children}</div>
     </div>
   );
 }

@@ -170,6 +170,232 @@ body {
   }
 }
 
+/* ── the Team Intelligence report document ─────────────────
+   A designed artefact rather than a screen: fixed pages, one visual hero
+   each, and its own footer. Sized in millimetres so a page is a page in the
+   PDF instead of "however far the content happened to run".
+
+   These rules are deliberately outside @media print — the document renders
+   identically on screen, which is what makes it inspectable in a browser and
+   testable in Playwright without emulating print media. It is hidden on the
+   results page except when printing; see the results route. */
+
+.report-doc {
+  --report-page-w: 210mm;
+  --report-page-h: 297mm;
+  --report-pad: 14mm;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.report-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 7mm;
+  width: var(--report-page-w);
+  min-height: var(--report-page-h);
+  max-height: var(--report-page-h);
+  overflow: hidden;
+  margin: 0 auto;
+  padding: var(--report-pad) var(--report-pad) 18mm;
+  background: var(--color-canvas);
+}
+
+.report-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6mm;
+  min-height: 0;
+}
+
+.report-footer {
+  position: absolute;
+  right: var(--report-pad);
+  bottom: 9mm;
+  left: var(--report-pad);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--color-hairline);
+  padding-top: 2.5mm;
+  font-family: var(--font-mono), monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+
+.report-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5mm;
+  border: 1px solid var(--color-hairline);
+  border-radius: 14px;
+  padding: 5mm;
+  background: var(--color-paper);
+}
+.report-figure-hero {
+  flex: 1 1 auto;
+  justify-content: center;
+  min-height: 0;
+}
+/* Takes the page's remaining height. Grid children stretch with it (equal
+   cards across a row); a column of cards keeps its natural height and lets
+   the slack fall at the foot of the page, which is what a report with one
+   friction relationship should look like — not one enormous empty card. */
+.report-fill {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.report-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2mm;
+  border: 1px solid var(--color-hairline);
+  border-radius: 14px;
+  padding: 5mm;
+  background: var(--color-paper);
+}
+
+.report-indicator-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4mm;
+  border-block: 1px solid var(--color-hairline);
+  padding-block: 5mm;
+}
+.report-indicator {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5mm;
+}
+
+.report-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5mm;
+}
+.report-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4mm;
+}
+.report-split {
+  display: grid;
+  grid-template-columns: 1.35fr 0.65fr;
+  gap: 5mm;
+  align-items: stretch;
+}
+.report-split-actions {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  gap: 6mm;
+}
+
+.report-reading {
+  display: flex;
+  flex-direction: column;
+  gap: 1mm;
+  border-left: 2px solid var(--color-hairline);
+  padding-left: 3.5mm;
+}
+
+.report-dynamics {
+  display: flex;
+  flex-direction: column;
+  gap: 3.5mm;
+  padding-top: 1mm;
+}
+.report-dynamic {
+  display: grid;
+  grid-template-columns: auto 1fr auto minmax(0, 42%);
+  align-items: center;
+  gap: 3mm;
+}
+.report-dynamic-node {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 8mm;
+  height: 8mm;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+.report-dynamic-link {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    var(--color-hairline-strong),
+    var(--color-hairline)
+  );
+}
+.report-dynamic-label {
+  font-size: 13px;
+  color: var(--color-slate);
+}
+
+.report-friction {
+  gap: 3mm;
+}
+.report-bridge {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5mm;
+  border-left: 2px solid var(--color-botanical);
+  border-radius: 0 8px 8px 0;
+  padding: 3mm 4mm;
+  background: var(--color-sage) / 0.16;
+  background-color: color-mix(in srgb, var(--color-sage) 22%, transparent);
+}
+
+.report-pressure {
+  display: grid;
+  grid-template-columns: 1fr auto 1.4fr auto 1fr;
+  align-items: center;
+  gap: 3mm;
+  padding-block: 1mm;
+}
+.report-pressure-step {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5mm;
+}
+.report-pressure-arrow {
+  font-size: 16px;
+  color: var(--color-hairline-strong);
+}
+
+.report-action {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3mm;
+  align-items: start;
+}
+.report-action-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 6mm;
+  height: 6mm;
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: 999px;
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+  color: var(--color-faint);
+}
+
+.report-note {
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--color-faint);
+}
+
 /* ── print (report & presentation exports) ────────────────── */
 
 @media print {
@@ -268,6 +494,49 @@ body {
     break-after: avoid;
   }
   li {
+    break-inside: avoid;
+  }
+
+  /* The Team Intelligence report paginates itself.
+     Each page is exactly one printed page and carries its own footer, so the
+     result is a fixed seven-page document rather than wherever the content
+     happened to fall — and a chart can never straddle a break because no
+     page is ever taller than the sheet it is printed on.
+
+     `@page` margin 0 is what removes the browser's own URL/date footer: with
+     no page margin there is nowhere for it to print. The report supplies its
+     own padding, so nothing runs to the paper edge. Named so the rest of the
+     product keeps ordinary print margins. */
+  /* Declare the paper the product is designed on. Without this the engine
+     falls back to the host default (US Letter), and a report laid out in
+     millimetres then prints scaled or clipped. */
+  @page {
+    size: A4;
+  }
+  @page report {
+    size: A4;
+    margin: 0;
+  }
+  .report-doc {
+    page: report;
+  }
+  .report-page {
+    break-after: page;
+    break-inside: avoid;
+    /* Exactly the sheet: no rounding slop that spills a blank page. */
+    width: 210mm;
+    height: 297mm;
+    min-height: 297mm;
+    max-height: 297mm;
+    margin: 0;
+  }
+  .report-page:last-child {
+    break-after: auto;
+  }
+  .report-figure,
+  .report-card,
+  .report-dynamic,
+  .report-pressure {
     break-inside: avoid;
   }
 }

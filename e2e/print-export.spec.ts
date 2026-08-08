@@ -75,26 +75,146 @@ test("team results: every chart is drawn in print, not just the quadrant map", a
   expect(await page.locator("svg").count()).toBeGreaterThan(0);
 });
 
-test("team results: print carries the whole report, not the executive density", async ({ page }) => {
+test("team results: print is the seven-page Team Intelligence report", async ({ page }) => {
   await openTeamPage(page, "results");
 
-  // "Executive view" is a reading density for the screen. An exported PDF is
-  // the report, so the analytical sections belong in it either way.
-  const headings = await page.locator("section h2").allTextContents();
-  expect(headings).toContain("What this team is like");
-  expect(headings).toContain("Who carries which energy");
-  expect(headings).toContain("Where communication can break");
-  expect(headings).toContain("Who complements — and who collides");
-  expect(headings).toContain("Completed profiles");
-  expect(headings).toContain("Recommended actions");
+  // The printed artefact is a designed document, not the dashboard.
+  const pages = page.locator('[data-report="team-intelligence"] .report-page');
+  await expect(pages).toHaveCount(7);
+
+  const text = await page.locator('[data-report="team-intelligence"]').innerText();
+  for (const heading of [
+    "Team Intelligence",
+    "The behavioural shape of this team",
+    "Where the team is concentrated",
+    "How this team communicates and decides",
+    "Where communication can break",
+    "What changes when it matters",
+    "Recommended actions",
+  ]) {
+    expect(text, `report section "${heading}"`).toContain(heading);
+  }
+
+  // The interactive view is not printed alongside it.
+  await expect(page.getByRole("group", { name: "Information density" })).toBeHidden();
+});
+
+test("team results: the participant roster is not in the exported report", async ({ page }) => {
+  await openTeamPage(page, "results");
+  const report = page.locator('[data-report="team-intelligence"]');
+  const text = await report.innerText();
+
+  // A recommendation may cite one member by their anonymised alias; several
+  // pages listing every one of them is a register, not intelligence.
+  const cited = new Set(text.match(/\bMember [A-Z]\b/g) ?? []);
+  expect(cited.size, `members named: ${[...cited].join(", ")}`).toBeLessThanOrEqual(2);
+  // And no per-member table: no row carries a full DISC readout.
+  expect(text).not.toMatch(/D \d+ · I \d+ · S \d+ · A \d+/);
+
+  // The aggregate participation indicator stays.
+  expect(text).toMatch(/\d+\/\d+/);
+  expect(text.toLowerCase()).toContain("profiles completed");
+  expect(text.toLowerCase()).toContain("participation");
+});
+
+test("team results: the report carries no facilitator recommendations", async ({ page }) => {
+  await openTeamPage(page, "results");
+  const text = await page.locator('[data-report="team-intelligence"]').innerText();
+  expect(text.toLowerCase()).toContain("recommended actions");
+  expect(text.toLowerCase()).toContain("for the team");
+  expect(text.toLowerCase()).not.toContain("for the facilitator");
+  expect(text.toLowerCase()).not.toContain("for the coach");
+});
+
+test("team results: every report page is exactly one sheet, footer and all", async ({ page }) => {
+  await openTeamPage(page, "results");
+  const pages = page.locator('[data-report="team-intelligence"] .report-page');
+  const count = await pages.count();
+
+  for (let index = 0; index < count; index++) {
+    const box = await pages.nth(index).boundingBox();
+    // 297mm at 96dpi ≈ 1122.5px. A page taller than its sheet would split.
+    expect(Math.round(box!.height), `page ${index + 1} height`).toBeGreaterThan(1100);
+    expect(Math.round(box!.height), `page ${index + 1} height`).toBeLessThan(1140);
+    // Its footer carries the report identity and the page number.
+    const footer = await pages.nth(index).locator(".report-footer").innerText();
+    expect(footer).toContain("DISC360");
+    expect(footer).toContain(`${index + 1} / ${count}`);
+  }
+});
+
+test("team results: charts are atomic print blocks", async ({ page }) => {
+  await openTeamPage(page, "results");
+  const figures = page.locator('[data-report="team-intelligence"] .report-figure');
+  expect(await figures.count()).toBeGreaterThan(0);
+  const splittable = await figures.evaluateAll(
+    (nodes) => nodes.filter((node) => getComputedStyle(node).breakInside !== "avoid").length,
+  );
+  expect(splittable, "figures that could split across a page").toBe(0);
+});
+
+test("team results: the report renders the report's charts", async ({ page }) => {
+  await openTeamPage(page, "results");
+  const report = page.locator('[data-report="team-intelligence"]');
+  // Radar and composition map are SVG; the bars are DOM.
+  expect(await report.locator("svg").count(), "SVG charts").toBeGreaterThanOrEqual(2);
+  expectBarsMatchDeclared(
+    await page.evaluate(() =>
+      [...document.querySelectorAll('[data-report="team-intelligence"] [data-print-reveal="width"]')].map(
+        (bar) => {
+          const track = bar.parentElement?.getBoundingClientRect().width ?? 0;
+          const declared = Number.parseFloat(
+            getComputedStyle(bar).getPropertyValue("--print-reveal-width"),
+          );
+          return {
+            width: bar.getBoundingClientRect().width,
+            track,
+            declared,
+            expected: (track * declared) / 100,
+          };
+        },
+      ),
+    ),
+  );
+});
+
+test("the report exposes no participant contact details, named or not", async ({ page }) => {
+  await openTeamPage(page, "results");
+  const text = await page.locator('[data-report="team-intelligence"]').innerText();
+
+  expect(text, "an email address reached the report").not.toMatch(/[\w.+-]+@[\w-]+\.[\w.]+/);
+  expect(text, "a database id reached the report").not.toMatch(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+  );
+
+  // An anonymous team says so, and its members stay aliases.
+  if (text.includes("reports anonymously")) {
+    const cited = new Set(text.match(/\bMember [A-Z]\b/g) ?? []);
+    for (const alias of cited) expect(alias).toMatch(/^Member [A-Z]$/);
+  }
+});
+
+test("on screen, the results page is the interactive view — not the document", async ({ page }) => {
+  await signIn(page, "demo@disc360.dev");
+  await page.goto(`/app/teams/${ENG_TEAM}/results`);
+  await page.waitForTimeout(1500);
+  // The document exists in the DOM for print but must not be on screen.
+  await expect(page.locator('[data-report="team-intelligence"]')).toBeHidden();
+  await expect(page.getByRole("group", { name: "Information density" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export PDF" })).toBeVisible();
 });
 
 test("team results: screen-only chrome is left out of the export", async ({ page }) => {
   await openTeamPage(page, "results");
 
+  const visibleCount = async (text: string) =>
+    page
+      .getByText(text)
+      .evaluateAll((nodes) => nodes.filter((n) => (n as HTMLElement).checkVisibility()).length);
+
   await expect(page.getByRole("navigation", { name: "Team sections" })).toBeHidden();
-  await expect(page.getByText("Hover or focus a member to inspect")).toBeHidden();
-  await expect(page.getByRole("button", { name: "Export PDF" })).toBeHidden();
+  expect(await visibleCount("Hover or focus a member to inspect"), "map hover hint").toBe(0);
+  expect(await visibleCount("Export PDF"), "export button").toBe(0);
   await expect(page.getByRole("group", { name: "Information density" })).toBeHidden();
 });
 
