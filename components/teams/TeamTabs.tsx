@@ -40,7 +40,9 @@ export function TeamTabs({ teamId, isAdmin, isDisc = true }: TeamTabsProps) {
       ];
 
   return (
-    <nav aria-label="Team sections" className="flex gap-1 overflow-x-auto rule-b pb-px">
+    // Navigation is not part of the report — an exported PDF should not carry
+    // a row of links nobody can follow.
+    <nav aria-label="Team sections" className="flex gap-1 overflow-x-auto rule-b pb-px print:hidden">
       {tabs.map((tab) => {
         const active = tab.exact ? pathname === tab.href : pathname.startsWith(tab.href);
         return (

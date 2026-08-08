@@ -385,6 +385,10 @@ export function ExecutiveBrief({ data }: { data: ExecutiveBriefData }) {
             <div className="h-3 overflow-hidden rounded-full bg-ink/8">
               <motion.div
                 className="h-full rounded-full bg-botanical"
+                data-print-reveal="width"
+                style={
+                  { "--print-reveal-width": `${data.balance.index}%` } as React.CSSProperties
+                }
                 initial={reduced ? { width: `${data.balance.index}%` } : { width: 0 }}
                 whileInView={{ width: `${data.balance.index}%` }}
                 viewport={{ once: true }}
@@ -411,9 +415,13 @@ export function ExecutiveBrief({ data }: { data: ExecutiveBriefData }) {
                   <div className="h-2 flex-1 overflow-hidden rounded-[4px] bg-ink/8">
                     <motion.div
                       className="h-full rounded-[4px]"
-                      style={{
-                        background: `var(--color-disc-${band.dimension.toLowerCase()})`,
-                      }}
+                      data-print-reveal="width"
+                      style={
+                        {
+                          background: `var(--color-disc-${band.dimension.toLowerCase()})`,
+                          "--print-reveal-width": `${band.percentage}%`,
+                        } as React.CSSProperties
+                      }
                       initial={reduced ? { width: `${band.percentage}%` } : { width: 0 }}
                       whileInView={{ width: `${band.percentage}%` }}
                       viewport={{ once: true }}
@@ -519,7 +527,13 @@ export function ExecutiveBrief({ data }: { data: ExecutiveBriefData }) {
                   <div className="h-3 overflow-hidden rounded-full bg-ink/8">
                     <motion.div
                       className="h-full rounded-full"
-                      style={{ background: meter.color }}
+                      data-print-reveal="width"
+                      style={
+                        {
+                          background: meter.color,
+                          "--print-reveal-width": `${meter.value}%`,
+                        } as React.CSSProperties
+                      }
                       initial={reduced ? { width: `${meter.value}%` } : { width: 0 }}
                       whileInView={{ width: `${meter.value}%` }}
                       viewport={{ once: true }}

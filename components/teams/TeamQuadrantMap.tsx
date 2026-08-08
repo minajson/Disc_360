@@ -153,7 +153,7 @@ export function TeamQuadrantMap({
             ) : null}
           </div>
         ) : (
-          <span className="font-mono text-[11px] text-faint">
+          <span className="font-mono text-[11px] text-faint print:hidden">
             Hover or focus a member to inspect
           </span>
         )}

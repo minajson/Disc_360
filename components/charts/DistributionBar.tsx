@@ -60,9 +60,13 @@ export function DistributionBar({
             <motion.div
               key={slice.dimension}
               className="h-full border-r-2 border-paper last:border-r-0"
-              style={{
-                background: `var(--color-disc-${slice.dimension.toLowerCase()})`,
-              }}
+              data-print-reveal="width"
+              style={
+                {
+                  background: `var(--color-disc-${slice.dimension.toLowerCase()})`,
+                  "--print-reveal-width": `${slice.share}%`,
+                } as React.CSSProperties
+              }
               initial={reduceMotion ? { width: `${slice.share}%` } : { width: 0 }}
               whileInView={{ width: `${slice.share}%` }}
               viewport={{ once: true }}

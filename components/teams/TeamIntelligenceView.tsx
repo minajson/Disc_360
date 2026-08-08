@@ -244,9 +244,11 @@ export function TeamIntelligenceView({ data }: { data: TeamIntelligence }) {
         </div>
       </Section>
 
-      {/* analytical extras */}
-      {analytical ? (
-        <>
+      {/* Analytical extras. Always rendered: "executive view" is a reading
+          density for the screen, not an edit to the report, and an exported
+          PDF is the whole report. `display: contents` in both states keeps
+          the parent's flex layout identical either way. */}
+      <div className={analytical ? "contents" : "hidden print-include"}>
           <Section eyebrow="Pairings" title="Who complements — and who collides">
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="paper-card flex flex-col gap-4 p-6">
@@ -304,8 +306,7 @@ export function TeamIntelligenceView({ data }: { data: TeamIntelligence }) {
               ))}
             </div>
           </Section>
-        </>
-      ) : null}
+      </div>
 
       {/* actions */}
       <Section eyebrow="Next moves" title="Recommended actions">

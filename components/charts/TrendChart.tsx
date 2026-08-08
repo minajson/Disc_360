@@ -129,6 +129,9 @@ export function TrendChart({ points, className }: TrendChartProps) {
             strokeWidth={2}
             strokeLinecap="round"
             strokeLinejoin="round"
+            // pathLength is drawn with stroke-dasharray; print clears it so an
+            // unscrolled line is a whole line rather than nothing.
+            data-print-reveal="path"
             initial={reduceMotion ? false : { pathLength: 0, opacity: 0 }}
             whileInView={{ pathLength: 1, opacity: 1 }}
             viewport={{ once: true }}

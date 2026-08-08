@@ -178,12 +178,53 @@ body {
   }
   * {
     opacity: 1 !important;
-    transform: none !important;
     animation: none !important;
     transition: none !important;
   }
+
+  /* Reset motion transforms so a reveal that never fired still prints — but
+     NOT on SVG nodes positioned by a `transform` attribute. `transform` is a
+     CSS property in SVG2, so a blanket `transform: none` silently collapses
+     every `<g transform="rotate(…)">` to the origin and destroys the chart it
+     was drawing. Motion-applied transforms land in inline style and carry no
+     attribute, so they are still cleared. */
+  *:not(svg *) {
+    transform: none !important;
+  }
+  svg *:not([transform]) {
+    transform: none !important;
+  }
   .paper-card {
     box-shadow: none !important;
+    break-inside: avoid;
+  }
+
+  /* Scroll-gated reveals.
+     Charts animate in with framer-motion's whileInView, which only fires once
+     an element scrolls into the viewport — and printing never scrolls. The
+     rules above already rescue anything revealed by opacity or transform, but
+     a bar that animates its WIDTH stays at 0 and a line that animates
+     pathLength stays undrawn, so they printed blank while the one chart with
+     no motion at all (the quadrant map) printed fine.
+
+     Each reveal carries its final value in a custom property, so print can
+     restore it without JavaScript — which means Cmd-P produces the same
+     document as the Export PDF button. */
+  [data-print-reveal="width"] {
+    width: var(--print-reveal-width) !important;
+  }
+  [data-print-reveal="path"] {
+    stroke-dasharray: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+
+  /* Sections the on-screen density control hides are still part of the
+     report; `display: contents` keeps the parent's own layout intact. */
+  .print-include {
+    display: contents !important;
+  }
+
+  section {
     break-inside: avoid;
   }
 }

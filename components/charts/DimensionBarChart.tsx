@@ -27,7 +27,16 @@ export function DimensionBarChart({ scores, className }: DimensionBarChartProps)
             <div className="h-2 flex-1 overflow-hidden rounded-[4px] bg-ink/8">
               <motion.div
                 className="h-full rounded-[4px]"
-                style={{ background: `var(--color-${meta.colorVar})` }}
+                // The final width travels as a custom property so print can
+                // restore it — whileInView never fires for a chart the reader
+                // has not scrolled to, and printing does not scroll.
+                data-print-reveal="width"
+                style={
+                  {
+                    background: `var(--color-${meta.colorVar})`,
+                    "--print-reveal-width": `${value}%`,
+                  } as React.CSSProperties
+                }
                 initial={reduceMotion ? { width: `${value}%` } : { width: 0 }}
                 whileInView={{ width: `${value}%` }}
                 viewport={{ once: true }}
