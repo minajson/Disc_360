@@ -12,6 +12,7 @@ import {
   type BoardProfile,
 } from "@/lib/insights/board";
 import { ExecutiveBrief } from "@/components/teams/ExecutiveBrief";
+import { ReportPaperSize } from "@/components/report/ReportPaperSize";
 
 export const metadata: Metadata = { title: "Executive brief" };
 
@@ -51,25 +52,28 @@ export default async function TeamExecutivePage({
   };
 
   return (
-    <ExecutiveBrief
-      data={{
-        teamId: data.teamId,
-        teamName: data.teamName,
-        named: data.named,
-        memberCount: data.memberCount,
-        completedCount: data.completedCount,
-        averages: data.averages,
-        profiles: data.profiles,
-        cultureSummary: data.cultureSummary,
-        collaboration: collaborationSummary(boardProfiles, data.averages),
-        balance: balanceVerdict(data.averages),
-        distribution: behaviourDistribution(boardProfiles),
-        strengths: strengthDistribution(boardProfiles),
-        communication: communicationTendencies(boardProfiles),
-        decision: decisionStyle(data.averages),
-        insights: facilitatorInsights(input),
-        risks: riskRegister(input),
-      }}
-    />
+    <>
+      <ReportPaperSize />
+      <ExecutiveBrief
+        data={{
+          teamId: data.teamId,
+          teamName: data.teamName,
+          named: data.named,
+          memberCount: data.memberCount,
+          completedCount: data.completedCount,
+          averages: data.averages,
+          profiles: data.profiles,
+          cultureSummary: data.cultureSummary,
+          collaboration: collaborationSummary(boardProfiles, data.averages),
+          balance: balanceVerdict(data.averages),
+          distribution: behaviourDistribution(boardProfiles),
+          strengths: strengthDistribution(boardProfiles),
+          communication: communicationTendencies(boardProfiles),
+          decision: decisionStyle(data.averages),
+          insights: facilitatorInsights(input),
+          risks: riskRegister(input),
+        }}
+      />
+    </>
   );
 }

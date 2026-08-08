@@ -366,3 +366,78 @@ test("the export produces a real, multi-page PDF", async ({ page }, testInfo) =>
   const pageCount = Number(raw.match(/\/Type\s*\/Pages[^>]*?\/Count\s+(\d+)/)?.[1] ?? 0);
   expect(pageCount, "the report runs to more than one page").toBeGreaterThan(1);
 });
+
+test("A4 is scoped to the report surfaces, not imposed product-wide", async ({ page }) => {
+  // `@page` is document-scoped — a bare rule in globals.css would silently
+  // put every printable surface on A4. The report declares its paper; nothing
+  // else should have had that decision made for it.
+  const paperRules = async (path: string) => {
+    await page.goto(path);
+    await page.waitForTimeout(1200);
+    return page.evaluate(() => {
+      const found: string[] = [];
+      const walk = (rules: CSSRuleList) => {
+        for (const rule of Array.from(rules)) {
+          if (rule.constructor.name === "CSSPageRule") found.push(rule.cssText);
+          const nested = (rule as CSSGroupingRule).cssRules;
+          if (nested) walk(nested);
+        }
+      };
+      for (const sheet of Array.from(document.styleSheets)) {
+        try {
+          walk(sheet.cssRules);
+        } catch {
+          /* cross-origin sheet — none of ours */
+        }
+      }
+      return found;
+    });
+  };
+
+  await signIn(page, "demo@disc360.dev");
+
+  // A surface with no report on it must declare no unnamed page size.
+  for (const path of ["/app", `/app/teams/${ENG_TEAM}/compare`, `/app/teams/${ENG_TEAM}/insights`]) {
+    const rules = await paperRules(path);
+    const unnamed = rules.filter((rule) => /^@page\s*\{/.test(rule.trim()));
+    expect(unnamed, `${path} declares a product-wide paper size: ${unnamed.join(" ")}`).toHaveLength(0);
+  }
+
+  // The Team Intelligence report carries a NAMED page, which applies only to
+  // the element that asks for it.
+  const reportRules = await paperRules(`/app/teams/${ENG_TEAM}/results`);
+  expect(reportRules.some((rule) => /@page\s+report/.test(rule)), "named @page report").toBe(true);
+
+  // The Executive Brief declares A4 for its own route only.
+  const execRules = await paperRules(`/app/teams/${ENG_TEAM}/executive`);
+  expect(
+    execRules.some((rule) => /^@page\s*\{/.test(rule.trim()) && /A4/i.test(rule)),
+    "executive brief declares its own A4 paper",
+  ).toBe(true);
+});
+
+test("the produced sheet is A4 for reports and untouched elsewhere", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === "firefox", "page.pdf is Chromium-only");
+  await signIn(page, "demo@disc360.dev");
+
+  /** Width and height of the first page, from the PDF's own MediaBox. */
+  const sheetOf = async (path: string) => {
+    await page.goto(path);
+    await page.waitForTimeout(2000);
+    const raw = (await page.pdf({ preferCSSPageSize: true, printBackground: true })).toString("latin1");
+    const box = raw.match(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)/);
+    return { w: Math.round(Number(box?.[1] ?? 0)), h: Math.round(Number(box?.[2] ?? 0)) };
+  };
+
+  // A4 is 595 × 842pt; US Letter is 612 × 792pt.
+  const report = await sheetOf(`/app/teams/${ENG_TEAM}/results`);
+  expect(report, "Team Intelligence prints A4").toEqual({ w: 595, h: 842 });
+
+  const executive = await sheetOf(`/app/teams/${ENG_TEAM}/executive`);
+  expect(executive, "Executive Brief prints A4").toEqual({ w: 595, h: 842 });
+
+  // Everything else keeps whatever the engine defaults to — the product is
+  // not silently re-papered by a rule meant for two reports.
+  const other = await sheetOf(`/app/teams/${ENG_TEAM}/compare`);
+  expect(other.w, "Compare keeps the default paper").not.toBe(595);
+});

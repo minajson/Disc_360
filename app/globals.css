@@ -507,12 +507,12 @@ body {
      no page margin there is nowhere for it to print. The report supplies its
      own padding, so nothing runs to the paper edge. Named so the rest of the
      product keeps ordinary print margins. */
-  /* Declare the paper the product is designed on. Without this the engine
-     falls back to the host default (US Letter), and a report laid out in
-     millimetres then prints scaled or clipped. */
-  @page {
-    size: A4;
-  }
+  /* Named, so it applies ONLY to the element that asks for it via `page:`.
+     A bare `@page` here would be document-scoped and would impose A4 on every
+     printable surface in the product — the participant report, the shared
+     profile, the room QR sheet, the deck, the marketing pages. Routes that
+     genuinely need a paper size declare it themselves; see
+     components/report/ReportPaperSize.tsx. */
   @page report {
     size: A4;
     margin: 0;
