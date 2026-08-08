@@ -83,6 +83,14 @@ export default async function AdminUserDetailPage({
           {profile.deactivated_at ? " · DEACTIVATED" : ""}
           {profile.is_super_admin ? " · SUPER ADMIN" : ""}
         </p>
+        <div>
+          <Link
+            href={`/admin/users/${userId}/identity`}
+            className="inline-flex min-h-10 items-center rounded-full border border-hairline px-4 text-xs text-slate transition-colors hover:border-botanical hover:text-botanical"
+          >
+            Manage identity
+          </Link>
+        </div>
       </div>
 
       <section className="flex flex-col gap-3" aria-label="Submissions">

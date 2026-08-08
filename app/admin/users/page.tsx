@@ -8,6 +8,7 @@ import {
   toggleSuperAdmin,
 } from "@/lib/actions/admin";
 import { AdminSearch, Pager, SortHeader, StatusBadge } from "@/components/admin/table";
+import { searchIdentities } from "@/lib/identity/queries";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 
 export const metadata: Metadata = { title: "Users · Admin" };
@@ -27,13 +28,32 @@ export default async function AdminUsersPage({
   const ascending = params.dir === "asc";
 
   const admin = createSupabaseAdminClient();
+
+  // A search may match an address the person no longer uses. Retired aliases
+  // resolve to their canonical profile, so an old email finds the person
+  // rather than nothing — see lib/identity/queries.ts.
+  const aliasMatches = params.q ? await searchIdentities(params.q, 200) : [];
+  const previousEmailFor = new Map(
+    aliasMatches
+      .filter((hit) => hit.matchedPreviousEmail)
+      .map((hit) => [hit.profileId, hit.matchedPreviousEmail as string]),
+  );
+
   let query = admin
     .from("profiles")
     .select("id, email, full_name, is_super_admin, deactivated_at, created_at", {
       count: "exact",
     });
   if (params.q) {
-    query = query.or(`email.ilike.%${params.q}%,full_name.ilike.%${params.q}%`);
+    const escaped = params.q.replace(/[%_,()]/g, "");
+    const ids = aliasMatches.map((hit) => hit.profileId);
+    const clauses = [
+      `email.ilike.%${escaped}%`,
+      `full_name.ilike.%${escaped}%`,
+      `preferred_name.ilike.%${escaped}%`,
+      ...(ids.length > 0 ? [`id.in.(${ids.join(",")})`] : []),
+    ];
+    query = query.or(clauses.join(","));
   }
   const { data: users, count } = await query
     .order(sort, { ascending })
@@ -48,7 +68,7 @@ export default async function AdminUsersPage({
         <h1 className="font-display text-h2 font-semibold">{count ?? 0} accounts</h1>
       </div>
 
-      <AdminSearch placeholder="Search email or name…" defaultValue={params.q} />
+      <AdminSearch placeholder="Search current or previous email, or name…" defaultValue={params.q} />
 
       <div className="paper-card overflow-x-auto p-0">
         <table className="w-full min-w-[760px] text-left text-sm">
@@ -75,7 +95,14 @@ export default async function AdminUsersPage({
                     {row.full_name || "—"}
                   </Link>
                 </td>
-                <td className="px-3 py-3 text-slate">{row.email}</td>
+                <td className="px-3 py-3 text-slate">
+                  {row.email}
+                  {previousEmailFor.has(row.id) ? (
+                    <span className="mt-0.5 block font-mono text-[10px] text-faint">
+                      matched previous email · {previousEmailFor.get(row.id)}
+                    </span>
+                  ) : null}
+                </td>
                 <td className="px-3 py-3">
                   <span className="flex flex-wrap gap-1.5">
                     {row.is_super_admin ? <StatusBadge tone="blue">super admin</StatusBadge> : null}

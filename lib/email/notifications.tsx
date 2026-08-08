@@ -4,6 +4,7 @@ import {
   AssessmentCompletionEmail,
   CampaignInvitationEmail,
   CampaignReminderEmail,
+  EmailChangeVerificationEmail,
   IndividualReportEmail,
   PasswordChangedEmail,
   ReportReadyEmail,
@@ -174,6 +175,32 @@ export async function sendIndividualReport(options: {
         contentType: "application/pdf",
       },
     ],
+  });
+}
+
+/**
+ * Proof-of-control for a new sign-in address, sent to that address alone.
+ * `essential`: an account-security message is not a preference. The result is
+ * returned so an administrator is never told a link went out that did not.
+ */
+export async function sendEmailChangeVerification(options: {
+  to: string;
+  profileId: string;
+  firstName: string;
+  verifyUrl: string;
+}): Promise<EmailSendResult> {
+  return sendEmail({
+    to: options.to,
+    profileId: options.profileId,
+    template: "email_change_verification",
+    subject: "Confirm your new DISC360 sign-in email",
+    category: "essential",
+    react: (
+      <EmailChangeVerificationEmail
+        firstName={options.firstName}
+        verifyUrl={options.verifyUrl}
+      />
+    ),
   });
 }
 

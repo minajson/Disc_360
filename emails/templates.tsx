@@ -208,6 +208,36 @@ export function IndividualReportEmail({
   );
 }
 
+/**
+ * Confirming a new sign-in address. Sent to the NEW address only — the point
+ * is to prove the person controls it before it becomes their login.
+ */
+export function EmailChangeVerificationEmail({
+  firstName,
+  verifyUrl,
+}: {
+  firstName: string;
+  verifyUrl: string;
+}) {
+  return (
+    <EmailShell
+      preview="Confirm your new DISC360 sign-in email"
+      heading={`Hello ${firstName},`}
+      cta={{ href: verifyUrl, label: "Confirm this address" }}
+      footerNote="If you were not expecting this, you can ignore it — your sign-in address will not change until this link is used."
+    >
+      <EmailText>
+        A DISC360 administrator has been asked to move your sign-in to this
+        address. Confirming keeps your existing account exactly as it is —
+        your assessments, reports and teams all stay with you.
+      </EmailText>
+      <EmailText>
+        Until you confirm, you can keep signing in with your current address.
+      </EmailText>
+    </EmailShell>
+  );
+}
+
 export function TeamCampaignCompletedEmail({
   teamName,
   campaignName,

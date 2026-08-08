@@ -1114,6 +1114,79 @@ export type Database = {
         }
         Relationships: []
       }
+      identity_reconciliations: {
+        Row: {
+          action: string
+          canonical_profile_id: string
+          completed_at: string | null
+          conflicts_resolved: Json
+          counts_after: Json
+          counts_before: Json
+          created_at: string
+          id: string
+          new_email: string | null
+          note: string | null
+          old_email: string | null
+          performed_by: string
+          retired_profile_id: string | null
+          status: string
+        }
+        Insert: {
+          action: string
+          canonical_profile_id: string
+          completed_at?: string | null
+          conflicts_resolved?: Json
+          counts_after?: Json
+          counts_before?: Json
+          created_at?: string
+          id?: string
+          new_email?: string | null
+          note?: string | null
+          old_email?: string | null
+          performed_by: string
+          retired_profile_id?: string | null
+          status?: string
+        }
+        Update: {
+          action?: string
+          canonical_profile_id?: string
+          completed_at?: string | null
+          conflicts_resolved?: Json
+          counts_after?: Json
+          counts_before?: Json
+          created_at?: string
+          id?: string
+          new_email?: string | null
+          note?: string | null
+          old_email?: string | null
+          performed_by?: string
+          retired_profile_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "identity_reconciliations_canonical_profile_id_fkey"
+            columns: ["canonical_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "identity_reconciliations_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "identity_reconciliations_retired_profile_id_fkey"
+            columns: ["retired_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invitations: {
         Row: {
           accepted_at: string | null
@@ -1365,6 +1438,73 @@ export type Database = {
           {
             foreignKeyName: "organizations_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      participant_identity_aliases: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          email: string
+          first_seen_at: string
+          id: string
+          profile_id: string
+          provider: string
+          reason: string | null
+          retired_at: string | null
+          source: string
+          source_profile_id: string | null
+          status: string
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          email: string
+          first_seen_at?: string
+          id?: string
+          profile_id: string
+          provider?: string
+          reason?: string | null
+          retired_at?: string | null
+          source?: string
+          source_profile_id?: string | null
+          status?: string
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          email?: string
+          first_seen_at?: string
+          id?: string
+          profile_id?: string
+          provider?: string
+          reason?: string | null
+          retired_at?: string | null
+          source?: string
+          source_profile_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "participant_identity_aliases_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "participant_identity_aliases_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "participant_identity_aliases_source_profile_id_fkey"
+            columns: ["source_profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1948,7 +2088,39 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_complete_reconciliation: {
+        Args: {
+          p_actor: string
+          p_note?: string
+          p_reconciliation: string
+          p_status: string
+        }
+        Returns: undefined
+      }
+      admin_preflight_identity_reconciliation: {
+        Args: { p_actor: string; p_canonical: string; p_retiring: string }
+        Returns: Json
+      }
+      admin_reconcile_identity: {
+        Args: {
+          p_actor: string
+          p_canonical: string
+          p_note?: string
+          p_retiring: string
+        }
+        Returns: Json
+      }
+      admin_record_email_change: {
+        Args: {
+          p_actor: string
+          p_new_email: string
+          p_profile: string
+          p_status?: string
+        }
+        Returns: string
+      }
       apply_super_admin_bootstrap: { Args: never; Returns: number }
+      identity_summary: { Args: { p_profile: string }; Returns: Json }
       is_org_admin: { Args: { org: string }; Returns: boolean }
       is_org_member: { Args: { org: string }; Returns: boolean }
       is_super_admin: { Args: never; Returns: boolean }
