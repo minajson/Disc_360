@@ -1,7 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-const PROTECTED_PREFIXES = ["/app", "/onboarding"];
+const PROTECTED_PREFIXES = ["/app", "/onboarding", "/wellbeing"];
+
+/**
+ * Public entry points inside an otherwise protected prefix.
+ *
+ * A Wellbeing Pulse join link is scanned off a printed code by someone who may
+ * not have an account yet, so it has to resolve before sign-in. Everything
+ * else under /wellbeing requires an authenticated participant.
+ */
+const PUBLIC_EXCEPTIONS = ["/wellbeing/join"];
 const AUTH_PAGES = ["/sign-in", "/sign-up", "/forgot-password"];
 
 /** Refreshes the Supabase session cookie and protects authenticated routes. */
@@ -35,15 +44,20 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isProtected = PROTECTED_PREFIXES.some((prefix) =>
-    pathname.startsWith(prefix),
-  );
+  const isProtected =
+    PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix)) &&
+    !PUBLIC_EXCEPTIONS.some((prefix) => pathname.startsWith(prefix));
   const isAuthPage = AUTH_PAGES.some((page) => pathname.startsWith(page));
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/sign-in";
-    url.searchParams.set("next", pathname);
+    // Preserve the query string too. A Wellbeing Pulse link carries the team
+    // it was issued for in `?team=`, and dropping it on the way through
+    // sign-in would land the participant in an unattributed solo attempt.
+    const target = `${pathname}${request.nextUrl.search}`;
+    url.search = "";
+    url.searchParams.set("next", target);
     return NextResponse.redirect(url);
   }
 

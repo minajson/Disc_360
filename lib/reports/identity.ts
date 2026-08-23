@@ -7,12 +7,28 @@
  * that are invisible in review and obvious in production.
  */
 
-export type ReportProduct = "disc" | "focus" | "combined";
+export type ReportProduct = "disc" | "focus" | "combined" | "wellbeing";
 
 const PRODUCT_FILENAME_TOKEN: Record<ReportProduct, string> = {
   disc: "",
   focus: "Focus",
   combined: "Combined",
+  wellbeing: "Pulse",
+};
+
+/**
+ * The brand a downloaded file carries.
+ *
+ * Wellbeing Pulse is a standalone product to the person taking it: someone who
+ * scanned a Wellbeing Pulse code and has never heard of DISC360 should not
+ * find "DISC360" in their Downloads folder. The platform is shared; the
+ * participant-facing artefact is not.
+ */
+const PRODUCT_BRAND: Record<ReportProduct, string> = {
+  disc: "DISC360",
+  focus: "DISC360",
+  combined: "DISC360",
+  wellbeing: "Wellbeing",
 };
 
 const MAX_NAME_LENGTH = 60;
@@ -28,7 +44,7 @@ const MAX_NAME_LENGTH = 60;
 export function reportFilename(fullName: string, product: ReportProduct = "disc"): string {
   const name = sanitizeNameSegment(fullName) || "Participant";
   const token = PRODUCT_FILENAME_TOKEN[product];
-  return ["DISC360", name, token, "Report"].filter(Boolean).join("_") + ".pdf";
+  return [PRODUCT_BRAND[product], name, token, "Report"].filter(Boolean).join("_") + ".pdf";
 }
 
 /**

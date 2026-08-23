@@ -32,6 +32,20 @@
   --color-disc-s-soft: #d8e8de;
   --color-disc-c-soft: #d9e4ef;
 
+  /* ── Wellbeing Pulse · sibling product accent ───────────── */
+  /* Deep petrol. Calm and private, and deliberately distinct from both
+     brand botanical and the DISC-C identifier blue, so a Wellbeing Pulse
+     surface is never mistaken for a DISC one at a glance. */
+  --color-pulse: #1f4e5f;
+  --color-pulse-deep: #143743;
+  --color-pulse-teal: #37778a;
+  --color-pulse-soft: #d7e4e7;
+  --color-pulse-mist: #eff4f5;
+  /* Attention, never danger. Warm and low-chroma: an above-threshold score
+     is a prompt to notice, not an alarm, so no red appears anywhere. */
+  --color-pulse-attention: #8a6a2f;
+  --color-pulse-attention-soft: #f0e7d5;
+
   /* ── typography ─────────────────────────────────────────── */
   --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
@@ -141,6 +155,41 @@ body {
 @utility botanical-band {
   background: var(--color-botanical);
   color: var(--color-mineral);
+}
+
+/* ── Wellbeing Pulse utilities ────────────────────────────── */
+
+/* The Wellbeing Pulse page ground. A touch cooler than Meridian ivory, so
+   the sibling product reads as its own place without leaving the family. */
+@utility pulse-canvas {
+  background: var(--color-pulse-mist);
+  color: var(--color-ink);
+}
+
+/* Content card on the pulse ground. */
+@utility pulse-card {
+  background: var(--color-paper);
+  border: 1px solid rgba(31, 78, 95, 0.14);
+  border-radius: var(--radius-editorial);
+  box-shadow: 0 20px 40px -30px rgba(20, 55, 67, 0.3);
+}
+
+/* Small dark accent for the pulse shell — the counterpart of ink-band. */
+@utility pulse-band {
+  background: var(--color-pulse);
+  color: #f4f8f9;
+}
+
+@utility pulse-rule {
+  border-color: rgba(31, 78, 95, 0.16);
+}
+
+/* Focus ring inside the pulse shell, so it matches the accent. */
+@utility pulse-focus {
+  &:focus-visible {
+    outline: 2px solid var(--color-pulse);
+    outline-offset: 3px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -70,18 +70,45 @@ const styles = {
   },
 } as const;
 
+/**
+ * Wellbeing Pulse is a sibling product with its own mark and its own footer
+ * disclaimer. Both are optional overrides: every existing DISC360 template
+ * passes neither and renders exactly as before.
+ */
+export interface EmailBrand {
+  /** Leading word, rendered in ink. */
+  name: string;
+  /** Trailing word, rendered in the brand accent. */
+  accent: string;
+  accentColor: string;
+}
+
+const WELLBEING_BRAND: EmailBrand = {
+  name: "Wellbeing ",
+  accent: "Pulse",
+  accentColor: "#1F4E5F",
+};
+
+export const EMAIL_BRANDS = { wellbeing: WELLBEING_BRAND } as const;
+
 export function EmailShell({
   preview,
   heading,
   children,
   cta,
   footerNote,
+  brand,
+  disclaimer,
 }: {
   preview: string;
   heading: string;
   children: React.ReactNode;
   cta?: { href: string; label: string };
   footerNote?: string;
+  /** Defaults to the DISC360 wordmark. */
+  brand?: EmailBrand;
+  /** Defaults to the DISC360 product disclaimer. */
+  disclaimer?: string;
 }) {
   return (
     <Html lang="en">
@@ -89,9 +116,16 @@ export function EmailShell({
       <Preview>{preview}</Preview>
       <Body style={styles.body}>
         <Container style={styles.container}>
-          <Text style={styles.brand}>
-            DISC<span style={styles.brandAccent}>360</span>
-          </Text>
+          {brand ? (
+            <Text style={styles.brand}>
+              {brand.name}
+              <span style={{ color: brand.accentColor }}>{brand.accent}</span>
+            </Text>
+          ) : (
+            <Text style={styles.brand}>
+              DISC<span style={styles.brandAccent}>360</span>
+            </Text>
+          )}
           <Heading style={styles.heading}>{heading}</Heading>
           {children}
           {cta ? (
@@ -105,8 +139,8 @@ export function EmailShell({
           <Text style={styles.footer}>
             {footerNote ??
               "You're receiving this because of your DISC360 account. Manage notification preferences from Settings."}{" "}
-            DISC360 is a development tool — not a medical, clinical or
-            employment-selection instrument.
+            {disclaimer ??
+              "DISC360 is a development tool — not a medical, clinical or employment-selection instrument."}
           </Text>
         </Container>
       </Body>

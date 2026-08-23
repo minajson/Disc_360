@@ -1,4 +1,4 @@
-import { EmailShell, EmailText } from "@/emails/components";
+import { EMAIL_BRANDS, EmailShell, EmailText } from "@/emails/components";
 
 /**
  * The ten transactional templates. Account verification and password reset
@@ -304,6 +304,46 @@ export function AdminNotificationEmail({
       cta={{ href: actionUrl, label: actionLabel }}
     >
       <EmailText>{body}</EmailText>
+    </EmailShell>
+  );
+}
+
+/**
+ * Wellbeing Pulse — the report-ready notice.
+ *
+ * Carries no score, no item response and no interpretation — not in the
+ * subject line, not in the preview text, not in the body. Wellbeing email
+ * lands in inboxes that are read on shared screens, previewed on lock screens
+ * and forwarded by accident; the only thing this message reveals is that a
+ * report exists and where to sign in for it.
+ *
+ * The link goes to the authenticated report page, so the message itself is
+ * never a credential.
+ */
+export function WellbeingReportReadyEmail({
+  firstName,
+  reportUrl,
+}: {
+  firstName: string;
+  reportUrl: string;
+}) {
+  return (
+    <EmailShell
+      preview="Your Wellbeing Pulse report is ready"
+      heading="Your report is ready"
+      brand={EMAIL_BRANDS.wellbeing}
+      cta={{ href: reportUrl, label: "Open my report" }}
+      footerNote="You asked us to email this report when you completed your Wellbeing Pulse."
+      disclaimer="GHQ-12 is a screening questionnaire and does not provide a diagnosis. Your answers and score are visible only to you."
+    >
+      <EmailText>
+        {firstName ? `${firstName}, thank you` : "Thank you"} for completing your Wellbeing
+        Pulse. Your report is waiting for you when you sign in, and it is private to you.
+      </EmailText>
+      <EmailText>
+        Your individual answers and your score are not shared with your manager, your
+        facilitator or platform administrators.
+      </EmailText>
     </EmailShell>
   );
 }

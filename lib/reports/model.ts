@@ -43,6 +43,38 @@ export interface ReportBar {
   tone?: Dimension;
 }
 
+/**
+ * A 0–N screening scale with a marked threshold.
+ *
+ * Its own primitive rather than a `ReportBar`, because a bar says "how much of
+ * the maximum" and this says "where the count sits relative to a configured
+ * line". Rendering it as a filled bar would imply a proportion of something.
+ */
+export interface ReportScale {
+  label: string;
+  value: number;
+  max: number;
+  /** Marked with a rule and a caption; never used to recolour the whole track. */
+  threshold: number;
+  /** Text beneath the scale, e.g. the at/below-threshold outcome. */
+  caption?: string;
+  atOrAboveThreshold?: boolean;
+}
+
+export interface ReportSeriesPoint {
+  label: string;
+  value: number;
+}
+
+/** A small line chart — used for a participant's own history over time. */
+export interface ReportSeries {
+  points: ReportSeriesPoint[];
+  max: number;
+  /** Dashed reference rule, e.g. the screening threshold. */
+  threshold?: number;
+  thresholdLabel?: string;
+}
+
 export interface ReportSection {
   title: string;
   lead?: string;
@@ -51,6 +83,10 @@ export interface ReportSection {
   /** Two-column guidance, e.g. Do / Avoid. */
   columns?: { heading: string; bullets: string[] }[];
   bars?: ReportBar[];
+  /** A 0–N score against a marked threshold. */
+  scale?: ReportScale;
+  /** A line chart of values over time. */
+  series?: ReportSeries;
 }
 
 export interface ReportDocument {
@@ -308,5 +344,139 @@ export function buildCombinedReport(input: CombinedReportInput): ReportDocument 
       ...disc.sections,
     ],
     disclaimer: `${DISC_DISCLAIMER} ${FOCUS_DISCLAIMER}`,
+  };
+}
+
+
+/* ── Wellbeing Pulse ────────────────────────────────────────────────── */
+
+export interface WellbeingReportHistoryPoint {
+  completedAt: string;
+  totalScore: number;
+  threshold: number;
+}
+
+export interface WellbeingReportInput {
+  participantName: string;
+  completedAt: string;
+  totalScore: number;
+  maxScore: number;
+  threshold: number;
+  atOrAboveThreshold: boolean;
+  /** Copy comes from data/wellbeing-content.ts, already safety-screened. */
+  outcomeHeadline: string;
+  outcomeBody: string;
+  outcomeDetail: string;
+  scoreMeaning: string;
+  disclaimer: string;
+  /** Oldest first. Empty or single-entry histories draw no chart. */
+  history: WellbeingReportHistoryPoint[];
+  movementLabel?: string;
+  movementDetail?: string;
+  movementCaveat?: string;
+  departmentAtCompletion?: string | null;
+  workLocationAtCompletion?: string | null;
+  officeLocationAtCompletion?: string | null;
+  questionnaireVersion: number;
+  scoringVersion: string;
+  attemptNumber?: number | null;
+}
+
+const shortDate = (iso: string): string =>
+  new Date(iso).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+
+/**
+ * The private Wellbeing Pulse report.
+ *
+ * What this deliberately does NOT contain, in a report the participant may
+ * forward or print: any organisational figure, any cohort median, any
+ * comparison against colleagues, any DISC or Focus result, and any item-level
+ * breakdown. A personal wellbeing report is the person's own score, their own
+ * history, and the disclaimer — nothing that would let a reader place them
+ * against anybody else.
+ *
+ * The Likert 0–36 measure is likewise absent. It is stored for research and
+ * trend work, and showing a second, larger-looking number beside the screening
+ * score would invite exactly the misreading the two-scale separation exists to
+ * prevent.
+ */
+export function buildWellbeingReport(input: WellbeingReportInput): ReportDocument {
+  const meta: ReportMetaItem[] = [
+    { label: "Screening score", value: `${input.totalScore} / ${input.maxScore}` },
+    { label: "Screening threshold", value: String(input.threshold) },
+    { label: "Completed", value: formatDate(input.completedAt) },
+  ];
+  if (input.attemptNumber) {
+    meta.push({ label: "Pulse number", value: String(input.attemptNumber) });
+  }
+  if (input.departmentAtCompletion) {
+    meta.push({ label: "Department / Function", value: input.departmentAtCompletion });
+  }
+  if (input.workLocationAtCompletion) {
+    meta.push({
+      label: "Work location",
+      value: input.officeLocationAtCompletion
+        ? `${input.workLocationAtCompletion} · ${input.officeLocationAtCompletion}`
+        : input.workLocationAtCompletion,
+    });
+  }
+
+  const sections: ReportSection[] = [
+    {
+      title: "Your screening score",
+      scale: {
+        label: "GHQ-12 screening score",
+        value: input.totalScore,
+        max: input.maxScore,
+        threshold: input.threshold,
+        atOrAboveThreshold: input.atOrAboveThreshold,
+        caption: input.outcomeBody,
+      },
+      paragraphs: [input.outcomeDetail, input.scoreMeaning],
+    },
+  ];
+
+  // The trend only exists once there is something to compare against.
+  if (input.history.length > 1) {
+    sections.push({
+      title: "Your pulses over time",
+      lead: input.movementLabel,
+      series: {
+        points: input.history.map((point) => ({
+          label: shortDate(point.completedAt),
+          value: point.totalScore,
+        })),
+        max: input.maxScore,
+        threshold: input.threshold,
+        thresholdLabel: `Threshold ${input.threshold}`,
+      },
+      paragraphs: [input.movementDetail, input.movementCaveat].filter(
+        (value): value is string => Boolean(value),
+      ),
+    });
+  }
+
+  sections.push({
+    title: "What this is, and what it is not",
+    paragraphs: [input.disclaimer],
+    bullets: [
+      "Your individual answers and score are private to you. Your manager, your facilitator and platform administrators cannot see them.",
+      "Group reporting only ever uses figures for groups large enough that no one in them can be identified.",
+      "This result is never combined with, compared against or added to any other assessment.",
+      `Questionnaire version ${input.questionnaireVersion} · scoring version ${input.scoringVersion}.`,
+    ],
+  });
+
+  return {
+    product: "wellbeing",
+    participantName: input.participantName,
+    productLabel: "Wellbeing Pulse",
+    eyebrow: "Private report",
+    headline: input.outcomeHeadline,
+    summary: input.outcomeBody,
+    completedAt: input.completedAt,
+    meta,
+    sections,
+    disclaimer: input.disclaimer,
   };
 }

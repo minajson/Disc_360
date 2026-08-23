@@ -127,6 +127,7 @@ test("super admin navigation matches the specified set", () => {
       "Emails",
       "Reports",
       "Roles",
+      "Wellbeing",
       "Settings",
     ],
   );

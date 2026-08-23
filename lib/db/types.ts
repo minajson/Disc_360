@@ -1649,6 +1649,7 @@ export type Database = {
           profile_id: string
           result_id: string | null
           team_id: string | null
+          wellbeing_result_id: string | null
         }
         Insert: {
           created_at?: string
@@ -1657,6 +1658,7 @@ export type Database = {
           profile_id: string
           result_id?: string | null
           team_id?: string | null
+          wellbeing_result_id?: string | null
         }
         Update: {
           created_at?: string
@@ -1665,6 +1667,7 @@ export type Database = {
           profile_id?: string
           result_id?: string | null
           team_id?: string | null
+          wellbeing_result_id?: string | null
         }
         Relationships: [
           {
@@ -1686,6 +1689,13 @@ export type Database = {
             columns: ["team_id"]
             isOneToOne: false
             referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_exports_wellbeing_result_id_fkey"
+            columns: ["wellbeing_result_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_results"
             referencedColumns: ["id"]
           },
         ]
@@ -2083,6 +2093,688 @@ export type Database = {
           },
         ]
       }
+      wellbeing_departments: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          id: string
+          name: string
+          organization_id: string | null
+          position: number
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          organization_id?: string | null
+          position?: number
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          organization_id?: string | null
+          position?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_departments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wellbeing_item_options: {
+        Row: {
+          bimodal_score: number
+          created_at: string
+          id: string
+          item_id: string
+          label: string | null
+          likert_score: number
+          position: number
+        }
+        Insert: {
+          bimodal_score: number
+          created_at?: string
+          id?: string
+          item_id: string
+          label?: string | null
+          likert_score: number
+          position: number
+        }
+        Update: {
+          bimodal_score?: number
+          created_at?: string
+          id?: string
+          item_id?: string
+          label?: string | null
+          likert_score?: number
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_item_options_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wellbeing_items: {
+        Row: {
+          created_at: string
+          external_id: string
+          id: string
+          position: number
+          prompt: string | null
+          version_id: string
+        }
+        Insert: {
+          created_at?: string
+          external_id: string
+          id?: string
+          position: number
+          prompt?: string | null
+          version_id: string
+        }
+        Update: {
+          created_at?: string
+          external_id?: string
+          id?: string
+          position?: number
+          prompt?: string | null
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_items_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wellbeing_office_locations: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          id: string
+          name: string
+          organization_id: string | null
+          position: number
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          organization_id?: string | null
+          position?: number
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          organization_id?: string | null
+          position?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_office_locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wellbeing_policies: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          id: string
+          min_cohort_size: number
+          organization_id: string | null
+          rationale: string
+          scoring_method: string
+          screening_threshold: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          id?: string
+          min_cohort_size?: number
+          organization_id?: string | null
+          rationale?: string
+          scoring_method?: string
+          screening_threshold?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          id?: string
+          min_cohort_size?: number
+          organization_id?: string | null
+          rationale?: string
+          scoring_method?: string
+          screening_threshold?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_policies_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_policies_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wellbeing_report_deliveries: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          masked_recipient: string
+          notification_log_id: string | null
+          profile_id: string
+          requested_at: string
+          resolved_at: string | null
+          result_id: string
+          status: Database["public"]["Enums"]["wellbeing_delivery_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          masked_recipient: string
+          notification_log_id?: string | null
+          profile_id: string
+          requested_at?: string
+          resolved_at?: string | null
+          result_id: string
+          status?: Database["public"]["Enums"]["wellbeing_delivery_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          masked_recipient?: string
+          notification_log_id?: string | null
+          profile_id?: string
+          requested_at?: string
+          resolved_at?: string | null
+          result_id?: string
+          status?: Database["public"]["Enums"]["wellbeing_delivery_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_report_deliveries_notification_log_id_fkey"
+            columns: ["notification_log_id"]
+            isOneToOne: false
+            referencedRelation: "notification_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_report_deliveries_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_report_deliveries_result_id_fkey"
+            columns: ["result_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wellbeing_responses: {
+        Row: {
+          answered_at: string
+          created_at: string
+          id: string
+          item_id: string
+          option_position: number
+          session_id: string
+          updated_at: string
+        }
+        Insert: {
+          answered_at?: string
+          created_at?: string
+          id?: string
+          item_id: string
+          option_position: number
+          session_id: string
+          updated_at?: string
+        }
+        Update: {
+          answered_at?: string
+          created_at?: string
+          id?: string
+          item_id?: string
+          option_position?: number
+          session_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_responses_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_responses_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wellbeing_results: {
+        Row: {
+          at_or_above_threshold: boolean
+          attempt_number: number | null
+          completed_at: string
+          created_at: string
+          department_at_completion: string | null
+          id: string
+          item_positions: number[]
+          job_title_at_completion: string | null
+          likert_score: number
+          office_location_at_completion: string | null
+          organization_id: string | null
+          organization_name_at_completion: string | null
+          profile_id: string
+          questionnaire_version: number
+          scoring_method: string
+          scoring_version: string
+          session_id: string
+          team_id: string | null
+          team_name_at_completion: string | null
+          team_series_id: string | null
+          threshold_at_completion: number
+          total_score: number
+          version_id: string
+          work_location_at_completion:
+            | Database["public"]["Enums"]["wellbeing_work_location"]
+            | null
+        }
+        Insert: {
+          at_or_above_threshold: boolean
+          attempt_number?: number | null
+          completed_at?: string
+          created_at?: string
+          department_at_completion?: string | null
+          id?: string
+          item_positions: number[]
+          job_title_at_completion?: string | null
+          likert_score: number
+          office_location_at_completion?: string | null
+          organization_id?: string | null
+          organization_name_at_completion?: string | null
+          profile_id: string
+          questionnaire_version: number
+          scoring_method?: string
+          scoring_version: string
+          session_id: string
+          team_id?: string | null
+          team_name_at_completion?: string | null
+          team_series_id?: string | null
+          threshold_at_completion: number
+          total_score: number
+          version_id: string
+          work_location_at_completion?:
+            | Database["public"]["Enums"]["wellbeing_work_location"]
+            | null
+        }
+        Update: {
+          at_or_above_threshold?: boolean
+          attempt_number?: number | null
+          completed_at?: string
+          created_at?: string
+          department_at_completion?: string | null
+          id?: string
+          item_positions?: number[]
+          job_title_at_completion?: string | null
+          likert_score?: number
+          office_location_at_completion?: string | null
+          organization_id?: string | null
+          organization_name_at_completion?: string | null
+          profile_id?: string
+          questionnaire_version?: number
+          scoring_method?: string
+          scoring_version?: string
+          session_id?: string
+          team_id?: string | null
+          team_name_at_completion?: string | null
+          team_series_id?: string | null
+          threshold_at_completion?: number
+          total_score?: number
+          version_id?: string
+          work_location_at_completion?:
+            | Database["public"]["Enums"]["wellbeing_work_location"]
+            | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_results_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_results_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_results_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "wellbeing_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_results_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_results_team_series_id_fkey"
+            columns: ["team_series_id"]
+            isOneToOne: false
+            referencedRelation: "team_series"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_results_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wellbeing_role_grants: {
+        Row: {
+          created_at: string
+          granted_at: string
+          granted_by: string
+          id: string
+          note: string
+          organization_id: string
+          profile_id: string
+          revoked_at: string | null
+          revoked_by: string | null
+          role: Database["public"]["Enums"]["wellbeing_access_role"]
+        }
+        Insert: {
+          created_at?: string
+          granted_at?: string
+          granted_by: string
+          id?: string
+          note?: string
+          organization_id: string
+          profile_id: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          role: Database["public"]["Enums"]["wellbeing_access_role"]
+        }
+        Update: {
+          created_at?: string
+          granted_at?: string
+          granted_by?: string
+          id?: string
+          note?: string
+          organization_id?: string
+          profile_id?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          role?: Database["public"]["Enums"]["wellbeing_access_role"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_role_grants_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_role_grants_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_role_grants_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_role_grants_revoked_by_fkey"
+            columns: ["revoked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wellbeing_sessions: {
+        Row: {
+          completed_at: string | null
+          consent_at: string | null
+          consent_given: boolean
+          contact_email: string | null
+          created_at: string
+          current_index: number
+          department_id: string | null
+          department_name: string | null
+          email_opt_in: boolean
+          id: string
+          job_title: string | null
+          office_location_id: string | null
+          office_location_name: string | null
+          organization_id: string | null
+          profile_id: string
+          self_reported_first_time: boolean | null
+          started_at: string
+          status: Database["public"]["Enums"]["session_status"]
+          team_id: string | null
+          updated_at: string
+          version_id: string
+          work_location:
+            | Database["public"]["Enums"]["wellbeing_work_location"]
+            | null
+        }
+        Insert: {
+          completed_at?: string | null
+          consent_at?: string | null
+          consent_given?: boolean
+          contact_email?: string | null
+          created_at?: string
+          current_index?: number
+          department_id?: string | null
+          department_name?: string | null
+          email_opt_in?: boolean
+          id?: string
+          job_title?: string | null
+          office_location_id?: string | null
+          office_location_name?: string | null
+          organization_id?: string | null
+          profile_id: string
+          self_reported_first_time?: boolean | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["session_status"]
+          team_id?: string | null
+          updated_at?: string
+          version_id: string
+          work_location?:
+            | Database["public"]["Enums"]["wellbeing_work_location"]
+            | null
+        }
+        Update: {
+          completed_at?: string | null
+          consent_at?: string | null
+          consent_given?: boolean
+          contact_email?: string | null
+          created_at?: string
+          current_index?: number
+          department_id?: string | null
+          department_name?: string | null
+          email_opt_in?: boolean
+          id?: string
+          job_title?: string | null
+          office_location_id?: string | null
+          office_location_name?: string | null
+          organization_id?: string | null
+          profile_id?: string
+          self_reported_first_time?: boolean | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["session_status"]
+          team_id?: string | null
+          updated_at?: string
+          version_id?: string
+          work_location?:
+            | Database["public"]["Enums"]["wellbeing_work_location"]
+            | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_sessions_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_sessions_office_location_id_fkey"
+            columns: ["office_location_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_office_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_sessions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_sessions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_sessions_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_sessions_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wellbeing_versions: {
+        Row: {
+          content_status: Database["public"]["Enums"]["wellbeing_content_status"]
+          created_at: string
+          id: string
+          is_active: boolean
+          item_count: number
+          licence_expires_at: string | null
+          licence_granted_at: string | null
+          licence_holder: string | null
+          licence_note: string
+          licence_reference: string | null
+          name: string
+          questionnaire_code: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          content_status?: Database["public"]["Enums"]["wellbeing_content_status"]
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          item_count?: number
+          licence_expires_at?: string | null
+          licence_granted_at?: string | null
+          licence_holder?: string | null
+          licence_note?: string
+          licence_reference?: string | null
+          name: string
+          questionnaire_code?: string
+          updated_at?: string
+          version: number
+        }
+        Update: {
+          content_status?: Database["public"]["Enums"]["wellbeing_content_status"]
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          item_count?: number
+          licence_expires_at?: string | null
+          licence_granted_at?: string | null
+          licence_holder?: string | null
+          licence_note?: string
+          licence_reference?: string | null
+          name?: string
+          questionnaire_code?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -2120,6 +2812,15 @@ export type Database = {
         Returns: string
       }
       apply_super_admin_bootstrap: { Args: never; Returns: number }
+      can_read_wellbeing_lookup: { Args: { org: string }; Returns: boolean }
+      has_any_wellbeing_role: { Args: { org: string }; Returns: boolean }
+      has_wellbeing_role: {
+        Args: {
+          org: string
+          required: Database["public"]["Enums"]["wellbeing_access_role"]
+        }
+        Returns: boolean
+      }
       identity_summary: { Args: { p_profile: string }; Returns: Json }
       is_org_admin: { Args: { org: string }; Returns: boolean }
       is_org_member: { Args: { org: string }; Returns: boolean }
@@ -2152,6 +2853,13 @@ export type Database = {
           team_name: string
         }[]
       }
+      wellbeing_active_policy: {
+        Args: { org: string }
+        Returns: {
+          min_cohort_size: number
+          screening_threshold: number
+        }[]
+      }
     }
     Enums: {
       ai_narrative_source: "model" | "rules" | "edited"
@@ -2170,11 +2878,15 @@ export type Database = {
         | "CD"
         | "DC"
         | "BAL"
-      assessment_type: "disc" | "focus" | "combined"
+      assessment_type: "disc" | "focus" | "combined" | "wellbeing"
       assignment_status: "invited" | "started" | "completed"
       campaign_status: "draft" | "scheduled" | "active" | "closed" | "archived"
       dimension: "D" | "I" | "S" | "C"
-      export_kind: "individual_report" | "team_report" | "presentation"
+      export_kind:
+        | "individual_report"
+        | "team_report"
+        | "presentation"
+        | "wellbeing_report"
       focus_question_kind: "single" | "scale"
       invitation_status: "pending" | "accepted" | "revoked" | "expired"
       notification_status: "queued" | "sent" | "failed" | "skipped" | "logged"
@@ -2207,6 +2919,14 @@ export type Database = {
         | "ended"
       session_status: "in_progress" | "completed" | "abandoned"
       team_member_role: "member" | "team_admin"
+      wellbeing_access_role: "wellbeing_governance" | "wellbeing_analyst"
+      wellbeing_content_status: "structure_only" | "licensed" | "retired"
+      wellbeing_delivery_status:
+        | "requested"
+        | "sent"
+        | "failed"
+        | "not_delivered"
+      wellbeing_work_location: "field_based" | "office_based"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2354,11 +3074,16 @@ export const Constants = {
         "DC",
         "BAL",
       ],
-      assessment_type: ["disc", "focus", "combined"],
+      assessment_type: ["disc", "focus", "combined", "wellbeing"],
       assignment_status: ["invited", "started", "completed"],
       campaign_status: ["draft", "scheduled", "active", "closed", "archived"],
       dimension: ["D", "I", "S", "C"],
-      export_kind: ["individual_report", "team_report", "presentation"],
+      export_kind: [
+        "individual_report",
+        "team_report",
+        "presentation",
+        "wellbeing_report",
+      ],
       focus_question_kind: ["single", "scale"],
       invitation_status: ["pending", "accepted", "revoked", "expired"],
       notification_status: ["queued", "sent", "failed", "skipped", "logged"],
@@ -2395,6 +3120,15 @@ export const Constants = {
       ],
       session_status: ["in_progress", "completed", "abandoned"],
       team_member_role: ["member", "team_admin"],
+      wellbeing_access_role: ["wellbeing_governance", "wellbeing_analyst"],
+      wellbeing_content_status: ["structure_only", "licensed", "retired"],
+      wellbeing_delivery_status: [
+        "requested",
+        "sent",
+        "failed",
+        "not_delivered",
+      ],
+      wellbeing_work_location: ["field_based", "office_based"],
     },
   },
 } as const

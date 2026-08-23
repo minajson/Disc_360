@@ -64,6 +64,7 @@ export const SUPER_ADMIN_NAV: readonly NavItem[] = [
   { href: "/admin/emails", label: "Emails" },
   { href: "/admin/reports", label: "Reports" },
   { href: "/admin/roles", label: "Roles" },
+  { href: "/admin/wellbeing", label: "Wellbeing" },
   { href: "/admin/settings", label: "Settings" },
 ];
 

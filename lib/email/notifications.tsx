@@ -11,6 +11,7 @@ import {
   TeamCampaignCompletedEmail,
   TeamInvitationEmail,
   WelcomeEmail,
+  WellbeingReportReadyEmail,
 } from "@/emails/templates";
 import { buildJoinUrl, getPublicBaseUrl } from "@/lib/utils/site-url";
 
@@ -239,5 +240,38 @@ export async function sendPasswordChanged(to: string, profileId: string) {
     subject: "Your DISC360 password was changed",
     category: "essential",
     react: <PasswordChangedEmail supportEmail="hello@disc360.app" />,
+  });
+}
+
+/**
+ * Wellbeing Pulse — the opt-in report notice.
+ *
+ * `essential` because the participant explicitly asked for this specific
+ * message about their own report; it is not a product notification they may
+ * have muted. The subject deliberately names the product and nothing else: no
+ * score, ever, in a subject line.
+ *
+ * The result is returned so the caller can tell the participant the truth. A
+ * message that was only logged (no provider configured, or a real recipient
+ * outside production) is a failure from the person's point of view.
+ */
+export async function sendWellbeingReportReady(options: {
+  to: string;
+  profileId: string;
+  firstName: string;
+  reportPath: string;
+}): Promise<EmailSendResult> {
+  return sendEmail({
+    to: options.to,
+    profileId: options.profileId,
+    template: "wellbeing_report_ready",
+    subject: "Your Wellbeing Pulse report is ready",
+    category: "essential",
+    react: (
+      <WellbeingReportReadyEmail
+        firstName={options.firstName}
+        reportUrl={`${siteUrl()}${options.reportPath}`}
+      />
+    ),
   });
 }

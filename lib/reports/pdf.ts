@@ -1,5 +1,12 @@
 import type { Dimension } from "../types/index.ts";
-import type { ReportBar, ReportDocument, ReportSection } from "./model.ts";
+import type {
+  ReportBar,
+  ReportDocument,
+  ReportScale,
+  ReportSection,
+  ReportSeries,
+} from "./model.ts";
+import type { ReportProduct } from "./identity.ts";
 
 /**
  * A PDF writer for the individual report.
@@ -32,6 +39,12 @@ const BOTANICAL = "0.090 0.298 0.235";
 const TEAL = "0.294 0.510 0.459";
 const HAIRLINE = "0.867 0.851 0.824";
 const SAND = "0.945 0.933 0.914";
+// Wellbeing Pulse accents. Attention is warm and low-chroma on purpose: an
+// above-threshold screening score is a prompt to notice, never an alarm, so
+// no red enters the participant's own report.
+const PULSE = "0.122 0.306 0.373";
+const PULSE_SOFT = "0.843 0.894 0.906";
+const PULSE_ATTENTION = "0.541 0.416 0.184";
 
 const DIMENSION_TONE: Record<Dimension, string> = {
   D: "0.761 0.290 0.180",
@@ -314,7 +327,26 @@ class ReportLayout {
 
 /* ── report rendering ─────────────────────────────────────── */
 
-function drawWordmark(canvas: PageCanvas, y: number): void {
+/**
+ * The wordmark on the cover.
+ *
+ * Wellbeing Pulse reports carry the Wellbeing Pulse mark, not DISC360's. A
+ * participant who reached this product through a Wellbeing Pulse code has no
+ * relationship with DISC360, and their private wellbeing report is not the
+ * place to introduce one.
+ */
+function drawWordmark(canvas: PageCanvas, y: number, product: ReportProduct): void {
+  if (product === "wellbeing") {
+    canvas.text("Wellbeing", { x: MARGIN_X, y, size: 13, font: "bold", color: INK });
+    canvas.text("Pulse", {
+      x: MARGIN_X + measureText("Wellbeing ", 13, "bold"),
+      y,
+      size: 13,
+      font: "bold",
+      color: PULSE,
+    });
+    return;
+  }
   canvas.text("DISC", { x: MARGIN_X, y, size: 13, font: "bold", color: INK });
   canvas.text("360", {
     x: MARGIN_X + measureText("DISC", 13, "bold"),
@@ -323,6 +355,163 @@ function drawWordmark(canvas: PageCanvas, y: number): void {
     font: "bold",
     color: BOTANICAL,
   });
+}
+
+/**
+ * A 0–max screening scale with the configured threshold marked.
+ *
+ * Every cell is drawn, so the axis is the same width whatever the score, and
+ * the threshold is a labelled rule rather than a colour change — the same
+ * reading as the on-screen scale, which is what makes "the PDF says something
+ * the page does not" impossible rather than merely unlikely.
+ */
+function drawScale(layout: ReportLayout, scale: ReportScale): void {
+  const cellCount = scale.max + 1;
+  const gap = 2.5;
+  const cellWidth = (CONTENT_WIDTH - gap * (cellCount - 1)) / cellCount;
+  const cellHeight = 22;
+  const tone = scale.atOrAboveThreshold ? PULSE_ATTENTION : PULSE;
+
+  layout.reserve(cellHeight + 46);
+  const canvas = layout.canvas;
+  let top = layout.cursor;
+
+  // Headline figure, e.g. "7 / 12".
+  const figure = `${scale.value} / ${scale.max}`;
+  canvas.text(figure, { x: MARGIN_X, y: top - 20, size: 22, font: "bold", color: tone });
+  canvas.text(scale.label.toUpperCase(), {
+    x: MARGIN_X + measureText(figure, 22, "bold") + 12,
+    y: top - 13,
+    size: 7.5,
+    color: FAINT,
+    tracking: 0.9,
+  });
+  layout.move(30);
+  top = layout.cursor;
+
+  for (let cell = 0; cell < cellCount; cell += 1) {
+    const x = MARGIN_X + cell * (cellWidth + gap);
+    const filled = scale.value > 0 && cell <= scale.value;
+    canvas.rect(x, top - cellHeight, cellWidth, cellHeight, filled ? tone : PULSE_SOFT);
+    const caption = String(cell);
+    canvas.text(caption, {
+      x: x + (cellWidth - measureText(caption, 6.5, "regular")) / 2,
+      y: top - cellHeight - 9,
+      size: 6.5,
+      color: FAINT,
+    });
+  }
+
+  // Threshold rule, drawn at the left edge of the threshold cell.
+  const thresholdX = MARGIN_X + scale.threshold * (cellWidth + gap) - gap / 2;
+  canvas.rect(thresholdX, top - cellHeight - 3, 0.9, cellHeight + 6, PULSE_ATTENTION);
+
+  layout.move(cellHeight + 14);
+  layout.paragraph(`Current screening threshold: ${scale.threshold}`, {
+    size: 8.5,
+    font: "bold",
+    color: PULSE_ATTENTION,
+    leading: 12,
+  });
+  if (scale.caption) {
+    layout.move(2);
+    layout.paragraph(scale.caption, { size: 9.5, color: SLATE, leading: 13.5 });
+  }
+  layout.move(6);
+}
+
+/**
+ * A line chart of a participant's own scores over time.
+ *
+ * Every point is also printed as a value, and the labels run along the base,
+ * so the series is legible in greyscale and after a photocopy — which is how
+ * a fair number of these will actually be read.
+ */
+function drawSeries(layout: ReportLayout, series: ReportSeries): void {
+  const points = series.points;
+  if (points.length === 0) return;
+
+  const plotHeight = 96;
+  layout.reserve(plotHeight + 40);
+  const canvas = layout.canvas;
+  const top = layout.cursor;
+  const baseline = top - plotHeight;
+  const leftGutter = 18;
+  const plotWidth = CONTENT_WIDTH - leftGutter;
+  const originX = MARGIN_X + leftGutter;
+
+  const x = (index: number) =>
+    points.length === 1
+      ? originX + plotWidth / 2
+      : originX + (index / (points.length - 1)) * plotWidth;
+  const y = (value: number) =>
+    baseline + (series.max > 0 ? Math.min(Math.max(value, 0), series.max) / series.max : 0) * plotHeight;
+
+  // Gridlines at 0, half, max.
+  for (const gridValue of [0, Math.round(series.max / 2), series.max]) {
+    canvas.rule(originX, y(gridValue), plotWidth, HAIRLINE);
+    canvas.text(String(gridValue), {
+      x: MARGIN_X,
+      y: y(gridValue) - 2.5,
+      size: 6.5,
+      color: FAINT,
+    });
+  }
+
+  if (series.threshold !== undefined) {
+    // Dashed by hand: short segments, so no graphics-state dash array is needed.
+    const dashY = y(series.threshold);
+    for (let dashX = originX; dashX < originX + plotWidth; dashX += 7) {
+      canvas.rect(dashX, dashY, 4, 0.8, PULSE_ATTENTION);
+    }
+    const label = series.thresholdLabel ?? `Threshold ${series.threshold}`;
+    canvas.text(label, {
+      x: originX + plotWidth - measureText(label, 6.5, "regular"),
+      y: dashY + 4,
+      size: 6.5,
+      color: PULSE_ATTENTION,
+    });
+  }
+
+  // The line, as a run of thin quads between consecutive points.
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const x1 = x(index);
+    const y1 = y(points[index]!.value);
+    const x2 = x(index + 1);
+    const y2 = y(points[index + 1]!.value);
+    const steps = Math.max(1, Math.ceil(Math.abs(x2 - x1) / 2));
+    for (let step = 0; step < steps; step += 1) {
+      const t0 = step / steps;
+      const t1 = (step + 1) / steps;
+      const segX = x1 + (x2 - x1) * t0;
+      const segY = y1 + (y2 - y1) * t0;
+      const segW = (x2 - x1) * (t1 - t0) + 1.4;
+      canvas.rect(segX, segY - 0.7, segW, 1.4, PULSE);
+    }
+  }
+
+  points.forEach((point, index) => {
+    const px = x(index);
+    const py = y(point.value);
+    canvas.rect(px - 2.2, py - 2.2, 4.4, 4.4, PULSE);
+    const value = String(point.value);
+    canvas.text(value, {
+      x: px - measureText(value, 7.5, "bold") / 2,
+      y: py + 6,
+      size: 7.5,
+      font: "bold",
+      color: INK,
+    });
+    const label = point.label;
+    canvas.text(label, {
+      x: Math.max(MARGIN_X, px - measureText(label, 6.5, "regular") / 2),
+      y: baseline - 11,
+      size: 6.5,
+      color: FAINT,
+    });
+  });
+
+  layout.move(plotHeight + 24);
 }
 
 function drawBars(layout: ReportLayout, bars: ReportBar[]): void {
@@ -377,6 +566,14 @@ function drawSection(layout: ReportLayout, section: ReportSection): void {
     layout.paragraph(paragraph, { size: 9.5, color: SLATE, leading: 13.5 });
     layout.move(5);
   }
+  if (section.scale) {
+    layout.move(4);
+    drawScale(layout, section.scale);
+  }
+  if (section.series) {
+    layout.move(4);
+    drawSeries(layout, section.series);
+  }
   if (section.bars) {
     layout.move(2);
     drawBars(layout, section.bars);
@@ -402,7 +599,7 @@ function drawSection(layout: ReportLayout, section: ReportSection): void {
 function drawCover(layout: ReportLayout, document: ReportDocument): void {
   const canvas = layout.canvas;
   const top = layout.cursor;
-  drawWordmark(canvas, top - 10);
+  drawWordmark(canvas, top - 10, document.product);
   const label = document.productLabel.toUpperCase();
   canvas.text(label, {
     x: MARGIN_X + CONTENT_WIDTH - measureText(label, 7.5, "regular") - 7.5 * 0.14 * label.length,
@@ -459,7 +656,8 @@ function drawCover(layout: ReportLayout, document: ReportDocument): void {
 function drawFooters(pages: PageCanvas[], document: ReportDocument): void {
   pages.forEach((canvas, index) => {
     canvas.rule(MARGIN_X, MARGIN_BOTTOM - 16, CONTENT_WIDTH);
-    canvas.text(`DISC360 · ${document.participantName}`, {
+    const brand = document.product === "wellbeing" ? "Wellbeing Pulse" : "DISC360";
+    canvas.text(`${brand} · ${document.participantName}`, {
       x: MARGIN_X,
       y: MARGIN_BOTTOM - 28,
       size: 7.5,
@@ -529,9 +727,15 @@ export function renderReportPdf(document: ReportDocument, options: RenderOptions
   objects[pagesId - 1] =
     `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] >>`;
 
+  // Document metadata is visible in every PDF reader's properties panel and to
+  // desktop file indexers, so it carries the same brand the cover does. A
+  // Wellbeing Pulse participant's private report must not identify DISC360
+  // anywhere, including in a field nobody thinks to look at.
+  const brandName = document.product === "wellbeing" ? "Wellbeing Pulse" : "DISC360";
   const infoId = addObject(
-    `<< /Title ${pdfString(`${document.participantName} — DISC360 individual report`)} ` +
-      `/Author (DISC360) /Creator (DISC360) /Producer (DISC360) ` +
+    `<< /Title ${pdfString(`${document.participantName} — ${brandName} individual report`)} ` +
+      `/Author ${pdfString(brandName)} /Creator ${pdfString(brandName)} ` +
+      `/Producer ${pdfString(brandName)} ` +
       `/Subject ${pdfString(document.productLabel)} ` +
       `/CreationDate ${pdfString(pdfDate(options.generatedAt ?? document.completedAt))} >>`,
   );
