@@ -154,6 +154,10 @@ declare
   v_member_a uuid;
   v_member_b uuid;
   v_floor int;
+  v_pilot_team uuid;
+  v_cap_person uuid;
+  v_cap_first uuid;
+  v_i int;
 begin
   select t.id, t.organization_id into v_team, v_org from public.teams t limit 1;
   select id into v_super from public.profiles where is_super_admin order by email limit 1;
@@ -565,6 +569,103 @@ begin
   perform pg_temp.record(
     'the seed host guard refuses every public (hosted) address',
     v_floor = 5, format('%s of 5 public addresses refused', v_floor));
+
+  /* ── §25 · controlled pilot capacity ──────────────────────────────── */
+  --
+  -- Capacity is campaign governance enforced at the row write. These checks
+  -- exercise the trigger itself, so a UI that stopped calling it would not
+  -- make them pass.
+
+  select t.id into v_pilot_team from public.teams t
+   where t.id <> v_team
+     and t.id not in (select team_id from public.wellbeing_sessions where team_id is not null)
+   limit 1;
+  update public.teams set wellbeing_pilot_capacity = 3 where id = v_pilot_team;
+
+  -- Three distinct people take the three places.
+  for v_i in 1..3 loop
+    insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+      created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
+    values ('00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated',
+      'authenticated', 'cap-' || v_i || '@harness.invalid', 'NO-LOGIN', now(), now(),
+      '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb)
+    returning id into v_cap_person;
+    if v_i = 1 then v_cap_first := v_cap_person; end if;
+    insert into public.wellbeing_sessions
+      (profile_id, version_id, instrument_key, team_id, status, consent_given, consent_at)
+    values (v_cap_person, v_version, 'ghq12', v_pilot_team, 'in_progress', true, now());
+  end loop;
+
+  select count(distinct profile_id) into v_i
+  from public.wellbeing_sessions where team_id = v_pilot_team;
+  perform pg_temp.record('a pilot admits exactly its capacity', v_i = 3,
+    format('%s distinct participants', v_i));
+
+  -- A fourth, genuinely new person is refused by the DATABASE.
+  insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+    created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
+  values ('00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated',
+    'authenticated', 'cap-overflow@harness.invalid', 'NO-LOGIN', now(), now(),
+    '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb)
+  returning id into v_cap_person;
+
+  perform pg_temp.expect_rejected(
+    'participant beyond capacity is refused by the database, not the UI',
+    format($sql$insert into public.wellbeing_sessions
+       (profile_id, version_id, instrument_key, team_id, status, consent_given)
+       values (%L, %L, 'ghq12', %L, 'in_progress', true)$sql$,
+      v_cap_person, v_version, v_pilot_team));
+
+  -- A participant who already holds a place may retake, and does not take a
+  -- second one.
+  insert into public.wellbeing_sessions
+    (profile_id, version_id, instrument_key, team_id, status, consent_given)
+  values (v_cap_first, v_version, 'disc360_wellbeing_v1', v_pilot_team, 'in_progress', true);
+  select count(distinct profile_id) into v_i
+  from public.wellbeing_sessions where team_id = v_pilot_team;
+  perform pg_temp.record(
+    'a returning participant does not consume another place', v_i = 3,
+    format('%s distinct participants after a retake', v_i));
+
+  -- An existing participant can still finish after the pilot filled up.
+  update public.wellbeing_sessions set status = 'completed', completed_at = now(),
+    consent_at = now(), department_name = 'Operations', work_location = 'field_based'
+   where team_id = v_pilot_team and profile_id = v_cap_first and status = 'in_progress';
+  perform pg_temp.record(
+    'an in-progress participant can complete after capacity is reached',
+    exists (select 1 from public.wellbeing_sessions
+             where team_id = v_pilot_team and profile_id = v_cap_first and status = 'completed'));
+
+  -- Lifting the cap admits the refused participant, with nothing else changed.
+  update public.teams set wellbeing_pilot_capacity = null where id = v_pilot_team;
+  insert into public.wellbeing_sessions
+    (profile_id, version_id, instrument_key, team_id, status, consent_given)
+  values (v_cap_person, v_version, 'ghq12', v_pilot_team, 'in_progress', true);
+  select count(distinct profile_id) into v_i
+  from public.wellbeing_sessions where team_id = v_pilot_team;
+  perform pg_temp.record(
+    'setting capacity to NULL lifts the cap without any other change', v_i = 4,
+    format('%s distinct participants once unrestricted', v_i));
+
+  -- Capacity is not a licensing decision: a free place does not make a
+  -- structure-only instrument runnable.
+  perform pg_temp.record(
+    'a free place does not activate a restricted instrument',
+    (select coalesce(array_agg(instrument_key order by instrument_key), array[]::text[])
+       from public.wellbeing_versions where is_active) = array['disc360_wellbeing_v1']);
+
+  -- The status function reports counts, and only counts. Read the function's
+  -- actual signature from the catalogue: every OUT parameter must be an
+  -- integer, so there is no column shaped like an identity to return.
+  perform pg_temp.record(
+    'the pilot status function returns integers only — never an identity',
+    (select bool_and(t.typname = 'int4')
+       from pg_proc p
+       join unnest(p.proallargtypes) with ordinality as a(oid, ord) on true
+       join pg_type t on t.oid = a.oid
+      where p.proname = 'wellbeing_pilot_status'
+        and p.pronamespace = 'public'::regnamespace
+        and a.ord > 1));
 
 end;
 $harness$;

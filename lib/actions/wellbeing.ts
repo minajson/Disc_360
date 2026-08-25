@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOnboarded } from "@/lib/auth/guards";
 import { createSupabaseAdminClient } from "@/lib/db/admin";
+import { isPilotCapacityError, PILOT_CAPACITY_MESSAGE } from "@/lib/wellbeing/pilot";
 import {
   computeWellbeingResult,
   WELLBEING_SCORING_METHOD,
@@ -160,6 +161,14 @@ export async function beginWellbeingPulse(input: {
     })
     .select("id")
     .single();
+
+  // The pilot capacity control refuses a NEW participant once the campaign is
+  // full. It is not a fault, so it does not read like one — and it is reached
+  // only after the resume lookup above, so anyone who already holds a place
+  // continues their own attempt rather than meeting this message.
+  if (error && isPilotCapacityError(error)) {
+    return { ok: false, error: PILOT_CAPACITY_MESSAGE };
+  }
 
   if (error || !session) return { ok: false, error: "Could not start your Wellbeing Pulse." };
   return { ok: true, sessionId: session.id };

@@ -2001,6 +2001,7 @@ export type Database = {
           timezone: string | null
           updated_at: string
           wellbeing_instrument_key: string | null
+          wellbeing_pilot_capacity: number | null
         }
         Insert: {
           active_slide?: number | null
@@ -2034,6 +2035,7 @@ export type Database = {
           timezone?: string | null
           updated_at?: string
           wellbeing_instrument_key?: string | null
+          wellbeing_pilot_capacity?: number | null
         }
         Update: {
           active_slide?: number | null
@@ -2067,6 +2069,7 @@ export type Database = {
           timezone?: string | null
           updated_at?: string
           wellbeing_instrument_key?: string | null
+          wellbeing_pilot_capacity?: number | null
         }
         Relationships: [
           {
@@ -3066,6 +3069,15 @@ export type Database = {
           cohort: string
           participants: number
           scope: string
+        }[]
+      }
+      wellbeing_pilot_status: {
+        Args: { p_team: string }
+        Returns: {
+          capacity: number
+          completed: number
+          in_progress: number
+          joined: number
         }[]
       }
     }

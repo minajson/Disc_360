@@ -17,6 +17,8 @@ import {
   InstrumentPicker,
   type InstrumentOption,
 } from "@/components/wellbeing/InstrumentPicker";
+import { PilotPanel } from "@/components/wellbeing/PilotPanel";
+import { readPilotStatus } from "@/lib/wellbeing/pilot";
 
 export const metadata: Metadata = { title: "Campaign" };
 
@@ -91,7 +93,6 @@ export default async function WellbeingCampaignPage({
   const byProfile = new Map(attempts.map((session) => [session.profile_id as string, session]));
 
   const completed = attempts.filter((session) => session.status === "completed").length;
-  const inProgress = attempts.filter((session) => session.status === "in_progress").length;
   const invited = roster.length;
   const participation = invited > 0 ? Math.round((completed / invited) * 100) : null;
   const locked = attempts.length > 0;
@@ -112,6 +113,9 @@ export default async function WellbeingCampaignPage({
 
   const joinUrl = `${getPublicBaseUrl().url}/wellbeing/join/${team.invite_token}`;
 
+  // Four integers describing the pilot. Never an identity — see readPilotStatus.
+  const pilot = await readPilotStatus(teamId);
+
   return (
     <div className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
       <p className="font-mono text-[11px] tracking-[0.18em] text-pulse-teal uppercase">
@@ -125,11 +129,12 @@ export default async function WellbeingCampaignPage({
         {currentKey && locked ? " · locked" : ""}
       </p>
 
-      <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-6 sm:grid-cols-4">
+      <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-6">
         {[
+          // Completed and In progress live in the pilot panel below, which
+          // counts distinct PEOPLE. Showing both here printed the same two
+          // numbers twice under different headings.
           { label: "Invited", value: String(invited) },
-          { label: "Completed", value: String(completed) },
-          { label: "In progress", value: String(inProgress) },
           { label: "Participation", value: participation === null ? "—" : `${participation}%` },
         ].map((stat) => (
           <div key={stat.label} className="flex flex-col gap-1">
@@ -152,16 +157,17 @@ export default async function WellbeingCampaignPage({
       </section>
 
       {currentKey && (
-        <section className="pulse-card mt-6 flex flex-col gap-4 p-6 sm:p-9">
-          <h2 className="font-display text-h3 font-semibold">Join link</h2>
-          <p className="text-sm leading-relaxed text-slate">
-            This link and its QR code carry the campaign, which carries the instrument. A
-            participant opening it never chooses a questionnaire.
-          </p>
-          <code className="rounded-xl bg-pulse-mist px-4 py-3 font-mono text-xs break-all text-pulse-deep">
-            {joinUrl}
-          </code>
-        </section>
+        <PilotPanel
+          campaignName={team.session_name || team.name}
+          joinUrl={joinUrl}
+          fullscreenHref={`/wellbeing/admin/campaigns/${teamId}/qr`}
+          capacity={pilot.capacity}
+          joined={pilot.joined}
+          completed={pilot.completed}
+          inProgress={pilot.inProgress}
+          remaining={pilot.remaining}
+          isFull={pilot.isFull}
+        />
       )}
 
       <section className="pulse-card mt-6 flex flex-col gap-4 p-6 sm:p-9">
