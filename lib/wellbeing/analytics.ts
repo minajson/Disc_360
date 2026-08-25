@@ -19,6 +19,13 @@ import {
 } from "@/lib/wellbeing/suppression";
 import { WORK_LOCATION_LABEL, type WorkLocation } from "@/data/wellbeing-taxonomy";
 import { INSTRUMENTS, type InstrumentKey, type InstrumentMetadata } from "@/data/wellbeing-instruments";
+import {
+  buildDemoPopulation,
+  demoParticipantCounts,
+  DEMO_INVITED,
+  DEMO_TEAM_NAMES,
+  type DemoAnalyticsRow,
+} from "@/lib/wellbeing/demo-population";
 
 /**
  * Organisational Wellbeing Pulse analytics.
@@ -138,6 +145,19 @@ export interface WellbeingWorkspace {
   overview: WellbeingAggregate | null;
   overviewSuppressed: string | null;
   invited: number;
+  /**
+   * Distinct PEOPLE who have completed at least one pulse.
+   *
+   * Separate from `overview.completed`, which counts RESPONSES. With repeat
+   * waves the two diverge sharply — fifty-nine people across four waves are
+   * two hundred and thirty-six responses — and comparing responses against a
+   * headcount roster produced a participation rate above 100%, which is not a
+   * participation rate at all. Suppression has always counted people; the
+   * headline figures now agree with it.
+   */
+  participants: number;
+  /** People who completed, over the roster. Null when the denominator is unsound. */
+  participation: number | null;
   trend: WellbeingTrend;
   trendSuppressedWaves: number;
 }
@@ -304,18 +324,80 @@ function waveKey(iso: string): { key: string; label: string; at: string } {
   };
 }
 
+
+/* ── where the rows come from ───────────────────────────────────────── */
+
+/**
+ * LIVE PILOT or ANALYTICS DEMO.
+ *
+ * These are two data SOURCES behind one computation. Everything downstream —
+ * aggregation, wave grouping, suppression, signals — is identical, so the demo
+ * demonstrates the product's real behaviour rather than a drawing of it, and a
+ * figure can never be produced for the demo that the live path would not also
+ * produce.
+ *
+ * They can never mix. `loadAnalyticsRows` returns one or the other, chosen
+ * once per request from an explicit argument; there is no code path that
+ * concatenates them and no default that silently falls back from one to the
+ * other. The demo path issues no query against a participant table at all.
+ */
+export type AnalyticsSource = "live" | "demo";
+
+export function parseAnalyticsSource(value: string | undefined): AnalyticsSource {
+  return value === "demo" ? "demo" : "live";
+}
+
+interface LoadedRows {
+  rows: AnalyticsRow[];
+  counts: { overall: number; byScope: Map<string, Map<string, number>> };
+  invited: number;
+  teamNames: Map<string, string>;
+}
+
+async function loadAnalyticsRows(
+  organizationId: string,
+  instrumentKey: InstrumentKey,
+  source: AnalyticsSource,
+): Promise<LoadedRows> {
+  if (source === "demo") {
+    // No database read of any kind. The illustrative population is generated,
+    // used and discarded, so nothing synthetic can reach a participant table
+    // and nothing real can reach a demonstration.
+    const rows = buildDemoPopulation(instrumentKey) as unknown as AnalyticsRow[];
+    return {
+      rows,
+      counts: demoParticipantCounts(rows as unknown as DemoAnalyticsRow[]),
+      invited: DEMO_INVITED,
+      teamNames: DEMO_TEAM_NAMES,
+    };
+  }
+
+  const [rows, invited, counts] = await Promise.all([
+    readOrganizationResults(organizationId, instrumentKey),
+    readInvitedCount(organizationId),
+    readParticipantCounts(organizationId, instrumentKey),
+  ]);
+
+  const teamNames = new Map<string, string>();
+  const admin = createSupabaseAdminClient();
+  const { data: teams } = await admin
+    .from("teams")
+    .select("id, name")
+    .eq("organization_id", organizationId);
+  for (const team of teams ?? []) teamNames.set(team.id as string, team.name as string);
+
+  return { rows, counts, invited, teamNames };
+}
+
 export async function getWellbeingWorkspace(
   organizationId: string,
   instrumentKey: InstrumentKey,
+  source: AnalyticsSource = "live",
 ): Promise<WellbeingWorkspace> {
   const context = await resolveContext(organizationId, instrumentKey);
-  const [rows, invited] = await Promise.all([
-    readOrganizationResults(organizationId, instrumentKey),
-    readInvitedCount(organizationId),
-  ]);
+  const { rows, counts, invited } = await loadAnalyticsRows(organizationId, instrumentKey, source);
 
   const scores = rows.map((row) => reportedScore(row, context.instrument));
-  const counts = await readParticipantCounts(organizationId, instrumentKey);
   // People, not rows.
   const slice = checkSlice(counts.overall, context.minCohort);
 
@@ -354,6 +436,9 @@ export async function getWellbeingWorkspace(
     });
   }
 
+  const participants = counts.overall;
+  const denominatorIsSound = invited > 0 && participants <= invited;
+
   return {
     context,
     overview: slice.publishable
@@ -361,6 +446,10 @@ export async function getWellbeingWorkspace(
       : null,
     overviewSuppressed: slice.publishable ? null : SUPPRESSION_MESSAGE,
     invited,
+    participants,
+    participation: denominatorIsSound
+      ? Math.round((participants / invited) * 1000) / 10
+      : null,
     trend: buildTrend(points),
     trendSuppressedWaves,
   };
@@ -396,19 +485,14 @@ export async function getWellbeingComparison(
   organizationId: string,
   instrumentKey: InstrumentKey,
   dimension: CompareDimension,
+  source: AnalyticsSource = "live",
 ): Promise<{ context: WellbeingAnalyticsContext; view: ComparisonView }> {
   const context = await resolveContext(organizationId, instrumentKey);
-  const rows = await readOrganizationResults(organizationId, instrumentKey);
-
-  const teamNames = new Map<string, string>();
-  if (dimension === "team") {
-    const admin = createSupabaseAdminClient();
-    const { data: teams } = await admin
-      .from("teams")
-      .select("id, name")
-      .eq("organization_id", organizationId);
-    for (const team of teams ?? []) teamNames.set(team.id as string, team.name as string);
-  }
+  const { rows, counts, teamNames } = await loadAnalyticsRows(
+    organizationId,
+    instrumentKey,
+    source,
+  );
 
   const grouped = new Map<string, number[]>();
   for (const row of rows) {
@@ -417,7 +501,6 @@ export async function getWellbeingComparison(
     grouped.set(key, [...(grouped.get(key) ?? []), reportedScore(row, context.instrument)]);
   }
 
-  const counts = await readParticipantCounts(organizationId, instrumentKey);
   const scopeCounts = counts.byScope.get(SCOPE_FOR_DIMENSION[dimension]) ?? new Map();
 
   const cohortInputs = await Promise.all(
@@ -475,19 +558,14 @@ export async function getWellbeingSignals(
   instrumentKey: InstrumentKey,
   dimension: CompareDimension,
   itemIds: readonly string[],
+  source: AnalyticsSource = "live",
 ): Promise<{ context: WellbeingAnalyticsContext; rows: SignalRow[]; organizationWide: ItemSignal[] | null }> {
   const context = await resolveContext(organizationId, instrumentKey);
-  const rows = await readOrganizationResults(organizationId, instrumentKey);
-
-  const teamNames = new Map<string, string>();
-  if (dimension === "team") {
-    const admin = createSupabaseAdminClient();
-    const { data: teams } = await admin
-      .from("teams")
-      .select("id, name")
-      .eq("organization_id", organizationId);
-    for (const team of teams ?? []) teamNames.set(team.id as string, team.name as string);
-  }
+  const { rows, counts, teamNames } = await loadAnalyticsRows(
+    organizationId,
+    instrumentKey,
+    source,
+  );
 
   const grouped = new Map<string, number[][]>();
   for (const row of rows) {
@@ -496,7 +574,6 @@ export async function getWellbeingSignals(
     grouped.set(key, [...(grouped.get(key) ?? []), row.item_positions]);
   }
 
-  const counts = await readParticipantCounts(organizationId, instrumentKey);
   const scopeCounts = counts.byScope.get(SCOPE_FOR_DIMENSION[dimension]) ?? new Map();
 
   const cohortInputs = await Promise.all(
@@ -564,6 +641,7 @@ export interface DimensionProfileView {
 export async function getWellbeingDimensionProfile(
   organizationId: string,
   instrumentKey: InstrumentKey,
+  source: AnalyticsSource = "live",
 ): Promise<{ context: WellbeingAnalyticsContext; view: DimensionProfileView }> {
   const context = await resolveContext(organizationId, instrumentKey);
 
@@ -574,8 +652,7 @@ export async function getWellbeingDimensionProfile(
     };
   }
 
-  const rows = await readOrganizationResults(organizationId, instrumentKey);
-  const counts = await readParticipantCounts(organizationId, instrumentKey);
+  const { rows, counts } = await loadAnalyticsRows(organizationId, instrumentKey, source);
   const slice = checkSlice(counts.overall, context.minCohort);
   if (!slice.publishable) {
     return {

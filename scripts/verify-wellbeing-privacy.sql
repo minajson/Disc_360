@@ -462,9 +462,27 @@ begin
 
   select m.organization_id, m.profile_id into v_org_a, v_member_a
   from public.organization_members m order by m.organization_id limit 1;
+  -- Deliberately a member who holds NO wellbeing role in organisation A.
+  --
+  -- `can_read_wellbeing_lookup` grants catalogue read to anyone with a
+  -- wellbeing role in that organisation, which is correct and intended. If the
+  -- member picked here happened to hold one, this check would fail while the
+  -- product behaved exactly as designed — a misleading red that sends the
+  -- reader hunting for a bug that is not there. Choosing a member without one
+  -- makes the check test tenant isolation rather than ambient grant state.
   select m.organization_id, m.profile_id into v_org_b, v_member_b
   from public.organization_members m
-  where m.organization_id <> v_org_a order by m.organization_id limit 1;
+  where m.organization_id <> v_org_a
+    and not exists (
+      select 1 from public.wellbeing_role_grants g
+      where g.profile_id = m.profile_id
+        and g.organization_id = v_org_a
+        and g.revoked_at is null)
+  order by m.organization_id limit 1;
+
+  if v_member_b is null then
+    raise exception 'No organisation-B member without a wellbeing role in organisation A';
+  end if;
 
   insert into public.wellbeing_departments (organization_id, name, position)
   values (v_org_a, 'Tenant A Confidential Unit', 900),

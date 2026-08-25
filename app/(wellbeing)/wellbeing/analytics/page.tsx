@@ -7,6 +7,8 @@ import {
   getWellbeingDimensionProfile,
   getWellbeingSignals,
   getWellbeingWorkspace,
+  parseAnalyticsSource,
+  type AnalyticsSource,
   type CompareDimension,
 } from "@/lib/wellbeing/analytics";
 import {
@@ -38,6 +40,8 @@ import {
   parseWorkspaceTab,
   WorkspaceNav,
 } from "@/components/wellbeing/analytics/WorkspaceNav";
+import { SourceSwitch } from "@/components/wellbeing/analytics/SourceSwitch";
+import { HowToRead } from "@/components/wellbeing/analytics/HowToRead";
 
 export const metadata: Metadata = { title: "Wellbeing analytics" };
 
@@ -67,9 +71,22 @@ const TAB_DIMENSION: Partial<Record<string, CompareDimension>> = {
 export default async function WellbeingAnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ org?: string; tab?: string; by?: string; instrument?: string }>;
+  searchParams: Promise<{
+    org?: string;
+    tab?: string;
+    by?: string;
+    instrument?: string;
+    source?: string;
+  }>;
 }) {
-  const { org, tab: tabParam, by, instrument: instrumentParam } = await searchParams;
+  const {
+    org,
+    tab: tabParam,
+    by,
+    instrument: instrumentParam,
+    source: sourceParam,
+  } = await searchParams;
+  const source: AnalyticsSource = parseAnalyticsSource(sourceParam);
   const { scope } = await resolveWellbeingScope();
 
   if (scope.length === 0) {
@@ -107,7 +124,7 @@ export default async function WellbeingAnalyticsPage({
       ? instrumentParam
       : "disc360_wellbeing_v1";
 
-  const workspace = await getWellbeingWorkspace(organizationId, instrumentKey);
+  const workspace = await getWellbeingWorkspace(organizationId, instrumentKey, source);
   const { context, overview, trend } = workspace;
   const instrument = context.instrument;
   const isDisc = instrumentKey === "disc360_wellbeing_v1";
@@ -142,7 +159,7 @@ export default async function WellbeingAnalyticsPage({
           {INSTRUMENT_KEYS.map((key) => (
             <li key={key}>
               <Link
-                href={`/wellbeing/analytics?org=${organizationId}&instrument=${key}&tab=${tab}`}
+                href={`/wellbeing/analytics?org=${organizationId}&instrument=${key}&tab=${tab}&source=${source}`}
                 aria-current={key === instrumentKey ? "page" : undefined}
                 className={`pulse-focus block rounded-full border px-3.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors ${
                   key === instrumentKey
@@ -162,7 +179,7 @@ export default async function WellbeingAnalyticsPage({
           {scope.map((entry) => (
             <Link
               key={entry.organizationId}
-              href={`/wellbeing/analytics?org=${entry.organizationId}&instrument=${instrumentKey}&tab=${tab}`}
+              href={`/wellbeing/analytics?org=${entry.organizationId}&instrument=${instrumentKey}&tab=${tab}&source=${source}`}
               className={`pulse-focus rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
                 entry.organizationId === organizationId
                   ? "border-pulse bg-pulse text-white"
@@ -175,8 +192,22 @@ export default async function WellbeingAnalyticsPage({
         </div>
       )}
 
+      <div className="mt-6">
+        <SourceSwitch
+          source={source}
+          organizationId={organizationId}
+          instrumentKey={instrumentKey}
+          tab={tab}
+        />
+      </div>
+
       <div className="mt-7">
-        <WorkspaceNav active={tab} organizationId={organizationId} instrumentKey={instrumentKey} />
+        <WorkspaceNav
+          active={tab}
+          organizationId={organizationId}
+          instrumentKey={instrumentKey}
+          source={source}
+        />
       </div>
 
       <div className="mt-8 flex flex-col gap-8">
@@ -189,14 +220,24 @@ export default async function WellbeingAnalyticsPage({
                   <StatRow
                     stats={[
                       { label: "Invited", value: String(workspace.invited) },
-                      { label: "Completed", value: String(overview.completed) },
+                      {
+                        // People, matching what suppression counts. Responses
+                        // are reported beside the distribution they plot.
+                        label: "Participants",
+                        value: String(workspace.participants),
+                        note: `${overview.completed} ${
+                          overview.completed === 1 ? "response" : "responses"
+                        } across all waves`,
+                      },
                       {
                         label: "Participation",
                         value:
-                          overview.participation === null ? "—" : `${overview.participation}%`,
+                          workspace.participation === null
+                            ? "—"
+                            : `${workspace.participation}%`,
                         note:
-                          overview.participation === null && workspace.invited > 0
-                            ? "more completions than roster places — the invited list is incomplete"
+                          workspace.participation === null && workspace.invited > 0
+                            ? "more participants than roster places — the invited list is incomplete"
                             : undefined,
                       },
                       {
@@ -230,6 +271,18 @@ export default async function WellbeingAnalyticsPage({
                       maxScore={overview.maxScore}
                       bucketSize={overview.bucketSize}
                     />
+
+                    <div className="mt-6">
+                      <HowToRead
+                        seeing={`How many people scored in each part of the ${instrument.primaryScoreMin}–${instrument.primaryScoreMax} ${instrument.primaryScoreLabel.toLowerCase()} range, for everyone who completed this pulse.`}
+                        matters="An average alone cannot tell you whether people are clustered together or spread far apart. Two workforces with the same median can look completely different here, and the shape is usually the more useful of the two."
+                        notTelling={
+                          context.threshold !== null
+                            ? "It does not explain why the pattern exists, and it does not identify anyone. A score at or above the threshold indicates that a fuller conversation may be warranted — it is not a diagnosis of the person or of the group."
+                            : "It does not explain why the pattern exists, and it does not identify anyone. This instrument has no validated cut-off, so no part of the range means more than the number it shows."
+                        }
+                      />
+                    </div>
                   </div>
 
                   {trend.medianChange && (
@@ -254,7 +307,11 @@ export default async function WellbeingAnalyticsPage({
             </section>
 
             {isDisc && (
-              <DimensionProfileSection organizationId={organizationId} instrumentKey={instrumentKey} />
+              <DimensionProfileSection
+                organizationId={organizationId}
+                instrumentKey={instrumentKey}
+                source={source}
+              />
             )}
 
             <aside className="flex flex-col gap-3 rounded-2xl border border-[rgba(31,78,95,0.16)] bg-pulse-mist/60 p-5 text-sm leading-relaxed text-slate">
@@ -274,6 +331,7 @@ export default async function WellbeingAnalyticsPage({
           <CompareSection
             organizationId={organizationId}
             instrumentKey={instrumentKey}
+            source={source}
             tab={tab}
             dimension={dimension}
             threshold={context.threshold}
@@ -297,6 +355,12 @@ export default async function WellbeingAnalyticsPage({
             ) : (
               <SuppressionNotice minCohort={context.minCohort} />
             )}
+
+            <HowToRead
+              seeing="The median score for each wave of this pulse, in date order, for the organisation as a whole."
+              matters="A single wave is a snapshot. Movement across several waves is what distinguishes a persistent pattern from ordinary variation, and it is usually the more actionable of the two."
+              notTelling="It does not attribute the movement to any cause, and the people completing each wave are not necessarily the same people. A change between waves can reflect who answered as much as how they feel."
+            />
             {workspace.trendSuppressedWaves > 0 && (
               <p className="text-xs text-faint">
                 {workspace.trendSuppressedWaves}{" "}
@@ -313,6 +377,7 @@ export default async function WellbeingAnalyticsPage({
           <SignalsSection
             organizationId={organizationId}
             instrumentKey={instrumentKey}
+            source={source}
             dimension={dimension}
             minCohort={context.minCohort}
           />
@@ -325,6 +390,7 @@ export default async function WellbeingAnalyticsPage({
 async function CompareSection({
   organizationId,
   instrumentKey,
+  source,
   tab,
   dimension,
   threshold,
@@ -333,13 +399,19 @@ async function CompareSection({
 }: {
   organizationId: string;
   instrumentKey: InstrumentKey;
+  source: AnalyticsSource;
   tab: string;
   dimension: CompareDimension;
   threshold: number | null;
   maxScore: number;
   minCohort: number;
 }) {
-  const { view } = await getWellbeingComparison(organizationId, instrumentKey, dimension);
+  const { view } = await getWellbeingComparison(
+    organizationId,
+    instrumentKey,
+    dimension,
+    source,
+  );
   const scoreLabel = INSTRUMENTS[instrumentKey].primaryScoreLabel;
   const showPicker = tab === "compare" || tab === "locations";
   const choices =
@@ -365,7 +437,7 @@ async function CompareSection({
             {choices.map((entry) => (
               <Link
                 key={entry.key}
-                href={`/wellbeing/analytics?org=${organizationId}&instrument=${instrumentKey}&tab=${tab}&by=${entry.key}`}
+                href={`/wellbeing/analytics?org=${organizationId}&instrument=${instrumentKey}&tab=${tab}&by=${entry.key}&source=${source}`}
                 className={`pulse-focus rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                   entry.key === dimension
                     ? "border-pulse bg-pulse text-white"
@@ -390,6 +462,12 @@ async function CompareSection({
         />
       )}
 
+      <HowToRead
+        seeing={`The median ${scoreLabel.toLowerCase()} for each group, alongside how many people are in it.`}
+        matters="A single organisation-wide figure can hide a group whose experience differs markedly from everyone else's. Comparing groups is how that becomes visible."
+        notTelling="It does not rank people, and it does not say one group is doing better or worse as a place to work. Groups differ in size, role and circumstance, and a difference between them is a starting point for a conversation rather than a conclusion."
+      />
+
       {view.suppressedCount > 0 && !view.fullySuppressed && (
         <p className="text-xs leading-relaxed text-faint">
           {view.suppressedCount} of {view.cohorts.length} groups are withheld. Where only one group
@@ -404,15 +482,23 @@ async function CompareSection({
 async function SignalsSection({
   organizationId,
   instrumentKey,
+  source,
   dimension,
   minCohort,
 }: {
   organizationId: string;
   instrumentKey: InstrumentKey;
+  source: AnalyticsSource;
   dimension: CompareDimension;
   minCohort: number;
 }) {
-  const { rows } = await getWellbeingSignals(organizationId, instrumentKey, dimension, ITEM_IDS);
+  const { rows } = await getWellbeingSignals(
+    organizationId,
+    instrumentKey,
+    dimension,
+    ITEM_IDS,
+    source,
+  );
 
   return (
     <section className="pulse-card flex flex-col gap-6 p-6 sm:p-9">
@@ -427,7 +513,7 @@ async function SignalsSection({
           {COMPARE_DIMENSIONS.map((entry) => (
             <Link
               key={entry.key}
-              href={`/wellbeing/analytics?org=${organizationId}&instrument=${instrumentKey}&tab=signals&by=${entry.key}`}
+              href={`/wellbeing/analytics?org=${organizationId}&instrument=${instrumentKey}&tab=signals&by=${entry.key}&source=${source}`}
               className={`pulse-focus rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                 entry.key === dimension
                   ? "border-pulse bg-pulse text-white"
@@ -441,6 +527,12 @@ async function SignalsSection({
       </div>
 
       <SignalHeatmap rows={rows} minCohort={minCohort} />
+
+      <HowToRead
+        seeing="For each questionnaire item, the share of responses in each group indicating more difficulty than usual."
+        matters="A total score can be steady while one specific item moves underneath it. Reading items separately is how a pattern worth discussing becomes visible before it shows up in the headline figure."
+        notTelling="An item is not a diagnosis and not a subscale. A high share on one item describes a group's answers to one question — it does not identify anyone, and it does not establish why they answered that way."
+      />
     </section>
   );
 }
@@ -456,11 +548,17 @@ async function SignalsSection({
 async function DimensionProfileSection({
   organizationId,
   instrumentKey,
+  source,
 }: {
   organizationId: string;
   instrumentKey: InstrumentKey;
+  source: AnalyticsSource;
 }) {
-  const { context, view } = await getWellbeingDimensionProfile(organizationId, instrumentKey);
+  const { context, view } = await getWellbeingDimensionProfile(
+    organizationId,
+    instrumentKey,
+    source,
+  );
   if (!view.dimensions || view.dimensions.length === 0) {
     return (
       <section className="pulse-card flex flex-col gap-5 p-6 sm:p-9">

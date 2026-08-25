@@ -62,7 +62,14 @@ export default async function WellbeingCampaignQrPage({
         <PresentationQr value={joinUrl} />
       </div>
 
-      <p className="font-mono text-[clamp(0.75rem,1.5vmin,1.1rem)] break-all text-slate">
+      <p className="text-[clamp(1rem,2.2vmin,1.7rem)] font-medium text-ink">
+        Scan to join the Wellbeing Pulse
+      </p>
+
+      {/* The link is the fallback for anyone whose camera will not focus, so
+          it stays on screen — but quietly, at the size of a footnote rather
+          than competing with the instruction above the code. */}
+      <p className="font-mono text-[clamp(0.65rem,1.15vmin,0.9rem)] break-all text-faint">
         {joinUrl}
       </p>
 

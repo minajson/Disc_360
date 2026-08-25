@@ -22,9 +22,16 @@ export function WorkspaceNav({
   active,
   organizationId,
   instrumentKey,
+  source,
 }: {
   active: WorkspaceTab;
   organizationId: string;
+  /**
+   * Carried for the same reason as the instrument: changing tab must not
+   * silently move the reader between the live pilot and the illustrative
+   * demo, which would be the one confusion this workspace cannot afford.
+   */
+  source: "live" | "demo";
   /**
    * Carried on every tab link. Without it, changing tab silently switched the
    * reader to a different instrument's numbers under the same heading — the
@@ -44,7 +51,7 @@ export function WorkspaceNav({
           return (
             <li key={tab.key}>
               <Link
-                href={`/wellbeing/analytics?org=${organizationId}&instrument=${instrumentKey}&tab=${tab.key}`}
+                href={`/wellbeing/analytics?org=${organizationId}&instrument=${instrumentKey}&tab=${tab.key}&source=${source}`}
                 aria-current={current ? "page" : undefined}
                 className={`pulse-focus -mb-px block rounded-t-lg border-b-2 px-3.5 py-2.5 text-sm transition-colors sm:px-4 ${
                   current
