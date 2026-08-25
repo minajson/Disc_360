@@ -130,12 +130,24 @@ test("only instruments that legitimately have a threshold carry one", () => {
   }
 });
 
-test("only DISC360 Wellbeing carries dimensions — no instrument invents them", () => {
+test("dimensions appear only where the instrument legitimately has them", () => {
   for (const key of INSTRUMENT_KEYS) {
     const rows = buildDemoPopulation(key);
     const dims = rows[0]!.wellbeing_result_dimensions;
     if (key === "disc360_wellbeing_v1") {
       assert.equal(dims?.length, 6, "six workplace dimensions");
+    } else if (key === "ghq28") {
+      assert.equal(dims?.length, 4, "four published subscales, no more and no fewer");
+      for (const dim of dims!) {
+        // Namespaced to the instrument, matching the registry. An unprefixed
+        // key joins to nothing and empties the profile silently.
+        assert.match(dim.dimension_key, /^ghq28_/, "subscale keys are instrument-namespaced");
+      }
+      for (const dim of dims!) {
+        // Each subscale is seven items, so it cannot exceed seven, and it
+        // carries no threshold of its own anywhere in the product.
+        assert.ok(dim.index_score >= 0 && dim.index_score <= 7, "a subscale is scored 0–7");
+      }
     } else {
       assert.equal(dims, null, `${key} must not invent dimensions`);
     }
@@ -258,5 +270,62 @@ test("every demo row carries one response position per item of its instrument", 
         );
       }
     }
+  }
+});
+
+/* ── the demo must not misrepresent its instrument ───────────────────── */
+
+test("no instrument's demo piles responses onto an extreme of its scale", () => {
+  for (const key of INSTRUMENT_KEYS) {
+    const instrument = INSTRUMENTS[key];
+    const rows = buildDemoPopulation(key);
+    const reported = rows.map((row) =>
+      instrument.primaryScoreMax === 100 ? (row.index_score ?? 0) : row.total_score,
+    );
+    const atFloor = reported.filter((v) => v === instrument.primaryScoreMin).length;
+    const atCeiling = reported.filter((v) => v === instrument.primaryScoreMax).length;
+    // Clamping is what produced a GHQ-12 demo with 94 of 236 responses at the
+    // maximum — a demonstration that misrepresents the instrument.
+    assert.ok(
+      atFloor / reported.length < 0.15,
+      `${key}: ${atFloor}/${reported.length} responses clamped to the floor`,
+    );
+    assert.ok(
+      atCeiling / reported.length < 0.15,
+      `${key}: ${atCeiling}/${reported.length} responses clamped to the ceiling`,
+    );
+  }
+});
+
+test("a distress instrument's demo keeps most responses below the cut-off", () => {
+  for (const key of ["ghq12", "ghq28"] as const) {
+    const instrument = INSTRUMENTS[key];
+    const threshold = instrument.defaultThreshold ?? 4;
+    const rows = buildDemoPopulation(key);
+    const above = rows.filter((row) => row.total_score >= threshold).length;
+    const share = (above / rows.length) * 100;
+    // A demonstration reporting most of a workforce at or above a screening
+    // cut-off misrepresents what these instruments typically show, and trains
+    // a management audience to read the product as an alarm.
+    assert.ok(
+      share < 50,
+      `${key} demo reports ${share.toFixed(1)}% at or above threshold ${threshold}`,
+    );
+  }
+});
+
+test("a distress instrument's demo does not describe a workforce in crisis", () => {
+  for (const key of ["ghq12", "ghq28"] as const) {
+    const instrument = INSTRUMENTS[key];
+    const rows = buildDemoPopulation(key);
+    const sorted = rows.map((row) => row.total_score).sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)]!;
+    // A higher score means more reported distress. An illustrative population
+    // sitting above the midpoint of a screening scale would teach management
+    // to read the product as an alarm.
+    assert.ok(
+      median < instrument.primaryScoreMax / 2,
+      `${key} demo median ${median} sits above the middle of a 0–${instrument.primaryScoreMax} distress scale`,
+    );
   }
 });

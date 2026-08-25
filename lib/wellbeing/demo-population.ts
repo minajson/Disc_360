@@ -114,8 +114,18 @@ export const DEMO_INVITED = DEPARTMENTS.reduce((total, entry) => total + entry.p
  */
 const SPREAD = [-11, -6, -3, -1, 0, 2, 4, 7, 9, 13, -8, 5, -4, 11];
 
+/**
+ * Spread scaled to the instrument's own range.
+ *
+ * The offsets are written for a 0–100 scale. Applying them unscaled to a
+ * twelve-point instrument overshoots both ends and clamps, which piled ninety
+ * of the responses onto the maximum and made the GHQ-12 demonstration look
+ * like a workforce in crisis — a demo that misrepresents the instrument is
+ * worse than no demo.
+ */
 function scoreFor(centre: number, person: number, wave: number, max: number): number {
-  const raw = centre + SPREAD[(person + wave * 3) % SPREAD.length]! + wave;
+  const scale = max / 100;
+  const raw = centre + SPREAD[(person + wave * 3) % SPREAD.length]! * scale + wave * scale;
   return Math.max(0, Math.min(max, Math.round(raw)));
 }
 
@@ -147,15 +157,31 @@ export function buildDemoPopulation(instrumentKey: InstrumentKey): DemoAnalytics
       const team = TEAMS[personIndex % TEAMS.length]!;
 
       for (let wave = 0; wave < WAVES.length; wave += 1) {
-        // A higher GHQ score means MORE reported distress, so the illustrative
-        // drift has to run the other way for those instruments — otherwise the
-        // demo would show "improvement" as a rising distress count.
-        const centre = onHundred
-          ? department.centre
-          : Math.round((department.centre / 100) * max);
-        const drifted = onHundred
-          ? centre + WAVES[wave]!.drift
-          : centre - WAVES[wave]!.drift;
+        // A higher GHQ score means MORE reported distress, so a department that
+        // reports high wellbeing must land LOW on that scale. Mapping the
+        // wellbeing centre straight across would have described a workforce
+        // reporting 69% wellbeing as scoring 8 of 12 for distress.
+        const distress = instrument.scoreDirection === "higher_is_more_distress";
+        // A screening scale is not the inverse of a wellbeing scale, and it is
+        // not proportional to its own maximum either: GHQ-12 cuts off at 4 of
+        // 12 while GHQ-28 cuts off at 5 of 28. Anchoring the illustrative
+        // centre to the MAXIMUM reported 93% of a demo workforce above the
+        // GHQ-12 cut-off and 71% above GHQ-28's — teaching a management
+        // audience to read either instrument as an alarm.
+        //
+        // So the centre is anchored to the instrument's own THRESHOLD and sits
+        // below it, with department variation around that point. Screening
+        // distributions sit low in a general population; the demonstration
+        // should look like one.
+        const cutOff = instrument.defaultThreshold ?? 4;
+        const centre = distress
+          ? cutOff * (0.4 + (100 - department.centre) / 100)
+          : department.centre;
+        // Drift still runs the same way in EXPERIENCE terms: improving
+        // wellbeing means a falling distress count.
+        const drifted = distress
+          ? centre - WAVES[wave]!.drift * (max / 100)
+          : centre + WAVES[wave]!.drift;
         const score = scoreFor(drifted, person, wave, max);
 
         rows.push({
@@ -178,6 +204,10 @@ export function buildDemoPopulation(instrumentKey: InstrumentKey): DemoAnalytics
             { length: instrument.itemCount },
             (_, item) => Math.abs(SPREAD[(person + wave + item) % SPREAD.length]!) % 4,
           ),
+          // Dimensions ONLY where the instrument legitimately has them:
+          // DISC360 Wellbeing's six, and GHQ-28's four published subscales.
+          // GHQ-12 and WHO-5 get none, because inventing one would assert a
+          // factor structure neither instrument has.
           wellbeing_result_dimensions:
             instrumentKey === "disc360_wellbeing_v1"
               ? DISC360_WELLBEING_DIMENSIONS.map((dimension, index) => ({
@@ -190,7 +220,31 @@ export function buildDemoPopulation(instrumentKey: InstrumentKey): DemoAnalytics
                       (dimension.key === "recovery_demand" ? 8 : 0)),
                   ),
                 }))
-              : null,
+              : instrumentKey === "ghq28"
+                ? instrument.subscales.map((subscale, index) => ({
+                    // The registry stores subscale keys namespaced by
+                    // instrument (`ghq28_somatic`), so an unprefixed key would
+                    // join to nothing and the profile would silently come back
+                    // empty rather than failing loudly.
+                    dimension_key: `ghq28_${subscale.key}`,
+                    // Each subscale is scored 0–7 on its own seven items, and
+                    // carries NO threshold of its own — a subscale is a
+                    // profile dimension here and never a finding.
+                    index_score: Math.max(
+                      0,
+                      Math.min(
+                        subscale.itemCount,
+                        // Offset per subscale so the profile has shape. A demo
+                      // where all four read the same number shows management
+                      // nothing about what a subscale profile is for.
+                      Math.round(score / 4) +
+                          (Math.abs(SPREAD[(index + person) % SPREAD.length]!) % 3) -
+                          1 +
+                          [1, 2, 0, -1][index % 4]!,
+                      ),
+                    ),
+                  }))
+                : null,
         });
       }
     }

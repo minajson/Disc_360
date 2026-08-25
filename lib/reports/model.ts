@@ -93,6 +93,16 @@ export interface ReportSection {
 
 export interface ReportDocument {
   product: ReportProduct;
+  /**
+   * Who the document is about.
+   *
+   * "individual" is one person's own result — the default, and every existing
+   * report. "aggregate" is a group document that describes no one: it changes
+   * the header wording and the PDF's own title metadata, so a file that
+   * management forwards internally does not describe itself as somebody's
+   * individual report in a field nobody thinks to look at.
+   */
+  audience?: "individual" | "aggregate";
   /** Name as it appears on the report and in the filename. */
   participantName: string;
   productLabel: string;

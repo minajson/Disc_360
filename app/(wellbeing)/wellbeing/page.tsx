@@ -54,15 +54,22 @@ export default async function WellbeingHomePage({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 sm:py-16">
+      {/* The instrument this participant would actually answer — never a
+          hard-coded name. Telling someone they are taking GHQ-12 when their
+          campaign runs something else misdescribes the questionnaire to the
+          one person entitled to know exactly what they are answering. */}
       <p className="font-mono text-[11px] tracking-[0.18em] text-pulse-teal uppercase">
-        {WELLBEING_PRODUCT_DESCRIPTION}
+        {questionnaire ? questionnaire.instrument.descriptor : WELLBEING_PRODUCT_DESCRIPTION}
       </p>
       <h1 className="mt-3 font-display text-h1 font-semibold tracking-tight text-balance">
         {firstName ? `${firstName}, how have things been?` : "How have things been?"}
       </h1>
       <p className="mt-4 max-w-xl text-lead text-slate">
         {WELLBEING_PRODUCT_NAME} is a short, private check-in on how you have been feeling over
-        the last few weeks compared with usual. Twelve questions, about three minutes.
+        the last few weeks compared with usual.
+        {questionnaire
+          ? ` ${questionnaire.instrument.itemCount} questions, about ${questionnaire.instrument.minutesToComplete}.`
+          : ""}
       </p>
 
       {completedCount > 0 && (

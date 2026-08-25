@@ -16,7 +16,17 @@ import type { WellbeingMovement } from "../lib/scoring/wellbeing.ts";
  */
 
 export const WELLBEING_PRODUCT_NAME = "Wellbeing Pulse";
-export const WELLBEING_PRODUCT_DESCRIPTION = "GHQ-12 wellbeing screening";
+/**
+ * The product descriptor, used where no instrument is resolved yet — the join
+ * page a participant reaches before signing in, and the shell's metadata.
+ *
+ * Deliberately instrument-NEUTRAL. It said "GHQ-12 wellbeing screening" from
+ * the single-instrument era, which told every participant they were about to
+ * answer GHQ-12 whatever their campaign actually ran — and GHQ-12 is not
+ * currently servable at all. A surface that knows its instrument should name
+ * it from the registry instead of reusing this.
+ */
+export const WELLBEING_PRODUCT_DESCRIPTION = "Workplace wellbeing check-in";
 
 /** Shown on every result, every report and every history view. */
 export const SCREENING_DISCLAIMER =

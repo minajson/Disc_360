@@ -743,7 +743,14 @@ export function renderReportPdf(document: ReportDocument, options: RenderOptions
   // anywhere, including in a field nobody thinks to look at.
   const brandName = document.product === "wellbeing" ? "Wellbeing Pulse" : "DISC360";
   const infoId = addObject(
-    `<< /Title ${pdfString(`${document.participantName} — ${brandName} individual report`)} ` +
+    // An aggregate document must not describe itself as somebody's individual
+    // report — including in metadata, which is what a file manager shows and
+    // what a recipient sees before opening it.
+    `<< /Title ${pdfString(
+      `${document.participantName} — ${brandName} ${
+        document.audience === "aggregate" ? "aggregate report" : "individual report"
+      }`,
+    )} ` +
       `/Author ${pdfString(brandName)} /Creator ${pdfString(brandName)} ` +
       `/Producer ${pdfString(brandName)} ` +
       `/Subject ${pdfString(document.productLabel)} ` +

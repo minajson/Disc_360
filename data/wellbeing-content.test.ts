@@ -186,7 +186,17 @@ test("movement copy is direction and a count, in the approved phrasing", () => {
 
 test("the product is named Wellbeing Pulse, with GHQ-12 as the secondary description", () => {
   assert.equal(content.WELLBEING_PRODUCT_NAME, "Wellbeing Pulse");
-  assert.equal(content.WELLBEING_PRODUCT_DESCRIPTION, "GHQ-12 wellbeing screening");
+  // Instrument-NEUTRAL. This string is shown before any instrument is
+  // resolved — on the join page and in shell metadata — so naming one there
+  // told every participant they were answering GHQ-12 whatever their campaign
+  // actually ran, and GHQ-12 cannot currently be served at all.
+  assert.equal(content.WELLBEING_PRODUCT_DESCRIPTION, "Workplace wellbeing check-in");
+  for (const key of ["GHQ", "WHO-5", "DISC360"]) {
+    assert.ok(
+      !content.WELLBEING_PRODUCT_DESCRIPTION.includes(key),
+      `the shared descriptor must name no instrument — found ${key}`,
+    );
+  }
 });
 
 test("the management surfaces state the aggregate-only and no-combination rules", () => {

@@ -3,10 +3,13 @@ import Link from "next/link";
 export const WELLBEING_WORKSPACE_TABS = [
   { key: "overview", label: "Overview" },
   { key: "compare", label: "Compare" },
+  { key: "field", label: "Field vs Office" },
+  { key: "functions", label: "Sub Teams / Functions" },
   { key: "trends", label: "Trends" },
   { key: "signals", label: "Signals" },
   { key: "teams", label: "Teams" },
   { key: "locations", label: "Locations" },
+  { key: "reports", label: "Reports" },
 ] as const;
 
 export type WorkspaceTab = (typeof WELLBEING_WORKSPACE_TABS)[number]["key"];

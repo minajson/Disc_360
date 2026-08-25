@@ -44,6 +44,8 @@ import {
 import { SourceSwitch } from "@/components/wellbeing/analytics/SourceSwitch";
 import { HowToRead } from "@/components/wellbeing/analytics/HowToRead";
 import { SignalCards } from "@/components/wellbeing/analytics/SignalCards";
+import { ReportsPanel } from "@/components/wellbeing/analytics/ReportsPanel";
+import { TwoCohortCompare } from "@/components/wellbeing/analytics/TwoCohortCompare";
 
 export const metadata: Metadata = { title: "Wellbeing analytics" };
 
@@ -71,6 +73,10 @@ const TAB_DIMENSION: Partial<Record<string, CompareDimension>> = {
   teams: "team",
   locations: "work_location",
   signals: "department",
+  // Dedicated surfaces, each pinned to one dimension. Pinning rather than
+  // offering a picker is the point: these tabs answer one question each.
+  field: "work_location",
+  functions: "department",
 };
 
 /**
@@ -390,6 +396,45 @@ export default async function WellbeingAnalyticsPage({
           </section>
         )}
 
+        {/* ── Field vs Office ──────────────────────────────────────── */}
+        {tab === "field" && (
+          <FieldVsOfficeSection
+            organizationId={organizationId}
+            instrumentKey={instrumentKey}
+            source={source}
+            threshold={context.threshold}
+            maxScore={instrument.primaryScoreMax}
+            scoreLabel={instrument.primaryScoreLabel}
+            minCohort={context.minCohort}
+          />
+        )}
+
+        {/* ── Sub Teams / Functions ────────────────────────────────── */}
+        {tab === "functions" && (
+          <CompareSection
+            organizationId={organizationId}
+            instrumentKey={instrumentKey}
+            source={source}
+            tab={tab}
+            dimension="department"
+            threshold={context.threshold}
+            maxScore={instrument.primaryScoreMax}
+            minCohort={context.minCohort}
+          />
+        )}
+
+        {/* ── Reports ──────────────────────────────────────────────── */}
+        {tab === "reports" && (
+          <ReportsPanel
+            organizationId={organizationId}
+            instrumentKey={instrumentKey}
+            instrumentName={instrument.name}
+            source={source}
+            suppressed={overview === null}
+            minCohort={context.minCohort}
+          />
+        )}
+
         {/* ── Signals ──────────────────────────────────────────────── */}
         {tab === "signals" && (
           <SignalsSection
@@ -431,6 +476,8 @@ async function CompareSection({
     source,
   );
   const scoreLabel = INSTRUMENTS[instrumentKey].primaryScoreLabel;
+  // A pinned tab answers one question; offering a dimension picker on it
+  // would let the reader change the question without changing the heading.
   const showPicker = tab === "compare" || tab === "locations";
   const choices =
     tab === "locations"
@@ -443,10 +490,15 @@ async function CompareSection({
     <section className="pulse-card flex flex-col gap-6 p-6 sm:p-9">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="font-display text-h3 font-semibold">{view.label}</h2>
-          <p className="mt-1.5 text-sm text-slate">
-            Median {scoreLabel.toLowerCase()}
-            {threshold !== null ? " and the share at or above the threshold" : ""}, by group.
+          <h2 className="font-display text-h3 font-semibold">
+            {tab === "functions" ? "Sub Teams / Functions" : view.label}
+          </h2>
+          <p className="mt-1.5 text-sm leading-relaxed text-slate">
+            {tab === "functions"
+              ? "Read from this organisation's own Department / Function catalogue. This is not the same thing as a DISC360 team — a person belongs to one of each."
+              : `Median ${scoreLabel.toLowerCase()}${
+                  threshold !== null ? " and the share at or above the threshold" : ""
+                }, by group.`}
           </p>
         </div>
 
@@ -658,6 +710,70 @@ async function DimensionProfileSection({
       )}
 
       <p className="text-xs leading-relaxed text-slate">{DISC_LOWER_DIMENSION_NOTE}</p>
+    </section>
+  );
+}
+
+/**
+ * Field Based vs Office Based.
+ *
+ * Its own surface rather than a row in the generic comparison, because it is
+ * the split management most often asks about and a two-group question deserves
+ * a two-group composition. The work-location values come from the stored
+ * taxonomy, not a hard-coded pair — an organisation that configures a third
+ * value gets it here without a deployment.
+ */
+async function FieldVsOfficeSection({
+  organizationId,
+  instrumentKey,
+  source,
+  threshold,
+  maxScore,
+  scoreLabel,
+  minCohort,
+}: {
+  organizationId: string;
+  instrumentKey: InstrumentKey;
+  source: AnalyticsSource;
+  threshold: number | null;
+  maxScore: number;
+  scoreLabel: string;
+  minCohort: number;
+}) {
+  const { view } = await getWellbeingComparison(
+    organizationId,
+    instrumentKey,
+    "work_location",
+    source,
+  );
+
+  return (
+    <section className="pulse-card flex flex-col gap-7 p-6 sm:p-9">
+      <div>
+        <h2 className="font-display text-h3 font-semibold">Field vs Office</h2>
+        <p className="mt-1.5 text-sm leading-relaxed text-slate">
+          Where people work is one of the few splits that reliably describes a different working
+          day. Both groups are shown identically — neither is a benchmark for the other.
+        </p>
+      </div>
+
+      <TwoCohortCompare
+        cohorts={view.cohorts.map((cohort) => ({
+          label: cohort.label,
+          suppressed: cohort.suppressed,
+          stats: cohort.stats ?? null,
+        }))}
+        scoreLabel={scoreLabel}
+        scoreMax={maxScore}
+        threshold={threshold}
+        minCohort={minCohort}
+      />
+
+      <HowToRead
+        seeing="The median score for each work-location group, with how many people are in each."
+        matters="A field-based and an office-based working day differ in ways an organisation-wide average cannot show. Splitting them is often the fastest way to see whether one group's experience is diverging."
+        notTelling="It does not say that working in the field or the office caused the difference, and it does not describe anyone individually. Group size, role and circumstance all differ alongside location."
+      />
     </section>
   );
 }
