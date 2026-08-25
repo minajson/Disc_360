@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   screenWellbeingContent,
@@ -198,14 +199,82 @@ test("the management surfaces state the aggregate-only and no-combination rules"
 /* ── taxonomy ───────────────────────────────────────────────────────── */
 
 test("Department / Function keeps its own name and its own list", () => {
-  assert.equal(DEFAULT_WELLBEING_DEPARTMENTS.length, 26);
-  assert.ok(DEFAULT_WELLBEING_DEPARTMENTS.includes("Ogoni Restoration Team"));
-  assert.ok(DEFAULT_WELLBEING_DEPARTMENTS.includes("Wells"));
+  assert.ok(DEFAULT_WELLBEING_DEPARTMENTS.length >= 8, "the floor is usable on its own");
+  assert.ok(DEFAULT_WELLBEING_DEPARTMENTS.includes("Other"), "no forced mis-selection");
   assert.equal(
     new Set(DEFAULT_WELLBEING_DEPARTMENTS).size,
     DEFAULT_WELLBEING_DEPARTMENTS.length,
     "no duplicates",
   );
+});
+
+/* ── the shipped catalogue belongs to nobody ────────────────────────── */
+
+/**
+ * DISC360 is multi-organisation, and anything shipped in this repository is
+ * offered to EVERY organisation — as the platform-level rows seeded by 00028
+ * and behind the per-organisation "Install defaults" button alike. So the
+ * shipped catalogue must describe no actual customer.
+ *
+ * These names were genuinely present once, as platform defaults, and every
+ * tenant on the platform would have seen them. The list is kept concrete
+ * rather than abstract because that is what makes the test able to fail.
+ */
+const CUSTOMER_SPECIFIC = [
+  "Shell", "Ogoni", "Nigeria", "Nigerian", "Renaissance", "Deepwater",
+  "Country Chair", "Integrated Gas", "Geo Solutions", "PT Development",
+  "Business and Government Relations", "Transformation Team",
+  "Abuja", "Lagos", "Port Harcourt", "Warri",
+];
+
+test("no shipped catalogue value names a real customer or its geography", () => {
+  const shipped = [...DEFAULT_WELLBEING_DEPARTMENTS, ...DEFAULT_WELLBEING_OFFICE_LOCATIONS];
+  for (const entry of shipped) {
+    for (const term of CUSTOMER_SPECIFIC) {
+      assert.ok(
+        !entry.toLowerCase().includes(term.toLowerCase()),
+        `"${entry}" carries customer-specific term "${term}" — a new organisation must never inherit another organisation's structure`,
+      );
+    }
+  }
+});
+
+test("the platform-level migration seeds the same neutral floor, and nothing else", () => {
+  const migration = readFileSync(
+    new URL("../supabase/migrations/00028_wellbeing_default_taxonomy.sql", import.meta.url),
+    "utf8",
+  );
+  // Only the comment header may discuss what must NOT be seeded; the SQL is
+  // what actually reaches every tenant, so screen that alone.
+  const values = migration
+    .split("\n")
+    .filter((line) => !/^\s*--/.test(line))
+    .join("\n");
+  for (const term of CUSTOMER_SPECIFIC) {
+    assert.ok(
+      !values.toLowerCase().includes(term.toLowerCase()),
+      `00028 seeds "${term}" at platform level, where every organisation would read it`,
+    );
+  }
+  // And what it does seed is exactly the shipped floor.
+  for (const entry of DEFAULT_WELLBEING_DEPARTMENTS) {
+    assert.ok(values.includes(`('${entry}'`), `00028 is missing the neutral entry "${entry}"`);
+  }
+  for (const entry of DEFAULT_WELLBEING_OFFICE_LOCATIONS) {
+    assert.ok(values.includes(`('${entry}'`), `00028 is missing the neutral office "${entry}"`);
+  }
+});
+
+test("only an organisation-scoped row may be written — never a new platform default", () => {
+  const installer = readFileSync(new URL("../lib/actions/wellbeing.ts", import.meta.url), "utf8");
+  const fn = installer.slice(installer.indexOf("export async function installWellbeingTaxonomy"));
+  // Every insert carries the caller's own organisation id.
+  assert.match(fn, /organization_id: organizationId/, "departments are written to the caller's org");
+  assert.ok(
+    !/organization_id: null/.test(fn),
+    "the installer must never create a platform-level row",
+  );
+  assert.match(fn, /requireWellbeingGovernance\(organizationId\)/, "authorised for that org first");
 });
 
 test("no wellbeing surface calls Department / Function a Sub Team", () => {
@@ -218,12 +287,10 @@ test("work location is a fixed pair, and office location follows from it", () =>
   assert.equal(requiresOfficeLocation("office_based"), true);
   assert.equal(requiresOfficeLocation("field_based"), false);
   assert.equal(requiresOfficeLocation(null), false);
-  assert.deepEqual([...DEFAULT_WELLBEING_OFFICE_LOCATIONS], [
-    "Abuja",
-    "Lagos",
-    "Port Harcourt",
-    "Warri",
-  ]);
+  // Facility roles, not places: an office list is geography, and geography is
+  // the most organisation-specific part of a taxonomy.
+  assert.ok(DEFAULT_WELLBEING_OFFICE_LOCATIONS.length >= 2);
+  assert.ok(DEFAULT_WELLBEING_OFFICE_LOCATIONS.includes("Other"));
 });
 
 

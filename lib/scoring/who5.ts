@@ -47,7 +47,7 @@ export const WHO5_MAX_SCORE = 100;
 
 export interface Who5AnswerInput {
   itemId: string;
-  /** 0-based: 0 = "at no time" … 5 = "all of the time". */
+  /** 0-based response position: 0 = lowest frequency … 5 = highest frequency. */
   position: number;
 }
 

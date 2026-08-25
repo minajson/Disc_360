@@ -1,8 +1,10 @@
 # Wellbeing Pulse — management-review screenshot matrix
 
-Status: **4 of 22 captured.** This matrix is **incomplete**. The four images in
-this directory are safe to circulate; the remaining eighteen have not been
-taken yet and must be captured before the management presentation.
+Status: **3 of 22 usable, 1 stale.** This matrix is **incomplete**. Three of the
+four images in this directory are safe to circulate as they are; frame 15 was
+captured before the catalogue was made tenant-neutral and must be retaken. The
+remaining eighteen have not been taken yet and must be captured before the
+management presentation.
 
 ## How to capture
 
@@ -49,7 +51,7 @@ otherwise, and name files `NN-slug-WIDTH.png` to match the existing four.
 | 12 | Participant result — index + dimension profile | `/wellbeing/result/[resultId]` | ☐ |
 | 13 | Participant history — trend across four waves | `/wellbeing/history` | ☐ |
 | 14 | Analytics — Overview | `/wellbeing/analytics` | ☐ |
-| 15 | Analytics — Compare, with suppressed cohorts | `/wellbeing/analytics?tab=compare` | ✅ captured |
+| 15 | Analytics — Compare, with suppressed cohorts | `/wellbeing/analytics?tab=compare` | ⚠️ stale — recapture |
 | 16 | Analytics — Trends | `/wellbeing/analytics?tab=trends` | ☐ |
 | 17 | Analytics — Signals | `/wellbeing/analytics?tab=signals` | ☐ |
 | 18 | Analytics — Teams | `/wellbeing/analytics?tab=teams` | ☐ |
@@ -64,7 +66,14 @@ otherwise, and name files `NN-slug-WIDTH.png` to match the existing four.
   Lena Fischer, Nia Thompson) — all committed fixtures in `supabase/seed.sql`,
   not real people. Completion state only; no scores are shown on that surface.
 - **15** demonstrates the confidentiality engine: Legal (4 people) falls below
-  the floor of 7 and is withheld, and Security is withheld alongside it so the
-  hidden group cannot be recovered by subtraction.
+  the floor of 7 and is withheld, and a second cohort is withheld alongside it
+  so the hidden group cannot be recovered by subtraction.
+
+  **This frame is stale and must be recaptured.** It was taken before the
+  catalogue was made tenant-neutral, so it shows the department names that used
+  to be seeded platform-wide. The suppression behaviour it demonstrates is
+  unchanged — the same cohort sizes (14, 11, 9, 8, 7, 4) and the same withheld
+  pair — but the labels are now Operations / Engineering / Information
+  Technology / Finance / Human Resources / Legal.
 - **05** is the strongest licensing evidence: every item reads
   `[Question content available after licensing]`.

@@ -28,6 +28,41 @@
 -- Undo: `npx supabase db reset`.
 -- ─────────────────────────────────────────────────────────────────────
 
+-- Abort on the FIRST error. Without this the local-host guard below is
+-- decorative: `raise exception` inside a DO block ends that block, psql
+-- reports it and then carries straight on to the next statement — so a script
+-- that "refuses to run" against the wrong database would seed it anyway.
+-- ─────────────────────────────────────────────────────────────────────
+-- ⚠ THIS SCRIPT DOES NOT CURRENTLY RUN. It needs a decision, not a patch.
+--
+-- Migration 00025 (four-instrument registry) replaced the unique constraint
+-- on wellbeing_versions.version with a unique on (instrument_key, version),
+-- and made instrument_key NOT NULL with no default. The version insert below
+-- therefore fails twice over: its `on conflict (version)` names a constraint
+-- that no longer exists, and it supplies no instrument_key.
+--
+-- It cannot simply be given one. instrument_key is a foreign key into
+-- wellbeing_instruments, so the only candidates are the four real
+-- instruments, and every choice is wrong:
+--
+--   ghq12 / ghq28 / who5 — would publish an ACTIVE third-party version
+--     carrying item prompts, which is precisely what the licensing gate and
+--     privacy checks 27 and 30 exist to prevent.
+--   disc360_wellbeing_v1 — collides with the real active version under
+--     wellbeing_versions_one_active_per_instrument, and would substitute
+--     placeholder text for shipped licensed content.
+--
+-- The honest options are to register a fifth, explicitly non-clinical
+-- "smoke_test" instrument, or to retire this script. Note that the wellbeing
+-- e2e suite passes 24/24 without it: DISC360 Wellbeing V1 is real runnable
+-- content, which is the gap this script was written to fill.
+--
+-- Until that is decided the script aborts on its first error rather than
+-- half-seeding, which is what it used to do silently.
+-- ─────────────────────────────────────────────────────────────────────
+
+\set ON_ERROR_STOP on
+
 do $$
 begin
   -- Refuse to run anywhere that is not a local development database.
@@ -35,8 +70,13 @@ begin
      and coalesce(current_database(), '') <> 'postgres' then
     raise exception 'Refusing to seed smoke content into database %', current_database();
   end if;
+  -- Loopback, or a private (RFC1918 / Docker) address. A hosted Supabase
+  -- instance is on neither, so this refuses anything reachable from outside.
   if inet_server_addr() is not null
-     and host(inet_server_addr()) not in ('127.0.0.1', '::1', '172.17.0.1') then
+     and not (inet_server_addr() <<= inet '127.0.0.0/8'
+           or inet_server_addr() <<= inet '10.0.0.0/8'
+           or inet_server_addr() <<= inet '172.16.0.0/12'
+           or inet_server_addr() <<= inet '192.168.0.0/16') then
     raise exception 'Refusing to seed smoke content into a non-local host %', inet_server_addr();
   end if;
 end;
@@ -88,13 +128,17 @@ set is_active = false
 where version <> 999 and is_active;
 
 -- Department / Function and Office Location for every local organisation.
+--
+-- Organisation-scoped (o.id), never platform-level, and drawn from the neutral
+-- catalogue: a local seed must not put one customer's structure in front of
+-- every tenant either.
 insert into public.wellbeing_departments (organization_id, name, position)
 select o.id, d.name, d.position
 from public.organizations o
 cross join (
-  values ('Production', 0), ('Engineering and Major Project', 1), ('Wells', 2),
+  values ('Operations', 0), ('Engineering', 1), ('Commercial', 2),
          ('Information Technology', 3), ('Legal', 4), ('Finance', 5),
-         ('Human Resources', 6), ('Security', 7)
+         ('Human Resources', 6), ('Procurement', 7)
 ) as d (name, position)
 where not exists (
   select 1 from public.wellbeing_departments w
@@ -105,7 +149,7 @@ insert into public.wellbeing_office_locations (organization_id, name, position)
 select o.id, l.name, l.position
 from public.organizations o
 cross join (
-  values ('Abuja', 0), ('Lagos', 1), ('Port Harcourt', 2), ('Warri', 3)
+  values ('Head Office', 0), ('Regional Office', 1), ('Other', 2)
 ) as l (name, position)
 where not exists (
   select 1 from public.wellbeing_office_locations w

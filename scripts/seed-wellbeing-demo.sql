@@ -30,10 +30,21 @@
 -- Undo: `npx supabase db reset`.
 -- ─────────────────────────────────────────────────────────────────────
 
+-- Abort on the FIRST error. Without this the local-host guard below is
+-- decorative: `raise exception` inside a DO block ends that block, psql
+-- reports it and then carries straight on to the next statement — so a script
+-- that "refuses to run" against the wrong database would seed it anyway.
+\set ON_ERROR_STOP on
+
 do $$
 begin
+  -- Loopback, or a private (RFC1918 / Docker) address. A hosted Supabase
+  -- instance is on neither, so this refuses anything reachable from outside.
   if inet_server_addr() is not null
-     and host(inet_server_addr()) not in ('127.0.0.1', '::1', '172.17.0.1') then
+     and not (inet_server_addr() <<= inet '127.0.0.0/8'
+           or inet_server_addr() <<= inet '10.0.0.0/8'
+           or inet_server_addr() <<= inet '172.16.0.0/12'
+           or inet_server_addr() <<= inet '192.168.0.0/16') then
     raise exception 'Refusing to seed demo data into a non-local host %', inet_server_addr();
   end if;
 end;
@@ -53,8 +64,11 @@ declare
   v_dims text[] := array['capacity','recovery_demand','emotional_resilience',
                          'connection_safety','purpose_confidence','everyday_wellbeing'];
   -- Department, headcount. Legal is intentionally below the floor of 7.
-  v_depts text[] := array['Production','Wells','Information Technology',
-                          'Engineering and Major Project','Security','Legal'];
+  -- Drawn from the NEUTRAL platform catalogue seeded by 00028, so the demo
+  -- shows departments a participant could actually select, and describes no
+  -- real customer's structure.
+  v_depts text[] := array['Operations','Engineering','Information Technology',
+                          'Finance','Human Resources','Legal'];
   v_sizes int[]  := array[14, 11, 9, 8, 7, 4];
   v_person int;
 begin
@@ -68,7 +82,7 @@ begin
       i := d * 100 + v_person;
       v_loc := case when v_person % 3 = 0 then 'field_based' else 'office_based' end;
       v_office := case when v_loc = 'office_based'
-                       then (array['Abuja','Lagos','Port Harcourt','Warri'])[1 + (i % 4)] end;
+                       then (array['Head Office','Regional Office','Other'])[1 + (i % 3)] end;
 
       -- A synthetic identity that cannot authenticate. The password column
       -- holds a literal that is not a valid bcrypt hash, so no credential

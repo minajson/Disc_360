@@ -94,6 +94,24 @@ begin
 end;
 $$;
 
+/* Runs a statement AS a given user that MUST be refused — RLS included. */
+create or replace function pg_temp.expect_rejected_as(p_name text, p_user uuid, p_sql text)
+returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', p_user::text, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  begin
+    execute p_sql;
+    perform set_config('role', 'postgres', true);
+    perform pg_temp.record(p_name, false, 'statement was accepted but should have been refused');
+  exception when others then
+    perform set_config('role', 'postgres', true);
+    perform pg_temp.record(p_name, true, sqlerrm);
+  end;
+end;
+$$;
+
 do $harness$
 declare
   v_team uuid;
@@ -105,6 +123,11 @@ declare
   v_alice_session uuid := 'aaaa0000-0000-4000-8000-000000000001';
   v_bob_session uuid := 'bbbb0000-0000-4000-8000-000000000001';
   v_spare uuid := 'cccc0000-0000-4000-8000-000000000001';
+  v_org_a uuid;
+  v_org_b uuid;
+  v_member_a uuid;
+  v_member_b uuid;
+  v_floor int;
 begin
   select t.id, t.organization_id into v_team, v_org from public.teams t limit 1;
   select id into v_super from public.profiles where is_super_admin order by email limit 1;
@@ -402,6 +425,100 @@ begin
         and table_name in ('assessment_results','focus_results','combined_sessions')
         and (column_name like '%wellbeing%' or column_name like '%ghq%')
     ));
+
+  /* ── §23 · the catalogue is tenant-scoped ─────────────────────────── */
+  --
+  -- DISC360 is multi-organisation. An organisation's Department / Function
+  -- catalogue is its own information: another tenant must not be able to read
+  -- it, select from it, or inherit it. The platform-level rows are the one
+  -- shared surface, and they must therefore describe nobody.
+
+  select m.organization_id, m.profile_id into v_org_a, v_member_a
+  from public.organization_members m order by m.organization_id limit 1;
+  select m.organization_id, m.profile_id into v_org_b, v_member_b
+  from public.organization_members m
+  where m.organization_id <> v_org_a order by m.organization_id limit 1;
+
+  insert into public.wellbeing_departments (organization_id, name, position)
+  values (v_org_a, 'Tenant A Confidential Unit', 900),
+         (v_org_b, 'Tenant B Confidential Unit', 900);
+  insert into public.wellbeing_office_locations (organization_id, name, position)
+  values (v_org_a, 'Tenant A Confidential Site', 900);
+
+  -- Non-vacuous: A really can see its own entry.
+  perform pg_temp.expect_visible_count(
+    'fixture: an organisation reads its OWN Department / Function entry',
+    v_member_a,
+    $q$select count(*) from public.wellbeing_departments where name = 'Tenant A Confidential Unit'$q$,
+    1);
+
+  perform pg_temp.expect_visible_count(
+    'organisation B cannot read organisation A''s Department / Function catalogue',
+    v_member_b,
+    $q$select count(*) from public.wellbeing_departments where name = 'Tenant A Confidential Unit'$q$,
+    0);
+
+  perform pg_temp.expect_visible_count(
+    'organisation A cannot read organisation B''s Department / Function catalogue',
+    v_member_a,
+    $q$select count(*) from public.wellbeing_departments where name = 'Tenant B Confidential Unit'$q$,
+    0);
+
+  perform pg_temp.expect_visible_count(
+    'organisation B cannot read organisation A''s office catalogue',
+    v_member_b,
+    $q$select count(*) from public.wellbeing_office_locations where name = 'Tenant A Confidential Site'$q$,
+    0);
+
+  -- B creating an entry changes nothing about what A can see.
+  perform pg_temp.expect_visible_count(
+    'a new department in organisation B leaves organisation A''s catalogue unchanged',
+    v_member_a,
+    format('select count(*) from public.wellbeing_departments where organization_id = %L', v_org_b),
+    0);
+
+  -- The shared floor is readable by everyone, which is exactly why it must
+  -- carry no customer's structure.
+  perform pg_temp.expect_true_as(
+    'every organisation reads the neutral platform floor',
+    v_member_b,
+    'select count(*) > 0 from public.wellbeing_departments where organization_id is null');
+
+  select count(*) into v_floor
+  from public.wellbeing_departments d
+  where d.organization_id is null
+    and (d.name ilike '%shell%' or d.name ilike '%ogoni%' or d.name ilike '%nigeria%'
+      or d.name ilike '%renaissance%' or d.name ilike '%country chair%'
+      or d.name ilike '%integrated gas%' or d.name ilike '%geo solutions%');
+  perform pg_temp.record(
+    'the platform Department / Function floor names no real customer',
+    v_floor = 0, format('%s customer-specific platform rows', v_floor));
+
+  select count(*) into v_floor
+  from public.wellbeing_office_locations l
+  where l.organization_id is null
+    and l.name in ('Abuja', 'Lagos', 'Port Harcourt', 'Warri');
+  perform pg_temp.record(
+    'the platform office floor names no real customer geography',
+    v_floor = 0, format('%s customer-specific platform offices', v_floor));
+
+  -- Writes are tenant-scoped too: nobody may add to another tenant's
+  -- catalogue, and nobody may add a NEW platform-level row through the
+  -- ordinary path — that would publish it to every organisation at once.
+  perform pg_temp.expect_rejected_as(
+    'an organisation member cannot write into another organisation''s catalogue',
+    v_member_a,
+    format('insert into public.wellbeing_departments (organization_id, name) values (%L, ''Injected By A'')', v_org_b));
+
+  perform pg_temp.expect_rejected_as(
+    'nobody may create a platform-level catalogue row through RLS',
+    v_member_a,
+    'insert into public.wellbeing_departments (organization_id, name) values (null, ''Injected Platform Default'')');
+
+  perform pg_temp.expect_rejected_as(
+    'a platform super admin does not inherit catalogue write access to an organisation',
+    v_super,
+    format('insert into public.wellbeing_departments (organization_id, name) values (%L, ''Injected By Platform Admin'')', v_org_a));
 end;
 $harness$;
 

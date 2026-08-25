@@ -26,7 +26,10 @@ export const WHO5_ITEM_COUNT = 5;
 /**
  * Six ordered response positions, scored 0–5.
  *
- * The published scale runs from "at no time" (0) to "all of the time" (5).
+ * The published scale runs from the lowest-frequency response at position 0 to
+ * the highest-frequency response at position 5. The anchor wording itself is
+ * part of the licensed instrument and is deliberately not reproduced here.
+ *
  * Every item is positively worded, so a higher position always means more
  * reported wellbeing and there is no reverse-scoring anywhere.
  */

@@ -9,8 +9,27 @@
  * one enumeration that genuinely is fixed by the form specification.
  *
  * No component imports the department list directly. A form renders whatever
- * the organisation's lookup holds, so a customer can add "Deepwater" without a
- * deployment — which is the whole reason the lookup exists.
+ * the organisation's lookup holds, so a customer can add whatever its own
+ * structure needs without a deployment — which is the whole reason the lookup
+ * exists.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * THESE DEFAULTS ARE DELIBERATELY GENERIC.
+ *
+ * DISC360 is multi-organisation. An organisation's department structure is its
+ * own information, and a list shipped in this repository is offered to EVERY
+ * organisation — as the platform-level catalogue and behind the "Install
+ * defaults" button alike. So nothing customer-specific may live here: no
+ * customer's business units, operating units, asset names or site structure.
+ *
+ * What is here instead is a neutral floor — the widely-recognised business
+ * functions almost any employer has — so that an organisation which has not
+ * configured its catalogue yet still presents a usable form. It is a starting
+ * point to be replaced, not a description of anyone.
+ *
+ * An organisation's real structure is created against ITS OWN organization_id,
+ * where RLS scopes it to that organisation and no other tenant can read it.
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 /**
@@ -24,39 +43,34 @@
 export const WELLBEING_DEPARTMENT_LABEL = "Department / Function";
 
 export const DEFAULT_WELLBEING_DEPARTMENTS: readonly string[] = [
-  "Business and Government Relations",
   "Commercial",
-  "Contract and Procurement",
-  "Country Chair Organization",
-  "Development",
-  "Engineering and Major Project",
-  "Exploration",
-  "External Relations",
+  "Customer Operations",
+  "Engineering",
   "Finance",
-  "Geo Solutions",
+  "Health, Safety and Environment",
   "Human Resources",
   "Information Technology",
-  "Integrated Gas",
   "Legal",
-  "Logistics",
-  "Nigeria Real Estate",
-  "Ogoni Restoration Team",
-  "Pipelines",
-  "Production",
-  "PT Development Nigeria",
-  "Renaissance Health",
-  "Safety Environment",
-  "Security",
-  "Shell Nigeria Gas",
-  "Transformation Team",
-  "Wells",
+  "Operations",
+  "Procurement",
+  "Sales and Marketing",
+  // Last by position, and an honest answer rather than a forced mis-selection
+  // while an organisation is still building its own catalogue.
+  "Other",
 ];
 
+/**
+ * Office Location defaults.
+ *
+ * An office list is geography, and geography is the most organisation-specific
+ * part of a taxonomy — there is no neutral set of cities. These are facility
+ * ROLES rather than places, which unblocks the form for an office-based
+ * respondent without asserting where anybody works.
+ */
 export const DEFAULT_WELLBEING_OFFICE_LOCATIONS: readonly string[] = [
-  "Abuja",
-  "Lagos",
-  "Port Harcourt",
-  "Warri",
+  "Head Office",
+  "Regional Office",
+  "Other",
 ];
 
 /**
