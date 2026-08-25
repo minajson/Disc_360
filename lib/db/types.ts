@@ -1812,6 +1812,7 @@ export type Database = {
           team_name: string
           timezone: string | null
           updated_at: string
+          wellbeing_instrument_key: string | null
         }
         Insert: {
           approximate_size?: number | null
@@ -1832,6 +1833,7 @@ export type Database = {
           team_name?: string
           timezone?: string | null
           updated_at?: string
+          wellbeing_instrument_key?: string | null
         }
         Update: {
           approximate_size?: number | null
@@ -1852,6 +1854,7 @@ export type Database = {
           team_name?: string
           timezone?: string | null
           updated_at?: string
+          wellbeing_instrument_key?: string | null
         }
         Relationships: [
           {
@@ -1997,6 +2000,7 @@ export type Database = {
           team_series_id: string | null
           timezone: string | null
           updated_at: string
+          wellbeing_instrument_key: string | null
         }
         Insert: {
           active_slide?: number | null
@@ -2029,6 +2033,7 @@ export type Database = {
           team_series_id?: string | null
           timezone?: string | null
           updated_at?: string
+          wellbeing_instrument_key?: string | null
         }
         Update: {
           active_slide?: number | null
@@ -2061,6 +2066,7 @@ export type Database = {
           team_series_id?: string | null
           timezone?: string | null
           updated_at?: string
+          wellbeing_instrument_key?: string | null
         }
         Relationships: [
           {
@@ -2090,6 +2096,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "team_series"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_wellbeing_instrument_key_fkey"
+            columns: ["wellbeing_instrument_key"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_instruments"
+            referencedColumns: ["key"]
           },
         ]
       }
@@ -2131,32 +2144,130 @@ export type Database = {
           },
         ]
       }
+      wellbeing_dimensions: {
+        Row: {
+          created_at: string
+          description: string
+          instrument_key: string
+          key: string
+          label: string
+          position: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          instrument_key: string
+          key: string
+          label: string
+          position: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          instrument_key?: string
+          key?: string
+          label?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_dimensions_instrument_key_fkey"
+            columns: ["instrument_key"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_instruments"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      wellbeing_instruments: {
+        Row: {
+          created_at: string
+          descriptor: string
+          dimension_count: number
+          has_threshold: boolean
+          item_count: number
+          key: string
+          licensing: string
+          name: string
+          primary_score_label: string
+          primary_score_max: number
+          primary_score_min: number
+          purpose: string
+          response_option_count: number
+          score_direction: string
+          scoring_engine: string
+          scoring_method: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          descriptor?: string
+          dimension_count?: number
+          has_threshold?: boolean
+          item_count: number
+          key: string
+          licensing: string
+          name: string
+          primary_score_label: string
+          primary_score_max: number
+          primary_score_min: number
+          purpose: string
+          response_option_count: number
+          score_direction: string
+          scoring_engine: string
+          scoring_method: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          descriptor?: string
+          dimension_count?: number
+          has_threshold?: boolean
+          item_count?: number
+          key?: string
+          licensing?: string
+          name?: string
+          primary_score_label?: string
+          primary_score_max?: number
+          primary_score_min?: number
+          purpose?: string
+          response_option_count?: number
+          score_direction?: string
+          scoring_engine?: string
+          scoring_method?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       wellbeing_item_options: {
         Row: {
-          bimodal_score: number
+          bimodal_score: number | null
           created_at: string
           id: string
           item_id: string
           label: string | null
-          likert_score: number
+          likert_score: number | null
+          points: number
           position: number
         }
         Insert: {
-          bimodal_score: number
+          bimodal_score?: number | null
           created_at?: string
           id?: string
           item_id: string
           label?: string | null
-          likert_score: number
+          likert_score?: number | null
+          points: number
           position: number
         }
         Update: {
-          bimodal_score?: number
+          bimodal_score?: number | null
           created_at?: string
           id?: string
           item_id?: string
           label?: string | null
-          likert_score?: number
+          likert_score?: number | null
+          points?: number
           position?: number
         }
         Relationships: [
@@ -2172,7 +2283,9 @@ export type Database = {
       wellbeing_items: {
         Row: {
           created_at: string
+          dimension_key: string | null
           external_id: string
+          facet: string | null
           id: string
           position: number
           prompt: string | null
@@ -2180,7 +2293,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          dimension_key?: string | null
           external_id: string
+          facet?: string | null
           id?: string
           position: number
           prompt?: string | null
@@ -2188,13 +2303,22 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          dimension_key?: string | null
           external_id?: string
+          facet?: string | null
           id?: string
           position?: number
           prompt?: string | null
           version_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "wellbeing_items_dimension_key_fkey"
+            columns: ["dimension_key"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_dimensions"
+            referencedColumns: ["key"]
+          },
           {
             foreignKeyName: "wellbeing_items_version_id_fkey"
             columns: ["version_id"]
@@ -2402,17 +2526,61 @@ export type Database = {
           },
         ]
       }
+      wellbeing_result_dimensions: {
+        Row: {
+          created_at: string
+          dimension_key: string
+          id: string
+          index_score: number
+          raw_score: number
+          result_id: string
+        }
+        Insert: {
+          created_at?: string
+          dimension_key: string
+          id?: string
+          index_score: number
+          raw_score: number
+          result_id: string
+        }
+        Update: {
+          created_at?: string
+          dimension_key?: string
+          id?: string
+          index_score?: number
+          raw_score?: number
+          result_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_result_dimensions_dimension_key_fkey"
+            columns: ["dimension_key"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_dimensions"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "wellbeing_result_dimensions_result_id_fkey"
+            columns: ["result_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_results"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wellbeing_results: {
         Row: {
-          at_or_above_threshold: boolean
+          at_or_above_threshold: boolean | null
           attempt_number: number | null
           completed_at: string
           created_at: string
           department_at_completion: string | null
           id: string
+          index_score: number | null
+          instrument_key: string
           item_positions: number[]
           job_title_at_completion: string | null
-          likert_score: number
+          likert_score: number | null
           office_location_at_completion: string | null
           organization_id: string | null
           organization_name_at_completion: string | null
@@ -2424,7 +2592,7 @@ export type Database = {
           team_id: string | null
           team_name_at_completion: string | null
           team_series_id: string | null
-          threshold_at_completion: number
+          threshold_at_completion: number | null
           total_score: number
           version_id: string
           work_location_at_completion:
@@ -2432,15 +2600,17 @@ export type Database = {
             | null
         }
         Insert: {
-          at_or_above_threshold: boolean
+          at_or_above_threshold?: boolean | null
           attempt_number?: number | null
           completed_at?: string
           created_at?: string
           department_at_completion?: string | null
           id?: string
+          index_score?: number | null
+          instrument_key: string
           item_positions: number[]
           job_title_at_completion?: string | null
-          likert_score: number
+          likert_score?: number | null
           office_location_at_completion?: string | null
           organization_id?: string | null
           organization_name_at_completion?: string | null
@@ -2452,7 +2622,7 @@ export type Database = {
           team_id?: string | null
           team_name_at_completion?: string | null
           team_series_id?: string | null
-          threshold_at_completion: number
+          threshold_at_completion?: number | null
           total_score: number
           version_id: string
           work_location_at_completion?:
@@ -2460,15 +2630,17 @@ export type Database = {
             | null
         }
         Update: {
-          at_or_above_threshold?: boolean
+          at_or_above_threshold?: boolean | null
           attempt_number?: number | null
           completed_at?: string
           created_at?: string
           department_at_completion?: string | null
           id?: string
+          index_score?: number | null
+          instrument_key?: string
           item_positions?: number[]
           job_title_at_completion?: string | null
-          likert_score?: number
+          likert_score?: number | null
           office_location_at_completion?: string | null
           organization_id?: string | null
           organization_name_at_completion?: string | null
@@ -2480,7 +2652,7 @@ export type Database = {
           team_id?: string | null
           team_name_at_completion?: string | null
           team_series_id?: string | null
-          threshold_at_completion?: number
+          threshold_at_completion?: number | null
           total_score?: number
           version_id?: string
           work_location_at_completion?:
@@ -2488,6 +2660,13 @@ export type Database = {
             | null
         }
         Relationships: [
+          {
+            foreignKeyName: "wellbeing_results_instrument_key_fkey"
+            columns: ["instrument_key"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_instruments"
+            referencedColumns: ["key"]
+          },
           {
             foreignKeyName: "wellbeing_results_organization_id_fkey"
             columns: ["organization_id"]
@@ -2612,6 +2791,7 @@ export type Database = {
           department_name: string | null
           email_opt_in: boolean
           id: string
+          instrument_key: string
           job_title: string | null
           office_location_id: string | null
           office_location_name: string | null
@@ -2638,6 +2818,7 @@ export type Database = {
           department_name?: string | null
           email_opt_in?: boolean
           id?: string
+          instrument_key: string
           job_title?: string | null
           office_location_id?: string | null
           office_location_name?: string | null
@@ -2664,6 +2845,7 @@ export type Database = {
           department_name?: string | null
           email_opt_in?: boolean
           id?: string
+          instrument_key?: string
           job_title?: string | null
           office_location_id?: string | null
           office_location_name?: string | null
@@ -2686,6 +2868,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "wellbeing_departments"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_sessions_instrument_key_fkey"
+            columns: ["instrument_key"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_instruments"
+            referencedColumns: ["key"]
           },
           {
             foreignKeyName: "wellbeing_sessions_office_location_id_fkey"
@@ -2729,6 +2918,7 @@ export type Database = {
           content_status: Database["public"]["Enums"]["wellbeing_content_status"]
           created_at: string
           id: string
+          instrument_key: string
           is_active: boolean
           item_count: number
           licence_expires_at: string | null
@@ -2745,6 +2935,7 @@ export type Database = {
           content_status?: Database["public"]["Enums"]["wellbeing_content_status"]
           created_at?: string
           id?: string
+          instrument_key: string
           is_active?: boolean
           item_count?: number
           licence_expires_at?: string | null
@@ -2761,6 +2952,7 @@ export type Database = {
           content_status?: Database["public"]["Enums"]["wellbeing_content_status"]
           created_at?: string
           id?: string
+          instrument_key?: string
           is_active?: boolean
           item_count?: number
           licence_expires_at?: string | null
@@ -2773,7 +2965,15 @@ export type Database = {
           updated_at?: string
           version?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_versions_instrument_key_fkey"
+            columns: ["instrument_key"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_instruments"
+            referencedColumns: ["key"]
+          },
+        ]
       }
     }
     Views: {
@@ -2858,6 +3058,14 @@ export type Database = {
         Returns: {
           min_cohort_size: number
           screening_threshold: number
+        }[]
+      }
+      wellbeing_participant_counts: {
+        Args: { p_instrument: string; p_organization: string }
+        Returns: {
+          cohort: string
+          participants: number
+          scope: string
         }[]
       }
     }

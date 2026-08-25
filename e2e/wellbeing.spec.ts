@@ -79,13 +79,16 @@ test("the browser tab is branded Wellbeing Pulse, not DISC360", async ({ page })
   await expect(page).not.toHaveTitle(/DISC360/);
 });
 
-test("the disclaimer and privacy line appear on every wellbeing surface", async ({ page }) => {
+test("a non-diagnostic disclaimer and the privacy line appear on every wellbeing surface", async ({
+  page,
+}) => {
   await signInTo(page, "demo@disc360.dev", "/wellbeing");
   for (const path of ["/wellbeing", "/wellbeing/history"]) {
     await page.goto(path);
-    await expect(
-      page.getByText("GHQ-12 is a screening questionnaire and does not provide a diagnosis.").first(),
-    ).toBeVisible();
+    // Instrument-neutral: the platform runs four questionnaires, so the
+    // assertion is that a non-diagnostic disclaimer is present — not that one
+    // particular instrument is named in shared chrome.
+    await expect(page.getByText(/do(es)? not provide a diagnosis|is not a diagnosis/i).first()).toBeVisible();
     await expect(page.getByText(/not visible to your manager/i).first()).toBeVisible();
   }
 });
@@ -227,5 +230,67 @@ test("no wellbeing URL carries a score or an answer", async ({ page }) => {
 
   for (const url of seen) {
     expect(url).not.toMatch(/[?&](score|total|ghq|answer|item)=/i);
+  }
+});
+
+
+/* ── management demo surfaces (§8, §16) ─────────────────────────────── */
+
+test("an ordinary participant cannot reach any management demo route", async ({ page }) => {
+  await signInTo(page, PARTICIPANT, "/wellbeing");
+
+  for (const path of [
+    "/wellbeing/admin/demo",
+    "/wellbeing/admin/demo/ghq12",
+    "/wellbeing/admin/demo/disc360_wellbeing_v1",
+    // The comparison shows no participant data, but it is still a management
+    // surface: a participant does not choose the instrument, the campaign does.
+    "/wellbeing/admin/instruments",
+  ]) {
+    await page.goto(path);
+    // Redirected away, not shown a permission error — the surface is not
+    // advertised to people who should not know it exists.
+    await expect(page).toHaveURL(/\/wellbeing(\?.*)?$/);
+    await expect(page.getByText(/ILLUSTRATIVE DEMO DATA/i)).toHaveCount(0);
+    await expect(page.getByText(/STRUCTURE PREVIEW/i)).toHaveCount(0);
+  }
+});
+
+test("the participant shell offers no link into the management area", async ({ page }) => {
+  await signInTo(page, PARTICIPANT, "/wellbeing");
+  for (const path of ["/wellbeing", "/wellbeing/history"]) {
+    await page.goto(path);
+    await expect(page.locator('a[href^="/wellbeing/admin"]')).toHaveCount(0);
+  }
+});
+
+test("a participant cannot switch instrument by URL manipulation", async ({ page }) => {
+  await signInTo(page, PARTICIPANT, "/wellbeing");
+  test.skip(!(await questionnaireIsOpen(page)), "no licensed questionnaire in this environment");
+
+  // Ask for a restricted instrument explicitly; the server resolves the
+  // instrument itself and refuses anything not runnable here.
+  await page.goto("/wellbeing?instrument=ghq12");
+  await page.locator("input[name=consent]").check();
+  await page.getByRole("button", { name: "Start my Wellbeing Pulse" }).click();
+  await page.waitForURL(/\/wellbeing(\/assessment\/.+)?(\?.*)?$/);
+
+  // Whatever happened, no GHQ questionnaire was served.
+  await expect(page.getByText(/GHQ/i)).toHaveCount(0);
+});
+
+test("the structure preview offers nothing to submit", async ({ page }) => {
+  await signInTo(page, "admin@disc360.dev", "/wellbeing");
+  const response = await page.goto("/wellbeing/admin/demo/ghq28");
+
+  // Either the demo gate is closed here (redirect) or the preview renders —
+  // and if it renders, it must be inert.
+  if (page.url().includes("/wellbeing/admin/demo")) {
+    expect(response?.status()).toBe(200);
+    await expect(page.getByText(/STRUCTURE PREVIEW — NOT AN ACTIVE QUESTIONNAIRE/i)).toBeVisible();
+    await expect(page.locator("form")).toHaveCount(0);
+    await expect(page.locator('button[type="submit"]')).toHaveCount(0);
+    await expect(page.locator('input[type="radio"]')).toHaveCount(0);
+    await expect(page.getByText(/\[Question content available after licensing\]/i).first()).toBeVisible();
   }
 });

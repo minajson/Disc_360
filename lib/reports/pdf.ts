@@ -402,17 +402,25 @@ function drawScale(layout: ReportLayout, scale: ReportScale): void {
     });
   }
 
-  // Threshold rule, drawn at the left edge of the threshold cell.
-  const thresholdX = MARGIN_X + scale.threshold * (cellWidth + gap) - gap / 2;
-  canvas.rect(thresholdX, top - cellHeight - 3, 0.9, cellHeight + 6, PULSE_ATTENTION);
+  // Threshold rule, drawn at the left edge of the threshold cell — but ONLY
+  // for instruments that have one. A threshold outside the scale means the
+  // instrument declares none, and nothing is drawn or captioned: an
+  // unvalidated instrument must not acquire a line by rendering accident.
+  const hasThreshold = scale.threshold >= 0 && scale.threshold <= scale.max;
+  if (hasThreshold) {
+    const thresholdX = MARGIN_X + scale.threshold * (cellWidth + gap) - gap / 2;
+    canvas.rect(thresholdX, top - cellHeight - 3, 0.9, cellHeight + 6, PULSE_ATTENTION);
+  }
 
   layout.move(cellHeight + 14);
-  layout.paragraph(`Current screening threshold: ${scale.threshold}`, {
-    size: 8.5,
-    font: "bold",
-    color: PULSE_ATTENTION,
-    leading: 12,
-  });
+  if (hasThreshold) {
+    layout.paragraph(`Current screening threshold: ${scale.threshold}`, {
+      size: 8.5,
+      font: "bold",
+      color: PULSE_ATTENTION,
+      leading: 12,
+    });
+  }
   if (scale.caption) {
     layout.move(2);
     layout.paragraph(scale.caption, { size: 9.5, color: SLATE, leading: 13.5 });
@@ -550,6 +558,8 @@ function drawBars(layout: ReportLayout, bars: ReportBar[]): void {
 }
 
 function drawSection(layout: ReportLayout, section: ReportSection): void {
+  // Deliberate page structure, where a report defines one.
+  if (section.pageBreakBefore) layout.breakPage();
   // Keep a title with at least its first line of content.
   layout.reserve(52);
   layout.move(12);

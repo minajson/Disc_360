@@ -20,12 +20,15 @@ export function CohortStrip({
   cohorts,
   threshold,
   minCohort,
+  maxScore = WELLBEING_MAX_SCORE,
 }: {
   cohorts: CohortOutcome<CohortStats>[];
-  threshold: number;
+  /** Null for instruments that carry no threshold — no rule is drawn. */
+  threshold: number | null;
   minCohort: number;
+  maxScore?: number;
 }) {
-  const thresholdPercent = (threshold / WELLBEING_MAX_SCORE) * 100;
+  const thresholdPercent = threshold === null ? null : (threshold / maxScore) * 100;
 
   return (
     <ul className="flex flex-col divide-y divide-[rgba(31,78,95,0.12)]">
@@ -43,12 +46,14 @@ export function CohortStrip({
                   median{" "}
                   <strong className="text-sm text-ink">{cohort.stats!.median}</strong>
                 </span>
-                <span>
-                  ≥{threshold}{" "}
-                  <strong className="text-sm text-ink">
-                    {cohort.stats!.atOrAboveThresholdShare}%
-                  </strong>
-                </span>
+                {threshold !== null && (
+                  <span>
+                    ≥{threshold}{" "}
+                    <strong className="text-sm text-ink">
+                      {cohort.stats!.atOrAboveThresholdShare}%
+                    </strong>
+                  </span>
+                )}
                 <span>n = {cohort.completed}</span>
               </span>
             )}
@@ -59,19 +64,21 @@ export function CohortStrip({
               <div
                 className="absolute inset-y-0 left-0 rounded-full"
                 style={{
-                  width: `${Math.max((cohort.stats!.median / WELLBEING_MAX_SCORE) * 100, 1.5)}%`,
+                  width: `${Math.max((cohort.stats!.median / maxScore) * 100, 1.5)}%`,
                   background:
-                    cohort.stats!.median >= threshold
+                    threshold !== null && cohort.stats!.median >= threshold
                       ? "var(--color-pulse-attention)"
                       : "var(--color-pulse)",
                 }}
               />
             )}
-            <div
-              aria-hidden="true"
-              className="absolute inset-y-0 w-px bg-[rgba(20,55,67,0.55)]"
-              style={{ left: `${thresholdPercent}%` }}
-            />
+            {thresholdPercent !== null && (
+              <div
+                aria-hidden="true"
+                className="absolute inset-y-0 w-px bg-[rgba(20,55,67,0.55)]"
+                style={{ left: `${thresholdPercent}%` }}
+              />
+            )}
           </div>
         </li>
       ))}

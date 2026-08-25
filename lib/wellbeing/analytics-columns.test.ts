@@ -18,11 +18,21 @@ import { readFileSync } from "node:fs";
 
 const SOURCE = readFileSync(new URL("./analytics.ts", import.meta.url), "utf8");
 
-/** Pulled from the module rather than duplicated, so they cannot drift. */
+/**
+ * Pulled from the module rather than duplicated, so they cannot drift.
+ *
+ * Nested selects (`table (a, b)`) are flattened to the joined table plus its
+ * own columns, so a nested join cannot smuggle an identifying column past the
+ * check by hiding inside parentheses.
+ */
 function extractColumns(): string[] {
   const match = SOURCE.match(/WELLBEING_ANALYTICS_COLUMNS\s*=\s*\n?\s*"([^"]+)"/);
   assert.ok(match, "WELLBEING_ANALYTICS_COLUMNS must be a single string literal");
-  return match![1]!.split(",").map((column) => column.trim());
+  return match![1]!
+    .replace(/[()]/g, ",")
+    .split(",")
+    .map((column) => column.trim())
+    .filter(Boolean);
 }
 
 test("the analytics column list is exactly what group reporting needs", () => {
@@ -30,11 +40,16 @@ test("the analytics column list is exactly what group reporting needs", () => {
     "at_or_above_threshold",
     "completed_at",
     "department_at_completion",
+    "dimension_key",
+    "index_score",
+    "index_score",
+    "instrument_key",
     "item_positions",
     "office_location_at_completion",
     "team_id",
     "threshold_at_completion",
     "total_score",
+    "wellbeing_result_dimensions",
     "work_location_at_completion",
   ]);
 });
@@ -74,11 +89,16 @@ test("every analytics read is pinned to the authorised organisation", () => {
   const reads = SOURCE.split('from("wellbeing_results")').slice(1);
   assert.ok(reads.length > 0, "the module reads wellbeing_results");
   for (const read of reads) {
-    const head = read.slice(0, 400);
+    const head = read.slice(0, 600);
     assert.match(
       head,
       /\.eq\("organization_id", organizationId\)/,
       "a wellbeing_results read is not pinned to the authorised organisation",
+    );
+    assert.match(
+      head,
+      /\.eq\("instrument_key", instrumentKey\)/,
+      "a wellbeing_results read is not pinned to exactly one instrument",
     );
   }
 });
@@ -92,9 +112,10 @@ test("authorization runs before the service role is created", () => {
     "getWellbeingWorkspace",
     "getWellbeingComparison",
     "getWellbeingSignals",
+    "getWellbeingDimensionProfile",
   ]) {
     const body = SOURCE.slice(SOURCE.indexOf(`export async function ${entry}`));
-    const contextCall = body.indexOf("await resolveContext(organizationId)");
+    const contextCall = body.indexOf("await resolveContext(organizationId");
     const adminCall = body.indexOf("createSupabaseAdminClient()");
     assert.ok(contextCall >= 0, `${entry} must resolve context`);
     assert.ok(
@@ -115,4 +136,42 @@ test("suppression is applied in every cohort-producing path", () => {
   }
   const workspace = SOURCE.slice(SOURCE.indexOf("export async function getWellbeingWorkspace"));
   assert.match(workspace, /checkSlice\(/, "the overview must check its own cohort size");
+});
+
+
+/* ── suppression counts people, not rows ────────────────────────────── */
+
+test("cohort suppression is decided on distinct PARTICIPANTS", () => {
+  // Longitudinal data makes rows and people diverge: four people across four
+  // waves are sixteen rows and still four people. The floor protects people.
+  assert.match(SOURCE, /readParticipantCounts\(/, "a participant counter exists");
+  assert.match(
+    SOURCE,
+    /checkSlice\(counts\.overall, context\.minCohort\)/,
+    "the overview gate uses the participant count",
+  );
+  assert.match(
+    SOURCE,
+    /completed: scopeCounts\.get\(key\) \?\? 0/,
+    "each cohort's suppression input is its participant count",
+  );
+  assert.ok(
+    !/completed: scores\.length/.test(SOURCE) && !/completed: positions\.length/.test(SOURCE),
+    "no cohort may be gated on, or labelled with, how many results it holds",
+  );
+});
+
+test("the participant counter returns integers only — no identifiers", () => {
+  const migration = readFileSync(
+    new URL("../../supabase/migrations/00030_wellbeing_participant_counts.sql", import.meta.url),
+    "utf8",
+  );
+  assert.match(migration, /returns table \(scope text, cohort text, participants int\)/);
+  assert.match(migration, /count\(distinct r\.profile_id\)/, "it counts people");
+  assert.ok(
+    !/select\s+r\.profile_id\s*(,|from)/i.test(migration),
+    "it must never return a profile id",
+  );
+  assert.match(migration, /security definer/i);
+  assert.match(migration, /revoke all on function/i, "and is not callable by just anyone");
 });

@@ -7,6 +7,14 @@ import {
   SANCTIONED_PHRASES,
 } from "../lib/wellbeing/language.ts";
 import * as content from "./wellbeing-content.ts";
+import * as discContent from "./disc360-wellbeing-content.ts";
+import {
+  DISC360_WELLBEING_DIMENSIONS,
+  DISC360_WELLBEING_INSTRUCTION,
+  DISC360_WELLBEING_ITEMS,
+  DISC360_WELLBEING_OPTIONS,
+} from "./disc360-wellbeing-items.ts";
+import { INSTRUMENTS, INSTRUMENT_KEYS } from "./wellbeing-instruments.ts";
 import {
   DEFAULT_WELLBEING_DEPARTMENTS,
   DEFAULT_WELLBEING_OFFICE_LOCATIONS,
@@ -14,10 +22,10 @@ import {
   WORK_LOCATIONS,
 } from "./wellbeing-taxonomy.ts";
 
-/** Every exported string in the content module, flattened for screening. */
-function allCopy(): Record<string, string> {
+/** Every exported string in a content module, flattened for screening. */
+function flatten(module: Record<string, unknown>): Record<string, string> {
   const entries: Record<string, string> = {};
-  for (const [key, value] of Object.entries(content)) {
+  for (const [key, value] of Object.entries(module)) {
     if (typeof value === "string") {
       entries[key] = value;
     } else if (Array.isArray(value)) {
@@ -32,6 +40,9 @@ function allCopy(): Record<string, string> {
   }
   return entries;
 }
+
+const allCopy = () => flatten(content as unknown as Record<string, unknown>);
+const allDiscCopy = () => flatten(discContent as unknown as Record<string, unknown>);
 
 /* ── the screen itself ──────────────────────────────────────────────── */
 
@@ -84,9 +95,11 @@ test("the screen catches cross-instrument combination and ranking", () => {
       (entry) => entry.term.toLowerCase() === "ranked",
     ),
   );
+  // "Wellbeing Index" alone is DISC360 V1's defined primary score and is
+  // permitted; a composite that merges instruments is not.
   assert.ok(
-    screenWellbeingCopy("We publish a Wellbeing Index each quarter.").some(
-      (entry) => entry.term.toLowerCase() === "wellbeing index",
+    screenWellbeingCopy("We publish a combined wellbeing index each quarter.").some(
+      (entry) => entry.term.toLowerCase() === "combined wellbeing index",
     ),
   );
 });
@@ -211,4 +224,207 @@ test("work location is a fixed pair, and office location follows from it", () =>
     "Port Harcourt",
     "Warri",
   ]);
+});
+
+
+/* ── DISC360 Wellbeing Pulse V1 ─────────────────────────────────────── */
+
+test("ALL DISC360 Wellbeing copy passes the safety-language screen", () => {
+  const failures = screenWellbeingContent(allDiscCopy());
+  assert.deepEqual(
+    failures,
+    [],
+    `unsafe DISC360 Wellbeing copy:\n${failures
+      .map((entry) => `  ${entry.key}: ${entry.violations.map((v) => v.term).join(", ")}`)
+      .join("\n")}`,
+  );
+});
+
+test("the twelve V1 items themselves pass the safety-language screen", () => {
+  const items = Object.fromEntries(
+    DISC360_WELLBEING_ITEMS.map((item) => [item.externalId, item.prompt]),
+  );
+  assert.deepEqual(screenWellbeingContent(items), []);
+});
+
+test("the instruction and response options are exactly as specified", () => {
+  assert.equal(
+    DISC360_WELLBEING_INSTRUCTION,
+    "Thinking about the past two weeks, choose the response that best reflects your experience.",
+  );
+  assert.deepEqual(DISC360_WELLBEING_OPTIONS.map((option) => option.label), [
+    "Never",
+    "Rarely",
+    "Sometimes",
+    "Often",
+    "Almost always",
+  ]);
+});
+
+test("V1 copy never APPLIES a threshold, band or category", () => {
+  // The words "threshold" and "cut-off" are permitted only in denial — V1 has
+  // to be able to say it does not have one. What must never appear is copy
+  // that applies one to a person.
+  const copy = Object.values(allDiscCopy()).join(" ").toLowerCase();
+  for (const forbidden of [
+    "your threshold",
+    "the threshold is",
+    "above the threshold",
+    "below the threshold",
+    "at or above",
+    "your band",
+    "band you",
+    "above average",
+    "below average",
+    "percentile",
+    "benchmark",
+    "target score",
+    "pass mark of",
+    "you scored in the",
+  ]) {
+    assert.ok(!copy.includes(forbidden), `V1 copy must not apply a threshold: "${forbidden}"`);
+  }
+
+  // Any mention at all must sit inside an explicit denial.
+  for (const [key, text] of Object.entries(allDiscCopy())) {
+    if (/threshold|cut-?off/i.test(text)) {
+      assert.match(
+        text,
+        /\b(no|not|never|without)\b/i,
+        `${key} mentions a threshold outside a denial`,
+      );
+    }
+  }
+
+  assert.match(discContent.DISC_NO_BANDS_NOTE, /does not place you in a category/i);
+  assert.match(discContent.DISC_WELLBEING_DISCLAIMER_LONG, /not been psychometrically validated/i);
+  assert.match(discContent.DISC_NO_BANDS_ANALYTICS_NOTE, /no bands, cut-offs or categories/i);
+});
+
+test("V1 never compares a participant to teammates or a population", () => {
+  const copy = Object.values(allDiscCopy()).join(" ").toLowerCase();
+  for (const forbidden of ["your team's", "compared with colleagues", "your peers", "the average person"]) {
+    assert.ok(!copy.includes(forbidden), `V1 copy must not compare people: "${forbidden}"`);
+  }
+  assert.match(discContent.DISC_INDEX_MEANING, /not with anybody else/i);
+});
+
+test("movement copy is direction and a point count", () => {
+  assert.equal(discContent.DISC_MOVEMENT_LABEL.higher, "Higher than your previous pulse");
+  assert.equal(discContent.DISC_MOVEMENT_LABEL.lower, "Lower than your previous pulse");
+  assert.equal(discContent.DISC_MOVEMENT_LABEL.similar, "Similar to your previous pulse");
+  assert.equal(
+    discContent.indexMovementDetail("higher", 5),
+    "Your index is 5 points higher than your previous pulse.",
+  );
+  assert.equal(
+    discContent.indexMovementDetail("lower", 1),
+    "Your index is 1 point lower than your previous pulse.",
+  );
+  assert.equal(discContent.sinceFirstDetail(13), "Your index is 13 points higher than your first recorded pulse.");
+});
+
+test("the lower-dimension framing is an area for attention, never a risk", () => {
+  assert.match(discContent.DISC_LOWEST_DIMENSION_LABEL, /lower-scoring dimension/i);
+  assert.match(discContent.DISC_LOWER_DIMENSION_NOTE, /area for attention/i);
+  assert.ok(!/risk/i.test(discContent.DISC_LOWER_DIMENSION_NOTE));
+});
+
+/* ── instrument registry ────────────────────────────────────────────── */
+
+test("both instruments are registered with their own scales and directions", () => {
+  assert.deepEqual([...INSTRUMENT_KEYS], ["ghq12", "ghq28", "who5", "disc360_wellbeing_v1"]);
+
+  const ghq = INSTRUMENTS.ghq12;
+  assert.equal(ghq.primaryScoreMax, 12);
+  assert.equal(ghq.scoreDirection, "higher_is_more_distress");
+  assert.equal(ghq.subscales.length, 0, "GHQ-12 has no subscales, by design");
+  assert.equal(ghq.hasThreshold, true);
+  assert.equal(ghq.licensing, "external_rights_required");
+
+  const ghq28 = INSTRUMENTS.ghq28;
+  assert.equal(ghq28.primaryScoreMax, 28);
+  assert.equal(ghq28.subscales.length, 4, "GHQ-28 has four profile subscales");
+  assert.equal(ghq28.hasThreshold, true);
+
+  const who5 = INSTRUMENTS.who5;
+  assert.equal(who5.primaryScoreMax, 100);
+  assert.equal(who5.scoreDirection, "higher_is_stronger_wellbeing");
+  assert.equal(who5.hasThreshold, false, "no threshold is configured for WHO-5 here");
+  assert.equal(who5.licensing, "open_licence");
+
+  const disc = INSTRUMENTS.disc360_wellbeing_v1;
+  assert.equal(disc.primaryScoreMax, 100);
+  assert.equal(disc.scoreDirection, "higher_is_stronger_wellbeing");
+  assert.equal(disc.hasThreshold, false, "V1 has no clinical threshold");
+  assert.equal(disc.licensing, "original_content");
+});
+
+test("the GHQ instruments and the wellbeing instruments run in opposite directions", () => {
+  assert.notEqual(
+    INSTRUMENTS.ghq12.scoreDirection,
+    INSTRUMENTS.disc360_wellbeing_v1.scoreDirection,
+    "a rising GHQ score and a rising Wellbeing Index mean different things",
+  );
+});
+
+test("neither instrument is described as superior, and neither overclaims", () => {
+  const text = Object.values(INSTRUMENTS)
+    .flatMap((instrument) => [
+      instrument.purpose,
+      instrument.descriptor,
+      instrument.thresholdDescription,
+      instrument.subscaleDescription,
+      instrument.licensingDescription,
+    ])
+    .join(" ")
+    .toLowerCase();
+  for (const forbidden of ["better than", "superior", "more accurate", "gold standard", "best-in-class"]) {
+    assert.ok(!text.includes(forbidden), `instrument metadata must not claim "${forbidden}"`);
+  }
+  assert.ok(
+    INSTRUMENTS.disc360_wellbeing_v1.notClaims.includes("not psychometrically validated"),
+    "V1 states plainly that it is not validated",
+  );
+});
+
+test("every dimension is defined with a label and a neutral description", () => {
+  assert.equal(DISC360_WELLBEING_DIMENSIONS.length, 6);
+  const descriptions = Object.fromEntries(
+    DISC360_WELLBEING_DIMENSIONS.map((d) => [d.key, d.description]),
+  );
+  assert.deepEqual(screenWellbeingContent(descriptions), []);
+  assert.deepEqual(
+    DISC360_WELLBEING_DIMENSIONS.map((d) => d.position),
+    [0, 1, 2, 3, 4, 5],
+  );
+});
+
+
+test("the GHQ instrument still never names an index — the exemption is V1's alone", () => {
+  const ghqCopy = Object.values(allCopy()).join(" ").toLowerCase();
+  for (const forbidden of ["wellbeing index", "index score", "composite"]) {
+    assert.ok(
+      !ghqCopy.includes(forbidden),
+      `GHQ copy must not name an index: "${forbidden}" — GHQ reports a 0–12 count`,
+    );
+  }
+});
+
+test("a composite that merges instruments is still refused", () => {
+  for (const phrase of [
+    "We publish a combined wellbeing index each quarter.",
+    "The composite index blends both instruments.",
+    "Their overall wellbeing score is 74.",
+    "A health index for every employee.",
+  ]) {
+    assert.ok(screenWellbeingCopy(phrase).length > 0, `must reject: ${phrase}`);
+  }
+});
+
+test("but V1's own defined primary score name is permitted", () => {
+  assert.deepEqual(
+    screenWellbeingCopy("Your Wellbeing Index summarises your twelve answers on a 0–100 scale."),
+    [],
+  );
 });

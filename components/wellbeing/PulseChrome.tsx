@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SCREENING_DISCLAIMER, WELLBEING_PRODUCT_NAME } from "@/data/wellbeing-content";
+import { WELLBEING_PRODUCT_NAME } from "@/data/wellbeing-content";
 
 /**
  * Wellbeing Pulse chrome.
@@ -123,11 +123,17 @@ export function PulseHeader({
  * The footer carries the disclaimer that must appear wherever a score can be
  * seen, and the privacy line participants ask about most.
  */
-export function PulseFooter() {
+export function PulseFooter({ disclaimer }: { disclaimer?: string } = {}) {
   return (
     <footer className="mt-auto border-t border-[rgba(31,78,95,0.14)] px-5 py-8 sm:px-8">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 text-xs leading-relaxed text-slate">
-        <p className="font-medium text-ink">{SCREENING_DISCLAIMER}</p>
+        {/*
+          Instrument-neutral by default. The platform runs four instruments,
+          and naming one of them in shared chrome would put "GHQ-12 is a
+          screening questionnaire" underneath a DISC360 Wellbeing result. A
+          surface that knows its instrument passes that instrument's wording.
+        */}
+        <p className="font-medium text-ink">{disclaimer ?? WELLBEING_SHELL_DISCLAIMER}</p>
         <p>
           Your individual answers and score are private to you. They are not visible to your
           manager, your facilitator or platform administrators.
@@ -136,3 +142,10 @@ export function PulseFooter() {
     </footer>
   );
 }
+
+/**
+ * The one line true of every instrument on the platform. Anything more
+ * specific belongs to the surface that knows which instrument it is showing.
+ */
+export const WELLBEING_SHELL_DISCLAIMER =
+  "Wellbeing Pulse questionnaires are screening and reflection tools. They do not provide a diagnosis.";

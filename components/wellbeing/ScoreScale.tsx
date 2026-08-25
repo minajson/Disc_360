@@ -17,20 +17,23 @@ export function ScoreScale({
   threshold,
   atOrAbove,
   label = "GHQ-12 screening score",
+  max = WELLBEING_MAX_SCORE,
 }: {
   score: number;
   threshold: number;
   atOrAbove: boolean;
   label?: string;
+  /** The instrument's own maximum — 12 for GHQ-12, 28 for GHQ-28. */
+  max?: number;
 }) {
-  const cells = Array.from({ length: WELLBEING_MAX_SCORE + 1 }, (_, index) => index);
+  const cells = Array.from({ length: max + 1 }, (_, index) => index);
   const tone = atOrAbove ? "var(--color-pulse-attention)" : "var(--color-pulse)";
   const soft = atOrAbove ? "var(--color-pulse-attention-soft)" : "var(--color-pulse-soft)";
 
   return (
     <figure className="flex flex-col gap-5">
       <figcaption className="sr-only">
-        {label}: {score} out of {WELLBEING_MAX_SCORE}. Screening threshold {threshold}.{" "}
+        {label}: {score} out of {max}. Screening threshold {threshold}.{" "}
         {atOrAbove ? "At or above the threshold." : "Below the threshold."}
       </figcaption>
 
@@ -41,7 +44,7 @@ export function ScoreScale({
         >
           {score}
         </span>
-        <span className="font-mono text-lg text-slate">/ {WELLBEING_MAX_SCORE}</span>
+        <span className="font-mono text-lg text-slate">/ {max}</span>
       </div>
 
       <div aria-hidden="true" className="flex flex-col gap-2">
@@ -52,7 +55,9 @@ export function ScoreScale({
             return (
               <div key={cell} className="flex flex-1 flex-col gap-1.5">
                 <div
-                  className="h-11 rounded-[4px] transition-colors sm:h-14"
+                  className={`rounded-[4px] transition-colors ${
+                    cells.length > 16 ? "h-8 sm:h-11" : "h-11 sm:h-14"
+                  }`}
                   style={{
                     background: filled ? tone : soft,
                     opacity: filled ? 1 : 0.55,

@@ -216,3 +216,63 @@ test("no completed responses yields zero shares, not NaN", () => {
   const signals = itemSignals([], IDS);
   assert.equal(signals.every((signal) => signal.elevatedShare === 0), true);
 });
+
+
+/* ── other instrument scales ────────────────────────────────────────── */
+
+test("GHQ-28 aggregates on its own 0–28 scale", () => {
+  const result = aggregateScores([0, 14, 28], { maxScore: 28, threshold: 5 });
+  assert.equal(result.maxScore, 28);
+  assert.equal(result.distribution.length, 29, "one column per point");
+  assert.equal(result.median, 14);
+  assert.equal(result.atOrAboveThreshold, 2, "14 and 28 are at or above 5");
+  assert.throws(() => aggregateScores([29], { maxScore: 28 }), RangeError);
+});
+
+test("a 0–100 scale buckets rather than drawing 101 columns", () => {
+  const result = aggregateScores([0, 12, 47, 72, 100], { maxScore: 100, threshold: null, bucketSize: 10 });
+  assert.equal(result.distribution.length, 11, "0–9, 10–19 … 100");
+  assert.deepEqual(
+    result.distribution.map((bucket) => bucket.score),
+    [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+  );
+  assert.equal(result.distribution[0]!.count, 1, "0 lands in the first bucket");
+  assert.equal(result.distribution[1]!.count, 1, "12 lands in 10–19");
+  assert.equal(result.distribution[4]!.count, 1, "47 lands in 40–49");
+  assert.equal(result.distribution[7]!.count, 1, "72 lands in 70–79");
+  assert.equal(result.distribution[10]!.count, 1, "100 lands in the last bucket");
+});
+
+test("an instrument with NO threshold reports no threshold and no share", () => {
+  const result = aggregateScores([20, 60, 90], { maxScore: 100, threshold: null, bucketSize: 10 });
+  assert.equal(result.threshold, null);
+  assert.equal(result.atOrAboveThreshold, 0);
+  assert.equal(result.atOrAboveThresholdShare, 0);
+  assert.ok(
+    result.distribution.every((bucket) => bucket.atOrAboveThreshold === false),
+    "nothing is 'at or above' a line that does not exist",
+  );
+  assert.equal(result.median, 60, "central tendency still works");
+});
+
+test("a thresholdless trend draws no threshold series and stays comparable on the median", () => {
+  const scale = { maxScore: 100, threshold: null, bucketSize: 10 } as const;
+  const trend = buildTrend([
+    {
+      key: "Q1",
+      label: "Q1",
+      at: "2026-01-01T00:00:00.000Z",
+      aggregate: aggregateScores([40, 60], scale),
+    },
+    {
+      key: "Q2",
+      label: "Q2",
+      at: "2026-04-01T00:00:00.000Z",
+      aggregate: aggregateScores([70, 80], scale),
+    },
+  ]);
+  assert.equal(trend.thresholdShareChange, null, "no threshold series exists to draw");
+  assert.ok(trend.medianChange, "the median remains comparable");
+  assert.equal(trend.medianChange!.movement, "higher");
+  assert.equal(trend.thresholdConsistent, true, "no thresholds means nothing inconsistent");
+});

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireOnboarded } from "@/lib/auth/guards";
-import { getActiveQuestionnaire, getMyWellbeingHistory } from "@/lib/wellbeing/queries";
+import { getInstrumentAvailability, getMyWellbeingHistory } from "@/lib/wellbeing/queries";
 import { startWellbeingPulseAction } from "@/lib/actions/wellbeing";
 import {
   CONSENT_AGREE,
@@ -12,6 +12,7 @@ import {
   WELLBEING_PRODUCT_DESCRIPTION,
   WELLBEING_PRODUCT_NAME,
 } from "@/data/wellbeing-content";
+import { DISC_WELLBEING_DISCLAIMER_LONG } from "@/data/disc360-wellbeing-content";
 
 export const metadata: Metadata = { title: "Your wellbeing check-in" };
 
@@ -34,10 +35,20 @@ export default async function WellbeingHomePage({
 }) {
   const { team } = await searchParams;
   const context = await requireOnboarded();
-  const [questionnaire, { history }] = await Promise.all([
-    getActiveQuestionnaire(context),
+  const [availability, { history }] = await Promise.all([
+    getInstrumentAvailability(context),
     getMyWellbeingHistory(),
   ]);
+
+  // Which instrument a solo participant would take: the one active instrument
+  // if there is exactly one, otherwise none — the participant is never asked
+  // to choose between questionnaires.
+  const live = availability.filter((entry) => entry.available);
+  const questionnaire = live.length === 1 ? live[0]! : null;
+  const completedCount = history.completedInstruments.reduce(
+    (total, key) => total + history[key].count,
+    0,
+  );
 
   const firstName = context.profile.preferred_name?.trim() || context.profile.full_name.split(" ")[0];
 
@@ -54,12 +65,12 @@ export default async function WellbeingHomePage({
         the last few weeks compared with usual. Twelve questions, about three minutes.
       </p>
 
-      {history.count > 0 && (
+      {completedCount > 0 && (
         <div className="mt-8 flex flex-wrap items-center gap-3 rounded-2xl border border-[rgba(31,78,95,0.16)] bg-paper px-5 py-4">
           <p className="text-sm text-slate">
             You have completed{" "}
             <strong className="font-medium text-ink">
-              {history.count} {history.count === 1 ? "pulse" : "pulses"}
+              {completedCount} {completedCount === 1 ? "pulse" : "pulses"}
             </strong>{" "}
             so far.
           </p>
@@ -85,6 +96,7 @@ export default async function WellbeingHomePage({
 
           <form action={startWellbeingPulseAction} className="flex flex-col gap-5">
             {team && <input type="hidden" name="team_id" value={team} />}
+            <input type="hidden" name="instrument_key" value={questionnaire.key} />
 
             <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[rgba(31,78,95,0.2)] bg-pulse-mist/60 p-4 transition-colors hover:border-pulse">
               <input
@@ -124,7 +136,7 @@ export default async function WellbeingHomePage({
             Nothing is missing from your account, and nothing is required from you. Your
             wellbeing governance contact will be able to tell you when it opens.
           </p>
-          {history.count > 0 && (
+          {completedCount > 0 && (
             <Link
               href="/wellbeing/history"
               className="pulse-focus mt-2 w-fit rounded-full border border-[rgba(31,78,95,0.2)] px-5 py-2.5 text-sm font-medium text-pulse"
@@ -136,7 +148,11 @@ export default async function WellbeingHomePage({
       )}
 
       <p className="mt-10 max-w-2xl text-xs leading-relaxed text-slate">
-        {SCREENING_DISCLAIMER_LONG}
+        {/* The disclaimer belongs to the instrument being offered, not to the
+            shell — four instruments run here and they do not share wording. */}
+        {questionnaire?.key === "disc360_wellbeing_v1"
+          ? DISC_WELLBEING_DISCLAIMER_LONG
+          : SCREENING_DISCLAIMER_LONG}
       </p>
     </div>
   );

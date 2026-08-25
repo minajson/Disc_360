@@ -4,6 +4,18 @@ import { requireOnboarded, type AuthContext } from "@/lib/auth/guards";
 import { getWellbeingPolicy, type WellbeingPolicy } from "@/lib/wellbeing/policy";
 import { compareToPrevious, type WellbeingComparison } from "@/lib/scoring/wellbeing";
 import type { WorkLocation } from "@/data/wellbeing-taxonomy";
+import { compareIndex, type IndexComparison } from "@/lib/scoring/disc360-wellbeing";
+import {
+  INSTRUMENT_KEYS,
+  INSTRUMENTS,
+  isInstrumentKey,
+  type InstrumentKey,
+  type InstrumentMetadata,
+} from "@/data/wellbeing-instruments";
+import {
+  DISC360_WELLBEING_INSTRUCTION,
+  type DimensionKey,
+} from "@/data/disc360-wellbeing-items";
 
 /**
  * Reading a participant's OWN wellbeing data.
@@ -25,6 +37,10 @@ export interface WellbeingItemView {
   externalId: string;
   position: number;
   prompt: string;
+  /** Short internal label, e.g. "Focus". Null for instruments without facets. */
+  facet: string | null;
+  /** Null for GHQ, which has no dimensions. */
+  dimensionKey: DimensionKey | null;
   options: { position: number; label: string }[];
 }
 
@@ -32,6 +48,10 @@ export interface WellbeingQuestionnaire {
   versionId: string;
   versionNumber: number;
   name: string;
+  instrumentKey: InstrumentKey;
+  instrument: InstrumentMetadata;
+  /** Shown once above the items. Empty for instruments that carry none. */
+  instruction: string;
   items: WellbeingItemView[];
 }
 
@@ -45,17 +65,21 @@ export interface WellbeingQuestionnaire {
  */
 export async function getActiveQuestionnaire(
   context: AuthContext,
+  instrumentKey: InstrumentKey,
 ): Promise<WellbeingQuestionnaire | null> {
   const { data: version } = await context.supabase
     .from("wellbeing_versions")
-    .select("id, name, version, content_status, is_active")
+    .select("id, name, version, content_status, is_active, instrument_key")
     .eq("is_active", true)
+    .eq("instrument_key", instrumentKey)
     .maybeSingle();
   if (!version) return null;
 
   const { data: items } = await context.supabase
     .from("wellbeing_items")
-    .select("id, external_id, position, prompt, wellbeing_item_options (position, label)")
+    .select(
+      "id, external_id, position, prompt, facet, dimension_key, wellbeing_item_options (position, label)",
+    )
     .eq("version_id", version.id)
     .order("position");
 
@@ -65,6 +89,8 @@ export async function getActiveQuestionnaire(
       externalId: item.external_id as string,
       position: item.position as number,
       prompt: (item.prompt as string | null) ?? "",
+      facet: (item.facet as string | null) ?? null,
+      dimensionKey: (item.dimension_key as DimensionKey | null) ?? null,
       options: ((item.wellbeing_item_options ?? []) as { position: number; label: string | null }[])
         .map((option) => ({ position: option.position, label: option.label ?? "" }))
         .sort((a, b) => a.position - b.position),
@@ -73,9 +99,15 @@ export async function getActiveQuestionnaire(
 
   // An active version with missing wording would be a seeding fault. Treat it
   // as "no questionnaire" rather than showing blank items to a participant.
+  // Counts come from the instrument, so GHQ's 12x4 and DISC360 Wellbeing's
+  // 12x5 are each checked against their own shape rather than a shared guess.
+  const instrument = INSTRUMENTS[instrumentKey];
   const complete =
-    view.length === 12 &&
-    view.every((item) => item.prompt.length > 0 && item.options.length === 4) &&
+    view.length === instrument.itemCount &&
+    view.every(
+      (item) =>
+        item.prompt.length > 0 && item.options.length === instrument.responseOptionCount,
+    ) &&
     view.every((item) => item.options.every((option) => option.label.length > 0));
   if (!complete) return null;
 
@@ -83,8 +115,81 @@ export async function getActiveQuestionnaire(
     versionId: version.id as string,
     versionNumber: version.version as number,
     name: version.name as string,
+    instrumentKey,
+    instrument,
+    instruction: INSTRUMENT_INSTRUCTION[instrumentKey] ?? "",
     items: view,
   };
+}
+
+/**
+ * The instruction shown above the items.
+ *
+ * Instrument-owned rather than a shared string: GHQ's items are asked against
+ * "recently, compared with usual" and DISC360 Wellbeing's against "the past
+ * two weeks", and blurring the two would change what people are answering.
+ */
+const INSTRUMENT_INSTRUCTION: Record<InstrumentKey, string> = {
+  ghq12: "",
+  ghq28: "",
+  who5: "",
+  disc360_wellbeing_v1: DISC360_WELLBEING_INSTRUCTION,
+};
+
+export interface InstrumentAvailability {
+  key: InstrumentKey;
+  instrument: InstrumentMetadata;
+  /** True when a licensed, active version exists for participants. */
+  available: boolean;
+  /** Why not, for the facilitator's picker. */
+  unavailableReason: string | null;
+}
+
+/**
+ * Which instruments a facilitator may actually run right now.
+ *
+ * An instrument with no live version is returned as unavailable WITH its
+ * reason rather than omitted, so the picker can show GHQ-12 greyed out and
+ * explain itself. Silently dropping it would look like the feature does not
+ * exist; silently substituting the other instrument would be worse.
+ */
+export async function getInstrumentAvailability(
+  context: AuthContext,
+): Promise<InstrumentAvailability[]> {
+  const { data: versions } = await context.supabase
+    .from("wellbeing_versions")
+    .select("instrument_key, is_active, content_status")
+    .eq("is_active", true);
+
+  const live = new Set((versions ?? []).map((row) => row.instrument_key as string));
+
+  return (Object.keys(INSTRUMENTS) as InstrumentKey[]).map((key) => {
+    const available = live.has(key);
+    return {
+      key,
+      instrument: INSTRUMENTS[key],
+      available,
+      unavailableReason: available
+        ? null
+        : INSTRUMENTS[key].licensing === "external_rights_required"
+          ? "Not available — questionnaire content awaiting licence confirmation"
+          : "Not available — no active questionnaire version",
+    };
+  });
+}
+
+/** The instrument a team's Wellbeing Pulse session runs, if one is chosen. */
+export async function getTeamInstrument(
+  context: AuthContext,
+  teamId: string,
+): Promise<InstrumentKey | null> {
+  const { data: team } = await context.supabase
+    .from("teams")
+    .select("wellbeing_instrument_key")
+    .eq("id", teamId)
+    .maybeSingle();
+  const key = team?.wellbeing_instrument_key as string | null;
+  return key && isInstrumentKey(key) ? key : null;
 }
 
 /* ── form taxonomy ──────────────────────────────────────────────────── */
@@ -158,12 +263,27 @@ export async function getWellbeingFormOptions(
 
 /* ── the participant's own results ──────────────────────────────────── */
 
+export interface WellbeingDimensionScore {
+  key: DimensionKey;
+  raw: number;
+  index: number;
+}
+
 export interface WellbeingHistoryRecord {
   id: string;
+  instrumentKey: InstrumentKey;
   completedAt: string;
+  /** The instrument's RAW score: 0–12 for GHQ, 0–48 for DISC360 Wellbeing. */
   totalScore: number;
-  threshold: number;
-  atOrAboveThreshold: boolean;
+  /** 0–100. Null for GHQ, which normalises nothing. */
+  indexScore: number | null;
+  /** Null for instruments without a threshold — DISC360 Wellbeing V1 has none. */
+  threshold: number | null;
+  atOrAboveThreshold: boolean | null;
+  /** Empty for GHQ. Six entries, in display order, for DISC360 Wellbeing. */
+  dimensions: WellbeingDimensionScore[];
+  /** Movement of the 0–100 index against the previous pulse of the SAME instrument. */
+  indexComparison: IndexComparison | null;
   attemptNumber: number | null;
   departmentAtCompletion: string | null;
   workLocationAtCompletion: WorkLocation | null;
@@ -187,10 +307,25 @@ export interface WellbeingHistory {
   thresholdChanged: boolean;
 }
 
+/**
+ * A participant's history, split by instrument.
+ *
+ * Never merged. The two instruments measure different things on different
+ * scales running in opposite directions, so a single combined series would be
+ * meaningless at best. Each instrument gets its own chart, its own movement
+ * and its own trend.
+ */
+export type WellbeingHistoryByInstrument = Record<InstrumentKey, WellbeingHistory> & {
+  /** Instruments this participant has actually completed at least once. */
+  completedInstruments: InstrumentKey[];
+};
+
+// One string literal, not a concatenation: supabase-js infers the row shape
+// from the literal type, and `"a" + "b"` widens to `string`.
 // One string literal, not a concatenation: supabase-js infers the row shape
 // from the literal type, and `"a" + "b"` widens to `string`.
 const RESULT_COLUMNS =
-  "id, profile_id, session_id, total_score, likert_score, threshold_at_completion, at_or_above_threshold, attempt_number, completed_at, questionnaire_version, scoring_version, department_at_completion, work_location_at_completion, office_location_at_completion, job_title_at_completion, team_name_at_completion, organization_name_at_completion";
+  "id, profile_id, session_id, instrument_key, total_score, index_score, likert_score, threshold_at_completion, at_or_above_threshold, attempt_number, completed_at, questionnaire_version, scoring_version, department_at_completion, work_location_at_completion, office_location_at_completion, job_title_at_completion, team_name_at_completion, organization_name_at_completion, wellbeing_result_dimensions (dimension_key, raw_score, index_score)";
 
 /**
  * This participant's complete wellbeing history.
@@ -206,7 +341,7 @@ const RESULT_COLUMNS =
  */
 export async function getMyWellbeingHistory(): Promise<{
   context: AuthContext;
-  history: WellbeingHistory;
+  history: WellbeingHistoryByInstrument;
 }> {
   const context = await requireOnboarded();
 
@@ -216,48 +351,127 @@ export async function getMyWellbeingHistory(): Promise<{
     .eq("profile_id", context.user.id)
     .order("completed_at", { ascending: true });
 
-  const chronological: WellbeingHistoryRecord[] = (data ?? []).map((row, index, all) => {
-    const previous = index > 0 ? all[index - 1] : null;
+  const rows = (data ?? []) as unknown as ResultRow[];
+
+  // Split FIRST, then compare within each instrument. Comparing a GHQ result
+  // against a DISC360 Wellbeing result would produce a movement figure from
+  // two different scales pointing in opposite directions.
+  const byInstrument = Object.fromEntries(
+    INSTRUMENT_KEYS.map((key) => [key, [] as ResultRow[]]),
+  ) as Record<InstrumentKey, ResultRow[]>;
+  for (const row of rows) {
+    const key = row.instrument_key;
+    if (isInstrumentKey(key)) byInstrument[key].push(row);
+  }
+
+  const build = (instrumentRows: ResultRow[]): WellbeingHistory => {
+    const chronological = instrumentRows.map((row, index, all) =>
+      toHistoryRecord(row, index > 0 ? all[index - 1]! : null),
+    );
+    const thresholds = new Set(
+      chronological
+        .map((record) => record.threshold)
+        .filter((value): value is number => value !== null),
+    );
     return {
-      id: row.id as string,
-      completedAt: row.completed_at as string,
-      totalScore: row.total_score as number,
-      threshold: row.threshold_at_completion as number,
-      atOrAboveThreshold: row.at_or_above_threshold as boolean,
-      attemptNumber: (row.attempt_number as number | null) ?? null,
-      departmentAtCompletion: (row.department_at_completion as string | null) ?? null,
-      workLocationAtCompletion: (row.work_location_at_completion as WorkLocation | null) ?? null,
-      officeLocationAtCompletion: (row.office_location_at_completion as string | null) ?? null,
-      jobTitleAtCompletion: (row.job_title_at_completion as string | null) ?? null,
-      teamNameAtCompletion: (row.team_name_at_completion as string | null) ?? null,
-      organizationNameAtCompletion:
-        (row.organization_name_at_completion as string | null) ?? null,
-      questionnaireVersion: row.questionnaire_version as number,
-      scoringVersion: row.scoring_version as string,
-      comparison: previous
-        ? compareToPrevious(row.total_score as number, previous.total_score as number)
-        : null,
-    };
-  });
-
-  const thresholds = new Set(chronological.map((record) => record.threshold));
-
-  return {
-    context,
-    history: {
       chronological,
       records: [...chronological].reverse(),
       count: chronological.length,
       thresholdChanged: thresholds.size > 1,
-    },
+    };
+  };
+
+  const history = {
+    ...(Object.fromEntries(
+      INSTRUMENT_KEYS.map((key) => [key, build(byInstrument[key])]),
+    ) as Record<InstrumentKey, WellbeingHistory>),
+    completedInstruments: INSTRUMENT_KEYS.filter((key) => byInstrument[key].length > 0),
+  } satisfies WellbeingHistoryByInstrument;
+
+  return { context, history };
+}
+
+interface ResultRow {
+  id: string;
+  profile_id: string;
+  session_id: string;
+  instrument_key: string;
+  total_score: number;
+  index_score: number | null;
+  likert_score: number | null;
+  threshold_at_completion: number | null;
+  at_or_above_threshold: boolean | null;
+  attempt_number: number | null;
+  completed_at: string;
+  questionnaire_version: number;
+  scoring_version: string;
+  department_at_completion: string | null;
+  work_location_at_completion: WorkLocation | null;
+  office_location_at_completion: string | null;
+  job_title_at_completion: string | null;
+  team_name_at_completion: string | null;
+  organization_name_at_completion: string | null;
+  wellbeing_result_dimensions: {
+    dimension_key: string;
+    raw_score: number;
+    index_score: number;
+  }[] | null;
+}
+
+function toHistoryRecord(row: ResultRow, previous: ResultRow | null): WellbeingHistoryRecord {
+  const dimensions: WellbeingDimensionScore[] = (row.wellbeing_result_dimensions ?? [])
+    .map((dimension) => ({
+      key: dimension.dimension_key as DimensionKey,
+      raw: dimension.raw_score,
+      index: dimension.index_score,
+    }))
+    .sort(
+      (a, b) => DIMENSION_DISPLAY_ORDER.indexOf(a.key) - DIMENSION_DISPLAY_ORDER.indexOf(b.key),
+    );
+
+  return {
+    id: row.id,
+    instrumentKey: row.instrument_key as InstrumentKey,
+    completedAt: row.completed_at,
+    totalScore: row.total_score,
+    indexScore: row.index_score,
+    threshold: row.threshold_at_completion,
+    atOrAboveThreshold: row.at_or_above_threshold,
+    dimensions,
+    attemptNumber: row.attempt_number,
+    departmentAtCompletion: row.department_at_completion,
+    workLocationAtCompletion: row.work_location_at_completion,
+    officeLocationAtCompletion: row.office_location_at_completion,
+    jobTitleAtCompletion: row.job_title_at_completion,
+    teamNameAtCompletion: row.team_name_at_completion,
+    organizationNameAtCompletion: row.organization_name_at_completion,
+    questionnaireVersion: row.questionnaire_version,
+    scoringVersion: row.scoring_version,
+    comparison:
+      previous !== null ? compareToPrevious(row.total_score, previous.total_score) : null,
+    indexComparison:
+      previous !== null && row.index_score !== null && previous.index_score !== null
+        ? compareIndex(row.index_score, previous.index_score)
+        : null,
   };
 }
+
+const DIMENSION_DISPLAY_ORDER: DimensionKey[] = [
+  "capacity",
+  "recovery_demand",
+  "emotional_resilience",
+  "connection_safety",
+  "purpose_confidence",
+  "everyday_wellbeing",
+];
 
 export interface OwnWellbeingResult {
   context: AuthContext;
   record: WellbeingHistoryRecord;
-  /** Every pulse this person has completed, for the trend on the result page. */
+  /** This participant's history FOR THIS INSTRUMENT ONLY. */
   history: WellbeingHistory;
+  instrument: InstrumentMetadata;
+  /** Only meaningful for instruments that carry a threshold. */
   policy: WellbeingPolicy;
 }
 
@@ -266,6 +480,10 @@ export interface OwnWellbeingResult {
  *
  * The redundant `profile_id === user.id` comparison on top of RLS is
  * deliberate: it means a future policy edit cannot silently widen this path.
+ *
+ * The history returned alongside is scoped to the SAME instrument as the
+ * result, so a DISC360 Wellbeing result never draws a trend line through GHQ
+ * pulses, or the reverse.
  */
 export async function loadOwnWellbeingResult(
   resultId: string,
@@ -273,8 +491,14 @@ export async function loadOwnWellbeingResult(
   if (!z.uuid().safeParse(resultId).success) return null;
 
   const { context, history } = await getMyWellbeingHistory();
-  const record = history.chronological.find((entry) => entry.id === resultId) ?? null;
-  if (!record) return null;
+
+  const found = (Object.keys(INSTRUMENTS) as InstrumentKey[])
+    .map((key) => ({
+      key,
+      record: history[key].chronological.find((entry) => entry.id === resultId) ?? null,
+    }))
+    .find((entry) => entry.record !== null);
+  if (!found?.record) return null;
 
   // Confirm ownership against the row itself rather than trusting the list.
   const { data: row } = await context.supabase
@@ -289,5 +513,11 @@ export async function loadOwnWellbeingResult(
     (row.organization_id as string | null) ?? null,
   );
 
-  return { context, record, history, policy };
+  return {
+    context,
+    record: found.record,
+    history: history[found.key],
+    instrument: INSTRUMENTS[found.key],
+    policy,
+  };
 }

@@ -17,10 +17,15 @@ export function DistributionChart({
   distribution,
   threshold,
   completed,
+  maxScore = 12,
+  bucketSize = 1,
 }: {
   distribution: DistributionBucket[];
-  threshold: number;
+  /** Null for instruments that carry no threshold. */
+  threshold: number | null;
   completed: number;
+  maxScore?: number;
+  bucketSize?: number;
 }) {
   const peak = Math.max(...distribution.map((bucket) => bucket.count), 1);
 
@@ -73,22 +78,37 @@ export function DistributionChart({
       </div>
 
       <figcaption className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate">
-        <span className="inline-flex items-center gap-2">
-          <span
-            aria-hidden="true"
-            className="h-2.5 w-2.5 rounded-[2px]"
-            style={{ background: "var(--color-pulse)" }}
-          />
-          Below threshold (0–{threshold - 1})
-        </span>
-        <span className="inline-flex items-center gap-2">
-          <span
-            aria-hidden="true"
-            className="h-2.5 w-2.5 rounded-[2px]"
-            style={{ background: "var(--color-pulse-attention)" }}
-          />
-          At or above threshold ({threshold}–12)
-        </span>
+        {threshold !== null ? (
+          <>
+            <span className="inline-flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="h-2.5 w-2.5 rounded-[2px]"
+                style={{ background: "var(--color-pulse)" }}
+              />
+              Below threshold (0–{threshold - 1})
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="h-2.5 w-2.5 rounded-[2px]"
+                style={{ background: "var(--color-pulse-attention)" }}
+              />
+              At or above threshold ({threshold}–{maxScore})
+            </span>
+          </>
+        ) : (
+          <span className="inline-flex items-center gap-2">
+            <span
+              aria-hidden="true"
+              className="h-2.5 w-2.5 rounded-[2px]"
+              style={{ background: "var(--color-pulse)" }}
+            />
+            {bucketSize > 1
+              ? `Scores 0–${maxScore}, grouped in ${bucketSize}s`
+              : `Scores 0–${maxScore}`}
+          </span>
+        )}
         <span className="font-mono">n = {completed}</span>
       </figcaption>
     </figure>

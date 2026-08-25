@@ -10,7 +10,13 @@ import {
   WELLBEING_SCORING_VERSION,
 } from "@/lib/scoring/wellbeing";
 import { getWellbeingPolicy } from "@/lib/wellbeing/policy";
-import { getActiveQuestionnaire } from "@/lib/wellbeing/queries";
+import { getActiveQuestionnaire, getTeamInstrument } from "@/lib/wellbeing/queries";
+import {
+  computeDiscWellbeingResult,
+  DISC_WELLBEING_SCORING_METHOD,
+  DISC_WELLBEING_SCORING_VERSION,
+} from "@/lib/scoring/disc360-wellbeing";
+import { INSTRUMENTS, isInstrumentKey, type InstrumentKey } from "@/data/wellbeing-instruments";
 import { buildWellbeingSnapshot } from "@/lib/wellbeing/snapshot";
 
 /**
@@ -38,6 +44,12 @@ const beginSchema = z.object({
   teamId: z.uuid().nullable().optional(),
   /** Must be explicitly true. A missing checkbox is not consent. */
   consent: z.literal(true),
+  /**
+   * Which instrument to run. Resolved from the team where one is configured;
+   * a client-supplied value is only honoured for a solo attempt, and is
+   * validated against the registry either way.
+   */
+  instrumentKey: z.enum(["ghq12", "disc360_wellbeing_v1"]).optional(),
 });
 
 export interface BeginResult {
@@ -56,6 +68,7 @@ export interface BeginResult {
 export async function beginWellbeingPulse(input: {
   teamId?: string | null;
   consent: boolean;
+  instrumentKey?: InstrumentKey;
 }): Promise<BeginResult> {
   const parsed = beginSchema.safeParse(input);
   if (!parsed.success) {
@@ -66,12 +79,30 @@ export async function beginWellbeingPulse(input: {
   const { supabase, user } = context;
   const teamId = parsed.data.teamId ?? null;
 
-  // Resume, scoped to the same context the participant is entering through.
+  // The team decides which instrument its session runs. A client-supplied key
+  // is honoured only for a solo attempt — otherwise a participant could opt
+  // themselves into a different questionnaire than the one their facilitator
+  // configured, and their result would land in the wrong analytics.
+  const teamInstrument = teamId ? await getTeamInstrument(context, teamId) : null;
+  const instrumentKey: InstrumentKey | null =
+    teamInstrument ?? (teamId ? null : (parsed.data.instrumentKey ?? null));
+
+  if (!instrumentKey) {
+    return {
+      ok: false,
+      error: teamId
+        ? "This session has not been configured with a questionnaire yet."
+        : "Choose which Wellbeing Pulse to take.",
+    };
+  }
+
+  // Resume, scoped to the same context AND the same instrument.
   let resume = supabase
     .from("wellbeing_sessions")
     .select("id")
     .eq("profile_id", user.id)
-    .eq("status", "in_progress");
+    .eq("status", "in_progress")
+    .eq("instrument_key", instrumentKey);
   resume = teamId ? resume.eq("team_id", teamId) : resume.is("team_id", null);
   const { data: existing } = await resume
     .order("started_at", { ascending: false })
@@ -79,9 +110,15 @@ export async function beginWellbeingPulse(input: {
     .maybeSingle();
   if (existing) return { ok: true, sessionId: existing.id };
 
-  const questionnaire = await getActiveQuestionnaire(context);
+  const questionnaire = await getActiveQuestionnaire(context, instrumentKey);
   if (!questionnaire) {
-    return { ok: false, error: "The Wellbeing Pulse is not available yet." };
+    return {
+      ok: false,
+      error:
+        INSTRUMENTS[instrumentKey].licensing === "external_rights_required"
+          ? "This questionnaire is not available yet — its content is awaiting licence confirmation."
+          : "This Wellbeing Pulse is not available yet.",
+    };
   }
 
   // The organisation is resolved server-side, never from the client.
@@ -115,6 +152,7 @@ export async function beginWellbeingPulse(input: {
     .insert({
       profile_id: user.id,
       version_id: questionnaire.versionId,
+      instrument_key: instrumentKey,
       team_id: teamId,
       organization_id: organizationId,
       consent_given: true,
@@ -300,7 +338,7 @@ export async function completeWellbeingPulse(sessionId: string): Promise<Complet
   const { data: session } = await supabase
     .from("wellbeing_sessions")
     .select(
-      "id, profile_id, status, version_id, team_id, organization_id, consent_given, consent_at, department_name, work_location, office_location_name, job_title",
+      "id, profile_id, status, version_id, instrument_key, team_id, organization_id, consent_given, consent_at, department_name, work_location, office_location_name, job_title",
     )
     .eq("id", sessionId)
     .maybeSingle();
@@ -357,20 +395,77 @@ export async function completeWellbeingPulse(sessionId: string): Promise<Complet
     .eq("id", session.version_id)
     .maybeSingle();
 
+  const instrumentKey = session.instrument_key as string;
+  if (!isInstrumentKey(instrumentKey)) {
+    return { ok: false, error: "This pulse is not linked to a known questionnaire." };
+  }
+
   const policy = await getWellbeingPolicy(
     supabase,
     (session.organization_id as string | null) ?? null,
   );
 
-  let scored;
+  /*
+   * Scoring is dispatched to the instrument's OWN engine.
+   *
+   * The two branches share no arithmetic: GHQ produces a 0–12 count against a
+   * configured threshold, DISC360 Wellbeing produces a 0–48 raw, a 0–100 index
+   * and six dimensions with no threshold at all. Each branch writes only the
+   * columns its instrument defines, and the database refuses the rest — a
+   * threshold on a DISC360 row is rejected by
+   * wellbeing_results_threshold_matches_instrument.
+   */
+  let scoredRow: {
+    total_score: number;
+    index_score: number | null;
+    likert_score: number | null;
+    item_positions: number[];
+    scoring_method: string;
+    scoring_version: string;
+    threshold_at_completion: number | null;
+    at_or_above_threshold: boolean | null;
+  };
+  let dimensionRows: { dimension_key: string; raw_score: number; index_score: number }[] = [];
+
   try {
-    scored = computeWellbeingResult({
-      answers,
-      itemOrder,
-      threshold: policy.screeningThreshold,
-    });
+    if (instrumentKey === "ghq12") {
+      const scored = computeWellbeingResult({
+        answers,
+        itemOrder,
+        threshold: policy.screeningThreshold,
+      });
+      scoredRow = {
+        total_score: scored.totalScore,
+        index_score: null,
+        likert_score: scored.likertScore,
+        item_positions: scored.itemPositions,
+        scoring_method: WELLBEING_SCORING_METHOD,
+        scoring_version: WELLBEING_SCORING_VERSION,
+        threshold_at_completion: scored.thresholdAtCompletion,
+        at_or_above_threshold: scored.atOrAboveThreshold,
+      };
+    } else {
+      const scored = computeDiscWellbeingResult({ answers, itemOrder });
+      scoredRow = {
+        total_score: scored.rawScore,
+        index_score: scored.wellbeingIndex,
+        likert_score: null,
+        item_positions: scored.itemPositions,
+        scoring_method: DISC_WELLBEING_SCORING_METHOD,
+        scoring_version: DISC_WELLBEING_SCORING_VERSION,
+        // V1 has no threshold, deliberately — it is not validated, so it does
+        // not grade anyone.
+        threshold_at_completion: null,
+        at_or_above_threshold: null,
+      };
+      dimensionRows = scored.dimensions.map((dimension) => ({
+        dimension_key: dimension.key,
+        raw_score: dimension.raw,
+        index_score: dimension.index,
+      }));
+    }
   } catch {
-    // The engine rejects incomplete or malformed sets rather than returning a
+    // Both engines reject incomplete or malformed sets rather than returning a
     // partial score. Surface that as a form problem, never as a silent zero.
     return { ok: false, error: "We could not score this pulse. Please check your answers." };
   }
@@ -389,22 +484,30 @@ export async function completeWellbeingPulse(sessionId: string): Promise<Complet
     .insert({
       session_id: sessionId,
       profile_id: user.id,
-      total_score: scored.totalScore,
-      likert_score: scored.likertScore,
-      item_positions: scored.itemPositions,
-      scoring_method: WELLBEING_SCORING_METHOD,
-      scoring_version: WELLBEING_SCORING_VERSION,
+      instrument_key: instrumentKey,
       questionnaire_version: (version?.version as number | null) ?? 1,
       version_id: session.version_id,
-      threshold_at_completion: scored.thresholdAtCompletion,
-      at_or_above_threshold: scored.atOrAboveThreshold,
       completed_at: new Date().toISOString(),
+      ...scoredRow,
       ...snapshot,
     })
     .select("id")
     .single();
 
   if (error || !result) return { ok: false, error: "Could not save your Wellbeing Pulse." };
+
+  // Dimension scores are part of the result, not a decoration on it. If they
+  // fail to write the result is incomplete, so the attempt is not marked
+  // complete and the participant can retry rather than being left with a
+  // headline index and six empty bars.
+  if (dimensionRows.length > 0) {
+    const { error: dimensionError } = await supabase
+      .from("wellbeing_result_dimensions")
+      .insert(dimensionRows.map((row) => ({ ...row, result_id: result.id })));
+    if (dimensionError) {
+      return { ok: false, error: "Could not save your Wellbeing Pulse." };
+    }
+  }
 
   await supabase
     .from("wellbeing_sessions")
@@ -421,7 +524,11 @@ export async function startWellbeingPulseAction(formData: FormData): Promise<voi
   const consent = formData.get("consent") === "on" || formData.get("consent") === "true";
   if (!consent) redirect("/wellbeing/declined");
 
-  const outcome = await beginWellbeingPulse({ teamId, consent: true });
+  const requested = formData.get("instrument_key");
+  const instrumentKey =
+    typeof requested === "string" && isInstrumentKey(requested) ? requested : undefined;
+
+  const outcome = await beginWellbeingPulse({ teamId, consent: true, instrumentKey });
   if (!outcome.ok || !outcome.sessionId) {
     redirect("/wellbeing?unavailable=1");
   }

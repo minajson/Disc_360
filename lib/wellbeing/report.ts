@@ -1,8 +1,12 @@
 import "server-only";
-import { buildWellbeingReport, type ReportDocument } from "@/lib/reports/model";
+import {
+  buildDiscWellbeingReport,
+  buildWellbeingReport,
+  type ReportDocument,
+} from "@/lib/reports/model";
 import { reportFilename } from "@/lib/reports/identity";
 import { loadOwnWellbeingResult } from "@/lib/wellbeing/queries";
-import { WELLBEING_MAX_SCORE } from "@/lib/scoring/wellbeing";
+import { DEFAULT_SCREENING_THRESHOLD, WELLBEING_MAX_SCORE } from "@/lib/scoring/wellbeing";
 import { WORK_LOCATION_LABEL } from "@/data/wellbeing-taxonomy";
 import {
   MOVEMENT_CAVEAT,
@@ -12,6 +16,25 @@ import {
   SCORE_MEANING,
   SCREENING_DISCLAIMER_LONG,
 } from "@/data/wellbeing-content";
+import {
+  DISC_DIMENSION_LEAD,
+  DISC_INDEX_LABEL,
+  DISC_INDEX_MEANING,
+  DISC_LOWEST_HEADING,
+  DISC_MOVEMENT_CAVEAT,
+  DISC_MOVEMENT_LABEL,
+  DISC_NO_BANDS_NOTE,
+  DISC_PATTERN_NOTE,
+  DISC_STRONGEST_HEADING,
+  DISC_WELLBEING_DISCLAIMER_LONG,
+  indexMovementDetail,
+  lowestLine,
+  sinceFirstDetail,
+  strongestLine,
+} from "@/data/disc360-wellbeing-content";
+import { DIMENSION_META, type DimensionKey } from "@/data/disc360-wellbeing-items";
+import { DISC_WELLBEING_MAX_RAW, rankDimensions } from "@/lib/scoring/disc360-wellbeing";
+import type { WellbeingHistoryRecord } from "@/lib/wellbeing/queries";
 import type { AuthContext } from "@/lib/auth/guards";
 
 /**
@@ -46,21 +69,36 @@ export async function loadOwnWellbeingReport(
   const { context, record, history } = loaded;
   const participantName =
     context.profile.full_name?.trim() || context.profile.preferred_name?.trim() || "Participant";
-  const outcome = outcomeCopy(record.atOrAboveThreshold);
 
   // History up to and including this pulse — a report for an older result must
-  // not draw a line into that participant's future.
+  // not draw a line into that participant's future. Same-instrument only,
+  // because `history` is already scoped to the result's instrument.
   const upToHere = history.chronological.filter(
     (entry) => entry.completedAt <= record.completedAt,
   );
+
+  if (record.instrumentKey === "disc360_wellbeing_v1") {
+    return {
+      document: buildDiscWellbeingDocument(participantName, record, upToHere),
+      filename: reportFilename(participantName, "wellbeing"),
+      context,
+      accountEmail: context.profile.email,
+      webPath: `/wellbeing/result/${record.id}`,
+      resultId: record.id,
+    };
+  }
+
+  const outcome = outcomeCopy(record.atOrAboveThreshold === true);
 
   const document = buildWellbeingReport({
     participantName,
     completedAt: record.completedAt,
     totalScore: record.totalScore,
     maxScore: WELLBEING_MAX_SCORE,
-    threshold: record.threshold,
-    atOrAboveThreshold: record.atOrAboveThreshold,
+    // GHQ always carries a threshold; the schema enforces it. The fallback
+    // exists so a type-level null can never render as "threshold null".
+    threshold: record.threshold ?? DEFAULT_SCREENING_THRESHOLD,
+    atOrAboveThreshold: record.atOrAboveThreshold === true,
     outcomeHeadline: outcome.headline,
     outcomeBody: outcome.body,
     outcomeDetail: outcome.detail,
@@ -69,7 +107,7 @@ export async function loadOwnWellbeingReport(
     history: upToHere.map((entry) => ({
       completedAt: entry.completedAt,
       totalScore: entry.totalScore,
-      threshold: entry.threshold,
+      threshold: entry.threshold ?? DEFAULT_SCREENING_THRESHOLD,
     })),
     movementLabel: record.comparison ? MOVEMENT_LABEL[record.comparison.movement] : undefined,
     movementDetail: record.comparison
@@ -95,3 +133,101 @@ export async function loadOwnWellbeingReport(
     resultId: record.id,
   };
 }
+
+
+/**
+ * The DISC360 Wellbeing Pulse document.
+ *
+ * Separate from the GHQ builder rather than a branch inside it: the two
+ * reports share a renderer and share nothing else — different scale, different
+ * sections, different language, and no threshold anywhere in this one.
+ */
+function buildDiscWellbeingDocument(
+  participantName: string,
+  record: WellbeingHistoryRecord,
+  upToHere: WellbeingHistoryRecord[],
+): ReportDocument {
+  const ranked = rankDimensions(
+    record.dimensions.map((dimension) => ({
+      key: dimension.key,
+      raw: dimension.raw,
+      index: dimension.index,
+    })),
+  );
+
+  // Name the person's own higher and lower dimensions — relative to their own
+  // other answers on this pulse, never to a standard or to other people.
+  const strongest = ranked.slice(0, 2).map((dimension) => DIMENSION_META[dimension.key].label);
+  const lowest = ranked
+    .slice(-2)
+    .reverse()
+    .map((dimension) => DIMENSION_META[dimension.key].label);
+
+  const first = upToHere[0];
+  const sinceFirst =
+    first && first.id !== record.id && record.indexScore !== null && first.indexScore !== null
+      ? sinceFirstDetail(record.indexScore - first.indexScore)
+      : undefined;
+
+  const dimensionHistory = DIMENSION_ORDER.map((key) => ({
+    label: DIMENSION_META[key].label,
+    points: upToHere
+      .map((entry) => {
+        const dimension = entry.dimensions.find((d) => d.key === key);
+        return dimension ? { completedAt: entry.completedAt, index: dimension.index } : null;
+      })
+      .filter((point): point is { completedAt: string; index: number } => point !== null),
+  }));
+
+  return buildDiscWellbeingReport({
+    participantName,
+    completedAt: record.completedAt,
+    wellbeingIndex: record.indexScore ?? 0,
+    rawScore: record.totalScore,
+    rawMax: DISC_WELLBEING_MAX_RAW,
+    indexLabel: DISC_INDEX_LABEL,
+    indexMeaning: DISC_INDEX_MEANING,
+    noBandsNote: DISC_NO_BANDS_NOTE,
+    dimensionLead: DISC_DIMENSION_LEAD,
+    dimensions: record.dimensions.map((dimension) => ({
+      label: DIMENSION_META[dimension.key].label,
+      index: dimension.index,
+      description: DIMENSION_META[dimension.key].description,
+    })),
+    strongestHeading: DISC_STRONGEST_HEADING,
+    strongestLine: strongestLine(strongest),
+    lowestHeading: DISC_LOWEST_HEADING,
+    lowestLine: lowestLine(lowest),
+    patternNote: DISC_PATTERN_NOTE,
+    disclaimer: DISC_WELLBEING_DISCLAIMER_LONG,
+    history: upToHere
+      .filter((entry) => entry.indexScore !== null)
+      .map((entry) => ({ completedAt: entry.completedAt, index: entry.indexScore! })),
+    movementLabel: record.indexComparison
+      ? DISC_MOVEMENT_LABEL[record.indexComparison.movement]
+      : undefined,
+    movementDetail: record.indexComparison
+      ? indexMovementDetail(record.indexComparison.movement, record.indexComparison.delta)
+      : undefined,
+    sinceFirstDetail: sinceFirst,
+    movementCaveat: record.indexComparison ? DISC_MOVEMENT_CAVEAT : undefined,
+    dimensionHistory,
+    departmentAtCompletion: record.departmentAtCompletion,
+    workLocationAtCompletion: record.workLocationAtCompletion
+      ? WORK_LOCATION_LABEL[record.workLocationAtCompletion]
+      : null,
+    officeLocationAtCompletion: record.officeLocationAtCompletion,
+    questionnaireVersion: record.questionnaireVersion,
+    scoringVersion: record.scoringVersion,
+    attemptNumber: record.attemptNumber,
+  });
+}
+
+const DIMENSION_ORDER: DimensionKey[] = [
+  "capacity",
+  "recovery_demand",
+  "emotional_resilience",
+  "connection_safety",
+  "purpose_confidence",
+  "everyday_wellbeing",
+];

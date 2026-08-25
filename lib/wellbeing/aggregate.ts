@@ -42,14 +42,31 @@ export interface WellbeingAggregate {
   distribution: DistributionBucket[];
   /** Count of responses at or above the configured threshold. */
   atOrAboveThreshold: number;
-  /** That count as a percentage of completed, 0–100. */
+  /** That count as a percentage of completed, 0–100. Zero when no threshold. */
   atOrAboveThresholdShare: number;
-  threshold: number;
+  /** Null for instruments that carry no threshold. */
+  threshold: number | null;
+  /** The instrument's own maximum, so a chart never guesses its axis. */
+  maxScore: number;
+  /** Points per distribution bucket. */
+  bucketSize: number;
 }
 
 export interface AggregateOptions {
-  threshold?: number;
+  /** Null for instruments that carry no threshold (WHO-5, DISC360 V1). */
+  threshold?: number | null;
   invited?: number | null;
+  /**
+   * The instrument's own maximum. GHQ-12 is 12, GHQ-28 is 28, WHO-5 and the
+   * DISC360 Wellbeing Index are 100. Defaults to GHQ-12's so existing callers
+   * are unchanged.
+   */
+  maxScore?: number;
+  /**
+   * Bucket width for the distribution. A 0–100 scale drawn as 101 columns is
+   * unreadable, so wide scales bucket; 0–12 and 0–28 stay one column per point.
+   */
+  bucketSize?: number;
 }
 
 const round1 = (value: number): number => Math.round(value * 10) / 10;
@@ -79,26 +96,43 @@ export function aggregateScores(
   scores: number[],
   options: AggregateOptions = {},
 ): WellbeingAggregate {
-  const threshold = options.threshold ?? DEFAULT_SCREENING_THRESHOLD;
+  const maxScore = options.maxScore ?? WELLBEING_MAX_SCORE;
+  // Null threshold is meaningful: the instrument has none. Undefined falls
+  // back to the GHQ default so existing GHQ callers are unchanged.
+  const threshold =
+    options.threshold === null
+      ? null
+      : (options.threshold ?? DEFAULT_SCREENING_THRESHOLD);
+  const bucketSize = options.bucketSize ?? 1;
 
   for (const score of scores) {
-    if (!Number.isInteger(score) || score < 0 || score > WELLBEING_MAX_SCORE) {
+    if (!Number.isInteger(score) || score < 0 || score > maxScore) {
       throw new RangeError(`Wellbeing score out of range: ${score}`);
     }
   }
 
   const completed = scores.length;
-  const counts = new Array<number>(WELLBEING_MAX_SCORE + 1).fill(0);
-  for (const score of scores) counts[score] = (counts[score] ?? 0) + 1;
+  const bucketCount = Math.floor(maxScore / bucketSize) + 1;
+  const counts = new Array<number>(bucketCount).fill(0);
+  for (const score of scores) {
+    const bucket = Math.min(Math.floor(score / bucketSize), bucketCount - 1);
+    counts[bucket] = (counts[bucket] ?? 0) + 1;
+  }
 
-  const distribution: DistributionBucket[] = counts.map((count, score) => ({
-    score,
-    count,
-    share: completed === 0 ? 0 : round1((count / completed) * 100),
-    atOrAboveThreshold: score >= threshold,
-  }));
+  const distribution: DistributionBucket[] = counts.map((count, bucket) => {
+    const score = bucket * bucketSize;
+    return {
+      score,
+      count,
+      share: completed === 0 ? 0 : round1((count / completed) * 100),
+      // False throughout for an instrument with no threshold — nothing is
+      // "at or above" a line that does not exist.
+      atOrAboveThreshold: threshold !== null && score >= threshold,
+    };
+  });
 
-  const above = scores.filter((score) => score >= threshold).length;
+  const above =
+    threshold === null ? 0 : scores.filter((score) => score >= threshold).length;
   const invited = options.invited ?? null;
 
   // Participation needs a denominator that actually contains the numerator.
@@ -116,8 +150,11 @@ export function aggregateScores(
     mean: mean(scores),
     distribution,
     atOrAboveThreshold: above,
-    atOrAboveThresholdShare: completed === 0 ? 0 : round1((above / completed) * 100),
+    atOrAboveThresholdShare:
+      threshold === null || completed === 0 ? 0 : round1((above / completed) * 100),
     threshold,
+    maxScore,
+    bucketSize,
   };
 }
 
@@ -176,14 +213,23 @@ export interface WellbeingTrend {
  */
 export function buildTrend(points: WavePoint[]): WellbeingTrend {
   const ordered = [...points].sort((a, b) => a.at.localeCompare(b.at));
-  const thresholds = [...new Set(ordered.map((point) => point.aggregate.threshold))].sort(
-    (a, b) => a - b,
-  );
+  const thresholds = [
+    ...new Set(
+      ordered
+        .map((point) => point.aggregate.threshold)
+        .filter((value): value is number => value !== null),
+    ),
+  ].sort((a, b) => a - b);
 
   const latest = ordered[ordered.length - 1];
   const previous = ordered[ordered.length - 2];
+  // An instrument with no threshold has no "% at or above" series to draw at
+  // all; one with a threshold needs both waves to share it.
   const comparable = Boolean(
-    latest && previous && latest.aggregate.threshold === previous.aggregate.threshold,
+    latest &&
+      previous &&
+      latest.aggregate.threshold !== null &&
+      latest.aggregate.threshold === previous.aggregate.threshold,
   );
 
   return {

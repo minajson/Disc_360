@@ -3,7 +3,8 @@ import { WELLBEING_MAX_SCORE } from "@/lib/scoring/wellbeing";
 export interface TrendPoint {
   label: string;
   score: number;
-  threshold: number;
+  /** Null for instruments that carry no threshold. */
+  threshold: number | null;
   atOrAbove: boolean;
 }
 
@@ -19,7 +20,14 @@ export interface TrendPoint {
  * Every point is also rendered as text beneath the chart, so the series is
  * readable without seeing the line at all.
  */
-export function PulseTrend({ points }: { points: TrendPoint[] }) {
+export function PulseTrend({
+  points,
+  max = WELLBEING_MAX_SCORE,
+}: {
+  points: TrendPoint[];
+  /** The instrument's own maximum, so the axis is never guessed. */
+  max?: number;
+}) {
   if (points.length < 2) return null;
 
   const width = 720;
@@ -32,13 +40,13 @@ export function PulseTrend({ points }: { points: TrendPoint[] }) {
 
   const x = (index: number) =>
     points.length === 1 ? padX + plotWidth / 2 : padX + (index / (points.length - 1)) * plotWidth;
-  const y = (score: number) => padTop + plotHeight - (score / WELLBEING_MAX_SCORE) * plotHeight;
+  const y = (score: number) => padTop + plotHeight - (score / max) * plotHeight;
 
   const line = points.map((point, index) => `${x(index)},${y(point.score)}`).join(" ");
   // Thresholds can differ across pulses if policy changed; draw the most
   // recent one and let the history table carry the per-pulse value.
   const threshold = points[points.length - 1]!.threshold;
-  const gridScores = [0, 3, 6, 9, 12];
+  const gridScores = [0, Math.round(max / 4), Math.round(max / 2), Math.round((max * 3) / 4), max];
 
   return (
     <figure className="flex flex-col gap-3">
@@ -47,7 +55,7 @@ export function PulseTrend({ points }: { points: TrendPoint[] }) {
         className="h-auto w-full"
         role="img"
         aria-label={`Your Wellbeing Pulse scores over time: ${points
-          .map((point) => `${point.label}, ${point.score} out of ${WELLBEING_MAX_SCORE}`)
+          .map((point) => `${point.label}, ${point.score} out of ${max}`)
           .join("; ")}.`}
       >
         {gridScores.map((score) => (
@@ -72,8 +80,9 @@ export function PulseTrend({ points }: { points: TrendPoint[] }) {
           </g>
         ))}
 
-        {/* Threshold reference — dashed, labelled, never a red zone. */}
-        <line
+        {/* Threshold reference — dashed, labelled, never a red zone. Drawn
+            only for instruments that have one. */}
+        {threshold !== null && (<><line
           x1={padX}
           x2={width - padX}
           y1={y(threshold)}
@@ -91,7 +100,7 @@ export function PulseTrend({ points }: { points: TrendPoint[] }) {
           fill="var(--color-pulse-attention)"
         >
           Threshold {threshold}
-        </text>
+        </text></>)}
 
         <polyline
           points={line}

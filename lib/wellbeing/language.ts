@@ -64,7 +64,15 @@ export const BANNED_WELLBEING_TERMS: readonly { term: string; reason: string }[]
   { term: "led to poorer", reason: "attributes a change to a named cause" },
   { term: "overall employee score", reason: "no composite across instruments may exist" },
   { term: "combined score", reason: "wellbeing is never combined with DISC or Focus" },
-  { term: "wellbeing index", reason: "no validated composite index exists" },
+  // NOTE: "Wellbeing Index" itself is NOT banned. It is the defined primary
+  // score of DISC360 Wellbeing Pulse V1 — a documented normalisation of that
+  // one instrument's own twelve items, (raw / 48) * 100. What stays banned is
+  // a composite that MERGES instruments or invents a measure with no formula.
+  { term: "composite index", reason: "no validated composite measure exists" },
+  { term: "combined index", reason: "instruments are never merged into one index" },
+  { term: "combined wellbeing index", reason: "instruments are never merged into one index" },
+  { term: "health index", reason: "the product does not measure health" },
+  { term: "overall wellbeing score", reason: "implies a composite across instruments" },
   { term: "ranked", reason: "employees are never ranked on wellbeing" },
   { term: "ranking", reason: "employees are never ranked on wellbeing" },
 ];
@@ -135,6 +143,14 @@ export const SANCTIONED_PHRASES: readonly { phrase: string; why: string }[] = [
   {
     phrase: "not a medical, clinical or employment-selection",
     why: "the platform-wide disclaimer already in use for DISC and Focus",
+  },
+  {
+    phrase: "not a medical or clinical",
+    why: "states what the Wellbeing Pulse is not",
+  },
+  {
+    phrase: "not clinical thresholds",
+    why: "distinguishes product descriptive bands from clinical ones",
   },
 ];
 

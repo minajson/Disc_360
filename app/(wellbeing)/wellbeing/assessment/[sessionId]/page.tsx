@@ -5,6 +5,7 @@ import { requireOnboarded } from "@/lib/auth/guards";
 import { getActiveQuestionnaire, getWellbeingFormOptions } from "@/lib/wellbeing/queries";
 import { PulseFlow } from "@/components/wellbeing/PulseFlow";
 import type { WorkLocation } from "@/data/wellbeing-taxonomy";
+import { isInstrumentKey } from "@/data/wellbeing-instruments";
 
 export const metadata: Metadata = { title: "Your check-in" };
 
@@ -32,7 +33,7 @@ export default async function WellbeingAssessmentPage({
   const { data: session } = await supabase
     .from("wellbeing_sessions")
     .select(
-      "id, profile_id, status, version_id, organization_id, current_index, department_name, work_location, office_location_name, job_title, self_reported_first_time, email_opt_in, contact_email",
+      "id, profile_id, status, version_id, instrument_key, organization_id, current_index, department_name, work_location, office_location_name, job_title, self_reported_first_time, email_opt_in, contact_email",
     )
     .eq("id", sessionId)
     .maybeSingle();
@@ -49,8 +50,14 @@ export default async function WellbeingAssessmentPage({
     redirect("/wellbeing");
   }
 
+  const instrumentKey = session.instrument_key as string;
+  if (!isInstrumentKey(instrumentKey)) redirect("/wellbeing");
+
   const [questionnaire, options, { data: responses }] = await Promise.all([
-    getActiveQuestionnaire(context),
+    // The questionnaire is the one THIS session was started with — never a
+    // freshly resolved "active" one, which could differ if a facilitator
+    // changed the campaign mid-flight.
+    getActiveQuestionnaire(context, instrumentKey),
     getWellbeingFormOptions(context, (session.organization_id as string | null) ?? null),
     supabase
       .from("wellbeing_responses")
@@ -76,6 +83,7 @@ export default async function WellbeingAssessmentPage({
     <div className="mx-auto w-full max-w-2xl px-5 py-8 sm:px-8 sm:py-14">
       <PulseFlow
         sessionId={sessionId}
+        instruction={questionnaire.instruction}
         items={questionnaire.items}
         options={options}
         accountEmail={context.profile.email}

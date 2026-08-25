@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { loadOwnWellbeingResult } from "@/lib/wellbeing/queries";
+import { loadOwnWellbeingResult, type WellbeingHistoryRecord } from "@/lib/wellbeing/queries";
 import { WELLBEING_MAX_SCORE } from "@/lib/scoring/wellbeing";
+import { DISC_WELLBEING_MAX_RAW, rankDimensions } from "@/lib/scoring/disc360-wellbeing";
 import { ScoreScale } from "@/components/wellbeing/ScoreScale";
 import { PulseTrend } from "@/components/wellbeing/PulseTrend";
+import { IndexHero } from "@/components/wellbeing/IndexHero";
+import { DimensionProfile } from "@/components/wellbeing/DimensionProfile";
 import { ReportActions } from "@/components/wellbeing/ReportActions";
 import { WORK_LOCATION_LABEL } from "@/data/wellbeing-taxonomy";
+import { DIMENSION_META } from "@/data/disc360-wellbeing-items";
+import type { InstrumentMetadata } from "@/data/wellbeing-instruments";
 import {
   MOVEMENT_CAVEAT,
   MOVEMENT_LABEL,
@@ -17,26 +22,41 @@ import {
   SCORE_MEANING,
   SCREENING_DISCLAIMER_LONG,
 } from "@/data/wellbeing-content";
+import {
+  DISC_DIMENSION_HEADING,
+  DISC_DIMENSION_LEAD,
+  DISC_INDEX_MEANING,
+  DISC_LOWEST_HEADING,
+  DISC_MOVEMENT_CAVEAT,
+  DISC_MOVEMENT_LABEL,
+  DISC_NO_BANDS_NOTE,
+  DISC_PATTERN_NOTE,
+  DISC_RESULT_HEADING,
+  DISC_STRONGEST_HEADING,
+  DISC_WELLBEING_DISCLAIMER_LONG,
+  indexMovementDetail,
+  lowestLine,
+  sinceFirstDetail,
+  strongestLine,
+} from "@/data/disc360-wellbeing-content";
 
 export const metadata: Metadata = { title: "Your result" };
 
 const monthLabel = (iso: string) =>
   new Date(iso).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-
 const fullDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 
 /**
  * The participant's own result.
  *
- * Calm by construction. There is no red state, no warning banner and no
- * escalation prompt: an at-or-above-threshold score is presented in the same
- * layout as a below-threshold one, in warm attention tone rather than alarm,
- * because the difference between the two is where a configured line sits — not
- * a finding about the person.
+ * Dispatches on the instrument. The two result experiences share the shell,
+ * the privacy model and the report actions, and share no numbers: a GHQ result
+ * is a 0–12 count against a configured threshold, a DISC360 Wellbeing result
+ * is a 0–100 index with six dimensions and no threshold at all.
  *
- * Nothing organisational appears here. No cohort median, no team average, no
- * percentile. A private result is the person's own numbers.
+ * Calm by construction in both cases. Nothing organisational appears — no
+ * cohort median, no team average, no percentile.
  */
 export default async function WellbeingResultPage({
   params,
@@ -47,9 +67,7 @@ export default async function WellbeingResultPage({
   const loaded = await loadOwnWellbeingResult(resultId);
   if (!loaded) notFound();
 
-  const { record, history } = loaded;
-  const outcome = outcomeCopy(record.atOrAboveThreshold);
-
+  const { record, history, instrument } = loaded;
   const upToHere = history.chronological.filter(
     (entry) => entry.completedAt <= record.completedAt,
   );
@@ -57,16 +75,170 @@ export default async function WellbeingResultPage({
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 sm:py-14">
       <p className="font-mono text-[11px] tracking-[0.18em] text-pulse-teal uppercase">
-        {fullDate(record.completedAt)}
+        {fullDate(record.completedAt)} · {instrument.name}
       </p>
+
+      {record.instrumentKey === "disc360_wellbeing_v1" ? (
+        <DiscWellbeingResult record={record} upToHere={upToHere} />
+      ) : (
+        <GhqResult record={record} upToHere={upToHere} />
+      )}
+
+      <section className="mt-8 flex flex-col gap-5">
+        <ReportActions resultId={record.id} />
+        <Link
+          href="/wellbeing/history"
+          className="pulse-focus w-fit rounded text-sm font-medium text-pulse underline underline-offset-4"
+        >
+          See my full history →
+        </Link>
+      </section>
+
+      <ResultContext record={record} instrument={instrument} />
+
+      <p className="mt-8 text-xs leading-relaxed text-slate">
+        {record.instrumentKey === "disc360_wellbeing_v1"
+          ? DISC_WELLBEING_DISCLAIMER_LONG
+          : SCREENING_DISCLAIMER_LONG}
+      </p>
+
+      {instrument.attribution && (
+        <p className="mt-4 border-t border-[rgba(31,78,95,0.14)] pt-4 text-xs leading-relaxed text-faint">
+          {instrument.attribution}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ── DISC360 Wellbeing ──────────────────────────────────────────────── */
+
+function DiscWellbeingResult({
+  record,
+  upToHere,
+}: {
+  record: WellbeingHistoryRecord;
+  upToHere: WellbeingHistoryRecord[];
+}) {
+  const ranked = rankDimensions(
+    record.dimensions.map((d) => ({ key: d.key, raw: d.raw, index: d.index })),
+  );
+  const strongest = ranked.slice(0, 2);
+  const lowest = ranked.slice(-2).reverse();
+  const first = upToHere[0];
+  const sinceFirst =
+    first && first.id !== record.id && record.indexScore !== null && first.indexScore !== null
+      ? sinceFirstDetail(record.indexScore - first.indexScore)
+      : null;
+
+  return (
+    <>
+      <h1 className="mt-3 font-display text-h2 font-semibold tracking-tight">
+        {DISC_RESULT_HEADING}
+      </h1>
+
+      <section className="pulse-card mt-8 flex flex-col gap-7 p-6 sm:p-9">
+        <IndexHero
+          index={record.indexScore ?? 0}
+          rawScore={record.totalScore}
+          rawMax={DISC_WELLBEING_MAX_RAW}
+        />
+        <div className="flex flex-col gap-3 border-t border-[rgba(31,78,95,0.14)] pt-6">
+          <p className="text-[0.95rem] leading-relaxed text-slate">{DISC_INDEX_MEANING}</p>
+          <p className="rounded-2xl bg-pulse-mist px-5 py-4 text-sm leading-relaxed text-slate">
+            {DISC_NO_BANDS_NOTE}
+          </p>
+        </div>
+      </section>
+
+      <section className="pulse-card mt-6 flex flex-col gap-5 p-6 sm:p-9">
+        <div>
+          <h2 className="font-display text-h3 font-semibold">{DISC_DIMENSION_HEADING}</h2>
+          <p className="mt-1.5 text-sm text-slate">{DISC_DIMENSION_LEAD}</p>
+        </div>
+        <DimensionProfile
+          dimensions={record.dimensions}
+          highlight={[strongest[0]?.key, lowest[0]?.key].filter(Boolean) as never}
+        />
+      </section>
+
+      <section className="pulse-card mt-6 flex flex-col gap-4 p-6 sm:p-9">
+        <h2 className="font-display text-h3 font-semibold">Your pattern</h2>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div>
+            <p className="text-xs tracking-[0.12em] text-faint uppercase">
+              {DISC_STRONGEST_HEADING}
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-ink">
+              {strongestLine(strongest.map((d) => DIMENSION_META[d.key].label))}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs tracking-[0.12em] text-faint uppercase">{DISC_LOWEST_HEADING}</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink">
+              {lowestLine(lowest.map((d) => DIMENSION_META[d.key].label))}
+            </p>
+          </div>
+        </div>
+        <p className="text-sm leading-relaxed text-slate">{DISC_PATTERN_NOTE}</p>
+      </section>
+
+      {record.indexComparison && (
+        <section className="pulse-card mt-6 flex flex-col gap-3 p-6 sm:p-9">
+          <h2 className="font-display text-h3 font-semibold">
+            {DISC_MOVEMENT_LABEL[record.indexComparison.movement]}
+          </h2>
+          <p className="text-[0.95rem] leading-relaxed text-ink">
+            {indexMovementDetail(record.indexComparison.movement, record.indexComparison.delta)}
+          </p>
+          {sinceFirst && <p className="text-[0.95rem] text-ink">{sinceFirst}</p>}
+          <p className="text-sm leading-relaxed text-slate">{DISC_MOVEMENT_CAVEAT}</p>
+        </section>
+      )}
+
+      {upToHere.length > 1 && (
+        <section className="pulse-card mt-6 flex flex-col gap-4 p-6 sm:p-9">
+          <h2 className="font-display text-h3 font-semibold">Your pulses over time</h2>
+          <PulseTrend
+            max={100}
+            points={upToHere
+              .filter((entry) => entry.indexScore !== null)
+              .map((entry) => ({
+                label: monthLabel(entry.completedAt),
+                score: entry.indexScore!,
+                threshold: null,
+                atOrAbove: false,
+              }))}
+          />
+        </section>
+      )}
+    </>
+  );
+}
+
+/* ── GHQ ────────────────────────────────────────────────────────────── */
+
+function GhqResult({
+  record,
+  upToHere,
+}: {
+  record: WellbeingHistoryRecord;
+  upToHere: WellbeingHistoryRecord[];
+}) {
+  const outcome = outcomeCopy(record.atOrAboveThreshold === true);
+  const threshold = record.threshold ?? 4;
+
+  return (
+    <>
       <h1 className="mt-3 font-display text-h2 font-semibold tracking-tight">{RESULT_HEADING}</h1>
 
       <section className="pulse-card mt-8 flex flex-col gap-7 p-6 sm:p-9">
         <ScoreScale
           score={record.totalScore}
-          threshold={record.threshold}
-          atOrAbove={record.atOrAboveThreshold}
+          threshold={threshold}
+          atOrAbove={record.atOrAboveThreshold === true}
           label={SCORE_LABEL}
+          max={record.instrumentKey === "ghq28" ? 28 : WELLBEING_MAX_SCORE}
         />
 
         <div className="flex flex-col gap-3 border-t border-[rgba(31,78,95,0.14)] pt-6">
@@ -96,55 +268,57 @@ export default async function WellbeingResultPage({
         <section className="pulse-card mt-6 flex flex-col gap-4 p-6 sm:p-9">
           <h2 className="font-display text-h3 font-semibold">Your pulses over time</h2>
           <PulseTrend
+            max={record.instrumentKey === "ghq28" ? 28 : WELLBEING_MAX_SCORE}
             points={upToHere.map((entry) => ({
               label: monthLabel(entry.completedAt),
               score: entry.totalScore,
               threshold: entry.threshold,
-              atOrAbove: entry.atOrAboveThreshold,
+              atOrAbove: entry.atOrAboveThreshold === true,
             }))}
           />
         </section>
       )}
+    </>
+  );
+}
 
-      <section className="mt-8 flex flex-col gap-5">
-        <ReportActions resultId={record.id} />
-        <Link
-          href="/wellbeing/history"
-          className="pulse-focus w-fit rounded text-sm font-medium text-pulse underline underline-offset-4"
-        >
-          See my full history →
-        </Link>
-      </section>
+function ResultContext({
+  record,
+  instrument,
+}: {
+  record: WellbeingHistoryRecord;
+  instrument: InstrumentMetadata;
+}) {
+  const rows = [
+    record.departmentAtCompletion
+      ? { label: "Department / Function", value: record.departmentAtCompletion }
+      : null,
+    record.workLocationAtCompletion
+      ? {
+          label: "Work location",
+          value: record.officeLocationAtCompletion
+            ? `${WORK_LOCATION_LABEL[record.workLocationAtCompletion]} · ${record.officeLocationAtCompletion}`
+            : WORK_LOCATION_LABEL[record.workLocationAtCompletion],
+        }
+      : null,
+    {
+      label: "Scale",
+      value: `${instrument.primaryScoreMin} – ${instrument.primaryScoreMax}`,
+    },
+    {
+      label: "Questionnaire",
+      value: `Version ${record.questionnaireVersion} · scoring ${record.scoringVersion}`,
+    },
+  ].filter((row): row is { label: string; value: string } => row !== null);
 
-      <dl className="mt-10 grid gap-x-8 gap-y-3 border-t border-[rgba(31,78,95,0.14)] pt-6 text-sm sm:grid-cols-2">
-        {[
-          record.departmentAtCompletion
-            ? { label: "Department / Function", value: record.departmentAtCompletion }
-            : null,
-          record.workLocationAtCompletion
-            ? {
-                label: "Work location",
-                value: record.officeLocationAtCompletion
-                  ? `${WORK_LOCATION_LABEL[record.workLocationAtCompletion]} · ${record.officeLocationAtCompletion}`
-                  : WORK_LOCATION_LABEL[record.workLocationAtCompletion],
-              }
-            : null,
-          { label: "Score range", value: `0 – ${WELLBEING_MAX_SCORE}` },
-          {
-            label: "Questionnaire",
-            value: `Version ${record.questionnaireVersion} · scoring ${record.scoringVersion}`,
-          },
-        ]
-          .filter((row): row is { label: string; value: string } => row !== null)
-          .map((row) => (
-            <div key={row.label} className="flex flex-col gap-0.5">
-              <dt className="text-xs tracking-wide text-faint uppercase">{row.label}</dt>
-              <dd className="text-ink">{row.value}</dd>
-            </div>
-          ))}
-      </dl>
-
-      <p className="mt-8 text-xs leading-relaxed text-slate">{SCREENING_DISCLAIMER_LONG}</p>
-    </div>
+  return (
+    <dl className="mt-10 grid gap-x-8 gap-y-3 border-t border-[rgba(31,78,95,0.14)] pt-6 text-sm sm:grid-cols-2">
+      {rows.map((row) => (
+        <div key={row.label} className="flex flex-col gap-0.5">
+          <dt className="text-xs tracking-wide text-faint uppercase">{row.label}</dt>
+          <dd className="text-ink">{row.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

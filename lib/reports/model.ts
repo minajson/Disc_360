@@ -87,6 +87,8 @@ export interface ReportSection {
   scale?: ReportScale;
   /** A line chart of values over time. */
   series?: ReportSeries;
+  /** Start this section on a fresh page. Used for deliberate page structure. */
+  pageBreakBefore?: boolean;
 }
 
 export interface ReportDocument {
@@ -474,6 +476,191 @@ export function buildWellbeingReport(input: WellbeingReportInput): ReportDocumen
     eyebrow: "Private report",
     headline: input.outcomeHeadline,
     summary: input.outcomeBody,
+    completedAt: input.completedAt,
+    meta,
+    sections,
+    disclaimer: input.disclaimer,
+  };
+}
+
+
+/* ── DISC360 Wellbeing Pulse V1 ─────────────────────────────────────── */
+
+export interface DiscWellbeingReportDimension {
+  label: string;
+  /** 0–100. */
+  index: number;
+  description: string;
+}
+
+export interface DiscWellbeingReportHistoryPoint {
+  completedAt: string;
+  index: number;
+}
+
+export interface DiscWellbeingDimensionHistory {
+  label: string;
+  points: DiscWellbeingReportHistoryPoint[];
+}
+
+export interface DiscWellbeingReportInput {
+  participantName: string;
+  completedAt: string;
+  /** 0–100. */
+  wellbeingIndex: number;
+  /** 0–48, shown as provenance rather than as a headline. */
+  rawScore: number;
+  rawMax: number;
+  indexLabel: string;
+  indexMeaning: string;
+  noBandsNote: string;
+  dimensionLead: string;
+  dimensions: DiscWellbeingReportDimension[];
+  /** Copy comes from data/disc360-wellbeing-content.ts, already screened. */
+  strongestHeading: string;
+  strongestLine: string;
+  lowestHeading: string;
+  lowestLine: string;
+  patternNote: string;
+  disclaimer: string;
+  /** Oldest first, this instrument only. */
+  history: DiscWellbeingReportHistoryPoint[];
+  movementLabel?: string;
+  movementDetail?: string;
+  sinceFirstDetail?: string;
+  movementCaveat?: string;
+  dimensionHistory: DiscWellbeingDimensionHistory[];
+  departmentAtCompletion?: string | null;
+  workLocationAtCompletion?: string | null;
+  officeLocationAtCompletion?: string | null;
+  questionnaireVersion: number;
+  scoringVersion: string;
+  attemptNumber?: number | null;
+}
+
+/**
+ * The private DISC360 Wellbeing Pulse report.
+ *
+ * Three deliberate pages: the current pulse, the person's own pattern, and
+ * their history.
+ *
+ * What it does NOT contain: any organisational figure, any cohort median, any
+ * comparison against colleagues, any other instrument, any band, any
+ * threshold, and any management recommendation. "Currently higher" and
+ * "currently lower" are relative to this person's own other dimensions on this
+ * pulse — nothing here grades them, because V1 is not validated and has no
+ * scale on which grading would mean anything.
+ */
+export function buildDiscWellbeingReport(input: DiscWellbeingReportInput): ReportDocument {
+  const meta: ReportMetaItem[] = [
+    { label: input.indexLabel, value: `${input.wellbeingIndex} / 100` },
+    { label: "Completed", value: formatDate(input.completedAt) },
+  ];
+  if (input.attemptNumber) {
+    meta.push({ label: "Pulse number", value: String(input.attemptNumber) });
+  }
+  if (input.departmentAtCompletion) {
+    meta.push({ label: "Department / Function", value: input.departmentAtCompletion });
+  }
+  if (input.workLocationAtCompletion) {
+    meta.push({
+      label: "Work location",
+      value: input.officeLocationAtCompletion
+        ? `${input.workLocationAtCompletion} · ${input.officeLocationAtCompletion}`
+        : input.workLocationAtCompletion,
+    });
+  }
+
+  const dimensionBars: ReportBar[] = input.dimensions.map((dimension) => ({
+    label: dimension.label,
+    value: dimension.index,
+    max: 100,
+    note: dimension.description,
+  }));
+
+  const sections: ReportSection[] = [
+    {
+      title: "Your Wellbeing Index",
+      // A 0–100 index with no threshold: the scale is drawn with its marker
+      // past the end, so no line is implied anywhere on it.
+      scale: {
+        label: input.indexLabel,
+        value: input.wellbeingIndex,
+        max: 100,
+        threshold: 101,
+        atOrAboveThreshold: false,
+        caption: `${input.rawScore} of ${input.rawMax} points across twelve questions.`,
+      },
+      paragraphs: [input.indexMeaning, input.noBandsNote],
+    },
+    {
+      title: "Your six dimensions",
+      lead: input.dimensionLead,
+      bars: dimensionBars,
+    },
+    {
+      title: "Your pattern",
+      pageBreakBefore: true,
+      lead: input.patternNote,
+      columns: [
+        { heading: input.strongestHeading, bullets: [input.strongestLine].filter(Boolean) },
+        { heading: input.lowestHeading, bullets: [input.lowestLine].filter(Boolean) },
+      ],
+    },
+  ];
+
+  if (input.history.length > 1) {
+    sections.push({
+      title: "Your history",
+      pageBreakBefore: true,
+      lead: input.movementLabel,
+      series: {
+        points: input.history.map((point) => ({
+          label: shortDate(point.completedAt),
+          value: point.index,
+        })),
+        max: 100,
+      },
+      paragraphs: [input.movementDetail, input.sinceFirstDetail, input.movementCaveat].filter(
+        (value): value is string => Boolean(value),
+      ),
+    });
+
+    // Dimension movement, only where there is movement to show.
+    for (const dimension of input.dimensionHistory) {
+      if (dimension.points.length < 2) continue;
+      sections.push({
+        title: `${dimension.label} over time`,
+        series: {
+          points: dimension.points.map((point) => ({
+            label: shortDate(point.completedAt),
+            value: point.index,
+          })),
+          max: 100,
+        },
+      });
+    }
+  }
+
+  sections.push({
+    title: "What this is, and what it is not",
+    pageBreakBefore: input.history.length > 1 ? false : true,
+    paragraphs: [input.disclaimer],
+    bullets: [
+      "Your individual answers and your index are private to you. Your manager, your facilitator and platform administrators cannot see them.",
+      "Group reporting only ever uses figures for groups large enough that no one in them can be identified.",
+      "This result is never combined with, compared against or added to any other assessment.",
+      `DISC360 Wellbeing Pulse V1 · questionnaire version ${input.questionnaireVersion} · scoring version ${input.scoringVersion}.`,
+    ],
+  });
+
+  return {
+    product: "wellbeing",
+    participantName: input.participantName,
+    productLabel: "DISC360 Wellbeing Pulse",
+    eyebrow: "Private report",
+    headline: `Wellbeing Index ${input.wellbeingIndex}`,
+    summary: input.indexMeaning,
     completedAt: input.completedAt,
     meta,
     sections,

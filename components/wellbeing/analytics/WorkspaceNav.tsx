@@ -21,9 +21,17 @@ export function parseWorkspaceTab(value: string | undefined): WorkspaceTab {
 export function WorkspaceNav({
   active,
   organizationId,
+  instrumentKey,
 }: {
   active: WorkspaceTab;
   organizationId: string;
+  /**
+   * Carried on every tab link. Without it, changing tab silently switched the
+   * reader to a different instrument's numbers under the same heading — the
+   * worst possible failure on a page whose whole rule is that instruments
+   * never mix.
+   */
+  instrumentKey: string;
 }) {
   return (
     <nav
@@ -36,7 +44,7 @@ export function WorkspaceNav({
           return (
             <li key={tab.key}>
               <Link
-                href={`/wellbeing/analytics?org=${organizationId}&tab=${tab.key}`}
+                href={`/wellbeing/analytics?org=${organizationId}&instrument=${instrumentKey}&tab=${tab.key}`}
                 aria-current={current ? "page" : undefined}
                 className={`pulse-focus -mb-px block rounded-t-lg border-b-2 px-3.5 py-2.5 text-sm transition-colors sm:px-4 ${
                   current

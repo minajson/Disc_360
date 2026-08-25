@@ -158,3 +158,83 @@ export async function installWellbeingTaxonomyAction(
   revalidatePath("/admin/wellbeing");
   return result;
 }
+
+/* ── campaign instrument selection ──────────────────────────────────── */
+
+/**
+ * Sets the instrument a team's Wellbeing Pulse campaign runs.
+ *
+ * Three guards, in order:
+ *
+ *  1 · TEAM ADMIN. Configuring a campaign is facilitation, so it uses the
+ *      existing team-admin guard rather than a wellbeing role — a facilitator
+ *      choosing which questionnaire to run gains no access to any result.
+ *  2 · LICENSING. An instrument that cannot be served here cannot be selected
+ *      here. Checked server-side against the same gate the participant flow
+ *      uses, so a disabled radio in the UI is a convenience, not the control.
+ *  3 · LOCKING. Enforced by the database trigger. This surfaces its message
+ *      rather than duplicating the rule.
+ */
+export async function setCampaignInstrumentAction(
+  formData: FormData,
+): Promise<AdminActionResult> {
+  const teamId = formData.get("team_id");
+  const requested = formData.get("instrument_key");
+
+  if (!z.uuid().safeParse(teamId).success) {
+    return { ok: false, message: "Invalid campaign." };
+  }
+  const { isInstrumentKey, canServeToParticipants, INSTRUMENTS: REGISTRY } = await import(
+    "@/data/wellbeing-instruments"
+  );
+  if (typeof requested !== "string" || !isInstrumentKey(requested)) {
+    return { ok: false, message: "Choose an instrument." };
+  }
+
+  const { requireTeamAdmin } = await import("@/lib/auth/guards");
+  const context = await requireTeamAdmin(teamId as string);
+
+  const { isProductionEnvironment, isWellbeingDemoEnabled } = await import(
+    "@/lib/wellbeing/environment"
+  );
+  const decision = canServeToParticipants(requested, {
+    isProduction: isProductionEnvironment(),
+    demoEnabled: isWellbeingDemoEnabled(),
+  });
+  if (!decision.allowed) {
+    return {
+      ok: false,
+      message: `${REGISTRY[requested].name} cannot be launched here — ${decision.reason}`,
+    };
+  }
+
+  const { error } = await context.supabase
+    .from("teams")
+    .update({ wellbeing_instrument_key: requested })
+    .eq("id", teamId);
+
+  if (error) {
+    // The lock trigger raises a check_violation with a participant-safe
+    // message; surface it rather than a generic failure.
+    const locked = error.message?.includes("Wellbeing instrument is locked");
+    return {
+      ok: false,
+      message: locked
+        ? "This campaign already has participant attempts, so its instrument cannot be changed. Create a new campaign to run a different instrument."
+        : "Could not set the instrument for this campaign.",
+    };
+  }
+
+  const admin = createSupabaseAdminClient();
+  await admin.from("audit_logs").insert({
+    actor_id: context.user.id,
+    action: "wellbeing.campaign_instrument_set",
+    entity_type: "team",
+    entity_id: teamId as string,
+    metadata: { instrument_key: requested },
+  });
+
+  revalidatePath(`/wellbeing/admin/campaigns/${teamId as string}`);
+  revalidatePath("/wellbeing/analytics");
+  return { ok: true, message: `${REGISTRY[requested].name} selected for this campaign.` };
+}

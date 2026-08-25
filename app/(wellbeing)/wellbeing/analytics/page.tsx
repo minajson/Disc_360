@@ -4,16 +4,29 @@ import { resolveWellbeingScope } from "@/lib/wellbeing/access";
 import {
   COMPARE_DIMENSIONS,
   getWellbeingComparison,
+  getWellbeingDimensionProfile,
   getWellbeingSignals,
   getWellbeingWorkspace,
   type CompareDimension,
 } from "@/lib/wellbeing/analytics";
+import {
+  INSTRUMENT_KEYS,
+  INSTRUMENTS,
+  isInstrumentKey,
+  type InstrumentKey,
+} from "@/data/wellbeing-instruments";
+import {
+  DISC_ANALYTICS_NOTE,
+  DISC_HIGHEST_DIMENSION_LABEL,
+  DISC_LOWER_DIMENSION_NOTE,
+  DISC_LOWEST_DIMENSION_LABEL,
+  DISC_NO_BANDS_ANALYTICS_NOTE,
+} from "@/data/disc360-wellbeing-content";
 import { WELLBEING_ITEM_STRUCTURE } from "@/data/wellbeing-items";
 import {
   AGGREGATE_ONLY_NOTICE,
   NO_COMBINATION_NOTICE,
   THRESHOLD_POLICY_NOTE,
-  WELLBEING_PRODUCT_DESCRIPTION,
 } from "@/data/wellbeing-content";
 import { DistributionChart } from "@/components/wellbeing/analytics/DistributionChart";
 import { AggregateTrend } from "@/components/wellbeing/analytics/AggregateTrend";
@@ -54,9 +67,9 @@ const TAB_DIMENSION: Partial<Record<string, CompareDimension>> = {
 export default async function WellbeingAnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ org?: string; tab?: string; by?: string }>;
+  searchParams: Promise<{ org?: string; tab?: string; by?: string; instrument?: string }>;
 }) {
-  const { org, tab: tabParam, by } = await searchParams;
+  const { org, tab: tabParam, by, instrument: instrumentParam } = await searchParams;
   const { scope } = await resolveWellbeingScope();
 
   if (scope.length === 0) {
@@ -86,8 +99,18 @@ export default async function WellbeingAnalyticsPage({
     scope[0]!.organizationId;
   const tab = parseWorkspaceTab(tabParam);
 
-  const workspace = await getWellbeingWorkspace(organizationId);
+  // Exactly one instrument drives every metric on the page. Defaulting rather
+  // than aggregating is the point: there is no "all instruments" view, because
+  // there is no number that would mean anything across them.
+  const instrumentKey: InstrumentKey =
+    instrumentParam && isInstrumentKey(instrumentParam)
+      ? instrumentParam
+      : "disc360_wellbeing_v1";
+
+  const workspace = await getWellbeingWorkspace(organizationId, instrumentKey);
   const { context, overview, trend } = workspace;
+  const instrument = context.instrument;
+  const isDisc = instrumentKey === "disc360_wellbeing_v1";
 
   const dimension: CompareDimension =
     (by as CompareDimension | undefined) ?? TAB_DIMENSION[tab] ?? "department";
@@ -96,23 +119,50 @@ export default async function WellbeingAnalyticsPage({
     <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-12">
       <header className="flex flex-col gap-2">
         <p className="font-mono text-[11px] tracking-[0.18em] text-pulse-teal uppercase">
-          {WELLBEING_PRODUCT_DESCRIPTION}
+          {instrument.descriptor}
         </p>
         <h1 className="font-display text-h2 font-semibold tracking-tight">Wellbeing Pulse</h1>
         <p className="text-sm text-slate">
           {context.organizationName} ·{" "}
           <span className="font-mono">
-            threshold {context.threshold} · minimum group {context.minCohort}
+            {context.threshold !== null
+              ? `threshold ${context.threshold} · `
+              : "no threshold · "}
+            minimum group {context.minCohort}
           </span>
         </p>
       </header>
+
+      {/* Instrument switcher. Selecting one replaces every metric below. */}
+      <nav
+        aria-label="Instrument"
+        className="-mx-1 mt-5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        <ul className="flex min-w-max gap-2">
+          {INSTRUMENT_KEYS.map((key) => (
+            <li key={key}>
+              <Link
+                href={`/wellbeing/analytics?org=${organizationId}&instrument=${key}&tab=${tab}`}
+                aria-current={key === instrumentKey ? "page" : undefined}
+                className={`pulse-focus block rounded-full border px-3.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors ${
+                  key === instrumentKey
+                    ? "border-pulse bg-pulse text-white"
+                    : "border-[rgba(31,78,95,0.24)] text-slate hover:text-pulse"
+                }`}
+              >
+                {INSTRUMENTS[key].name}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
       {scope.length > 1 && (
         <div className="mt-5 flex flex-wrap gap-2">
           {scope.map((entry) => (
             <Link
               key={entry.organizationId}
-              href={`/wellbeing/analytics?org=${entry.organizationId}&tab=${tab}`}
+              href={`/wellbeing/analytics?org=${entry.organizationId}&instrument=${instrumentKey}&tab=${tab}`}
               className={`pulse-focus rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
                 entry.organizationId === organizationId
                   ? "border-pulse bg-pulse text-white"
@@ -126,7 +176,7 @@ export default async function WellbeingAnalyticsPage({
       )}
 
       <div className="mt-7">
-        <WorkspaceNav active={tab} organizationId={organizationId} />
+        <WorkspaceNav active={tab} organizationId={organizationId} instrumentKey={instrumentKey} />
       </div>
 
       <div className="mt-8 flex flex-col gap-8">
@@ -150,34 +200,42 @@ export default async function WellbeingAnalyticsPage({
                             : undefined,
                       },
                       {
-                        label: "Median GHQ-12",
+                        label: `Median ${instrument.primaryScoreLabel}`,
                         value: String(overview.median),
                         note: `mean ${overview.mean}`,
                       },
-                      {
-                        label: `At or above ${context.threshold}`,
-                        value: `${overview.atOrAboveThresholdShare}%`,
-                        note: `${overview.atOrAboveThreshold} of ${overview.completed}`,
-                      },
+                      ...(context.threshold !== null
+                        ? [
+                            {
+                              label: `At or above ${context.threshold}`,
+                              value: `${overview.atOrAboveThresholdShare}%`,
+                              note: `${overview.atOrAboveThreshold} of ${overview.completed}`,
+                            },
+                          ]
+                        : []),
                     ]}
                   />
 
                   <div className="border-t border-[rgba(31,78,95,0.14)] pt-8">
                     <h2 className="font-display text-h3 font-semibold">Score distribution</h2>
                     <p className="mt-1.5 mb-6 text-sm text-slate">
-                      How the workforce is spread across the 0–12 screening range.
+                      How the workforce is spread across the {instrument.primaryScoreMin}–
+                      {instrument.primaryScoreMax} {instrument.primaryScoreLabel.toLowerCase()}{" "}
+                      range.
                     </p>
                     <DistributionChart
                       distribution={overview.distribution}
                       threshold={context.threshold}
                       completed={overview.completed}
+                      maxScore={overview.maxScore}
+                      bucketSize={overview.bucketSize}
                     />
                   </div>
 
                   {trend.medianChange && (
                     <div className="border-t border-[rgba(31,78,95,0.14)] pt-6">
                       <p className="text-sm text-slate">
-                        Median GHQ-12 is{" "}
+                        Median {instrument.primaryScoreLabel} is{" "}
                         <strong className="font-medium text-ink">
                           {trend.medianChange.movement === "unchanged"
                             ? "unchanged"
@@ -195,10 +253,18 @@ export default async function WellbeingAnalyticsPage({
               )}
             </section>
 
+            {isDisc && (
+              <DimensionProfileSection organizationId={organizationId} instrumentKey={instrumentKey} />
+            )}
+
             <aside className="flex flex-col gap-3 rounded-2xl border border-[rgba(31,78,95,0.16)] bg-pulse-mist/60 p-5 text-sm leading-relaxed text-slate">
               <p>{AGGREGATE_ONLY_NOTICE}</p>
               <p>{NO_COMBINATION_NOTICE}</p>
-              <p>{THRESHOLD_POLICY_NOTE}</p>
+              <p>{isDisc ? DISC_ANALYTICS_NOTE : THRESHOLD_POLICY_NOTE}</p>
+              {isDisc && <p>{DISC_NO_BANDS_ANALYTICS_NOTE}</p>}
+              {instrument.attribution && (
+                <p className="text-xs text-faint">{instrument.attribution}</p>
+              )}
             </aside>
           </>
         )}
@@ -207,9 +273,11 @@ export default async function WellbeingAnalyticsPage({
         {(tab === "compare" || tab === "teams" || tab === "locations") && (
           <CompareSection
             organizationId={organizationId}
+            instrumentKey={instrumentKey}
             tab={tab}
             dimension={dimension}
             threshold={context.threshold}
+            maxScore={instrument.primaryScoreMax}
             minCohort={context.minCohort}
           />
         )}
@@ -244,6 +312,7 @@ export default async function WellbeingAnalyticsPage({
         {tab === "signals" && (
           <SignalsSection
             organizationId={organizationId}
+            instrumentKey={instrumentKey}
             dimension={dimension}
             minCohort={context.minCohort}
           />
@@ -255,18 +324,23 @@ export default async function WellbeingAnalyticsPage({
 
 async function CompareSection({
   organizationId,
+  instrumentKey,
   tab,
   dimension,
   threshold,
+  maxScore,
   minCohort,
 }: {
   organizationId: string;
+  instrumentKey: InstrumentKey;
   tab: string;
   dimension: CompareDimension;
-  threshold: number;
+  threshold: number | null;
+  maxScore: number;
   minCohort: number;
 }) {
-  const { view } = await getWellbeingComparison(organizationId, dimension);
+  const { view } = await getWellbeingComparison(organizationId, instrumentKey, dimension);
+  const scoreLabel = INSTRUMENTS[instrumentKey].primaryScoreLabel;
   const showPicker = tab === "compare" || tab === "locations";
   const choices =
     tab === "locations"
@@ -281,7 +355,8 @@ async function CompareSection({
         <div>
           <h2 className="font-display text-h3 font-semibold">{view.label}</h2>
           <p className="mt-1.5 text-sm text-slate">
-            Median GHQ-12 and the share at or above the threshold, by group.
+            Median {scoreLabel.toLowerCase()}
+            {threshold !== null ? " and the share at or above the threshold" : ""}, by group.
           </p>
         </div>
 
@@ -290,7 +365,7 @@ async function CompareSection({
             {choices.map((entry) => (
               <Link
                 key={entry.key}
-                href={`/wellbeing/analytics?org=${organizationId}&tab=${tab}&by=${entry.key}`}
+                href={`/wellbeing/analytics?org=${organizationId}&instrument=${instrumentKey}&tab=${tab}&by=${entry.key}`}
                 className={`pulse-focus rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                   entry.key === dimension
                     ? "border-pulse bg-pulse text-white"
@@ -307,7 +382,12 @@ async function CompareSection({
       {view.fullySuppressed ? (
         <SuppressionNotice minCohort={minCohort} />
       ) : (
-        <CohortStrip cohorts={view.cohorts} threshold={threshold} minCohort={minCohort} />
+        <CohortStrip
+          cohorts={view.cohorts}
+          threshold={threshold}
+          maxScore={maxScore}
+          minCohort={minCohort}
+        />
       )}
 
       {view.suppressedCount > 0 && !view.fullySuppressed && (
@@ -323,14 +403,16 @@ async function CompareSection({
 
 async function SignalsSection({
   organizationId,
+  instrumentKey,
   dimension,
   minCohort,
 }: {
   organizationId: string;
+  instrumentKey: InstrumentKey;
   dimension: CompareDimension;
   minCohort: number;
 }) {
-  const { rows } = await getWellbeingSignals(organizationId, dimension, ITEM_IDS);
+  const { rows } = await getWellbeingSignals(organizationId, instrumentKey, dimension, ITEM_IDS);
 
   return (
     <section className="pulse-card flex flex-col gap-6 p-6 sm:p-9">
@@ -345,7 +427,7 @@ async function SignalsSection({
           {COMPARE_DIMENSIONS.map((entry) => (
             <Link
               key={entry.key}
-              href={`/wellbeing/analytics?org=${organizationId}&tab=signals&by=${entry.key}`}
+              href={`/wellbeing/analytics?org=${organizationId}&instrument=${instrumentKey}&tab=signals&by=${entry.key}`}
               className={`pulse-focus rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                 entry.key === dimension
                   ? "border-pulse bg-pulse text-white"
@@ -359,6 +441,89 @@ async function SignalsSection({
       </div>
 
       <SignalHeatmap rows={rows} minCohort={minCohort} />
+    </section>
+  );
+}
+
+
+/**
+ * The organisation-wide six-dimension profile.
+ *
+ * A hero visual for DISC360 Wellbeing. The lowest-scoring dimension is named
+ * as an AREA FOR ATTENTION — never a risk, never a finding, and never given a
+ * cause.
+ */
+async function DimensionProfileSection({
+  organizationId,
+  instrumentKey,
+}: {
+  organizationId: string;
+  instrumentKey: InstrumentKey;
+}) {
+  const { context, view } = await getWellbeingDimensionProfile(organizationId, instrumentKey);
+  if (!view.dimensions || view.dimensions.length === 0) {
+    return (
+      <section className="pulse-card flex flex-col gap-5 p-6 sm:p-9">
+        <h2 className="font-display text-h3 font-semibold">Dimension profile</h2>
+        <SuppressionNotice minCohort={context.minCohort} />
+      </section>
+    );
+  }
+
+  return (
+    <section className="pulse-card flex flex-col gap-6 p-6 sm:p-9">
+      <div>
+        <h2 className="font-display text-h3 font-semibold">Dimension profile</h2>
+        <p className="mt-1.5 text-sm text-slate">
+          Median score for each dimension across everyone who completed this pulse.
+        </p>
+      </div>
+
+      <ul className="flex flex-col gap-4">
+        {view.dimensions.map((entry) => (
+          <li key={entry.key} className="flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-baseline gap-x-3">
+              <span className="text-sm font-medium text-ink">{entry.label}</span>
+              <span className="ml-auto font-mono text-sm tabular-nums text-pulse-deep">
+                {entry.median}
+                <span className="text-faint"> / 100</span>
+              </span>
+            </div>
+            <div className="h-2.5 overflow-hidden rounded-full bg-pulse-soft/60">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${Math.max(entry.median, 1.5)}%`,
+                  background: "var(--color-pulse)",
+                }}
+              />
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {view.highest && view.lowest && (
+        <div className="grid gap-4 border-t border-[rgba(31,78,95,0.14)] pt-5 sm:grid-cols-2">
+          <div>
+            <p className="text-xs tracking-[0.12em] text-faint uppercase">
+              {DISC_HIGHEST_DIMENSION_LABEL}
+            </p>
+            <p className="mt-1.5 text-sm text-ink">
+              {view.highest.label} · {view.highest.median}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs tracking-[0.12em] text-faint uppercase">
+              {DISC_LOWEST_DIMENSION_LABEL}
+            </p>
+            <p className="mt-1.5 text-sm text-ink">
+              {view.lowest.label} · {view.lowest.median}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs leading-relaxed text-slate">{DISC_LOWER_DIMENSION_NOTE}</p>
     </section>
   );
 }

@@ -31,6 +31,8 @@ import type { WellbeingFormOptions, WellbeingItemView } from "@/lib/wellbeing/qu
 
 export interface PulseFlowProps {
   sessionId: string;
+  /** Shown above every item. Empty for instruments that carry none. */
+  instruction: string;
   items: WellbeingItemView[];
   options: WellbeingFormOptions;
   accountEmail: string;
@@ -51,7 +53,14 @@ export interface PulseFlowProps {
 const fieldClasses =
   "w-full rounded-xl border border-[rgba(31,78,95,0.22)] bg-paper px-4 py-3 text-[0.95rem] text-ink placeholder:text-faint focus:border-pulse focus:outline-none";
 
-export function PulseFlow({ sessionId, items, options, accountEmail, initial }: PulseFlowProps) {
+export function PulseFlow({
+  sessionId,
+  instruction,
+  items,
+  options,
+  accountEmail,
+  initial,
+}: PulseFlowProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -374,6 +383,9 @@ export function PulseFlow({ sessionId, items, options, accountEmail, initial }: 
       </div>
 
       <div className="pulse-card flex flex-col gap-6 p-6 sm:p-9">
+        {instruction && (
+          <p className="text-sm leading-relaxed text-slate">{instruction}</p>
+        )}
         <h2 className="font-display text-[clamp(1.25rem,3.5vw,1.6rem)] leading-snug font-semibold text-balance">
           {item.prompt}
         </h2>
