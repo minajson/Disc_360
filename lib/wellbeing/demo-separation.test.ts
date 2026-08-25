@@ -37,7 +37,6 @@ test("the demo population is generated, never read from a participant table", ()
     "createSupabaseAdminClient",
     "wellbeing_results",
     "wellbeing_sessions",
-    "from(",
     "supabase",
   ]) {
     assert.ok(
@@ -45,6 +44,12 @@ test("the demo population is generated, never read from a participant table", ()
       `the demo population must not touch the database — found ${forbidden}`,
     );
   }
+  // A table read specifically, rather than the bare word "from" — `Array.from`
+  // is legitimate and matching it produced a false failure.
+  assert.ok(
+    !/\b\w+\.from\(\s*["'`]/.test(source),
+    "the demo population must not read a table",
+  );
 });
 
 test("nothing writes the demo population anywhere", () => {
@@ -229,4 +234,29 @@ test("the overview labels responses as responses", () => {
   assert.match(page, /label: "Participants"/, "the headline count is people");
   assert.match(page, /workspace\.participants/);
   assert.match(page, /response/, "the response total is still shown, named for what it is");
+});
+
+/* ── the demo carries answerable rows, not empty ones ────────────────── */
+
+test("every demo row carries one response position per item of its instrument", () => {
+  for (const key of INSTRUMENT_KEYS) {
+    const rows = buildDemoPopulation(key);
+    const expected = INSTRUMENTS[key].itemCount;
+    for (const row of rows) {
+      // An empty array is not "no data" to the item engine — it is a row of
+      // the wrong length, and it raises. This was a real crash on the Signals
+      // tab before the demo rows were sized to their instrument.
+      assert.equal(
+        row.item_positions.length,
+        expected,
+        `${key} rows must carry ${expected} item positions`,
+      );
+      for (const position of row.item_positions) {
+        assert.ok(
+          Number.isInteger(position) && position >= 0 && position <= 3,
+          `${key} item position ${position} is outside every instrument's response range`,
+        );
+      }
+    }
+  }
 });

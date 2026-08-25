@@ -26,6 +26,13 @@ import {
   DEMO_TEAM_NAMES,
   type DemoAnalyticsRow,
 } from "@/lib/wellbeing/demo-population";
+import {
+  buildWellbeingSignals,
+  type CohortFigure,
+  type DimensionWave,
+  type WaveFigure,
+  type WellbeingSignal,
+} from "@/lib/wellbeing/signals";
 
 /**
  * Organisational Wellbeing Pulse analytics.
@@ -706,5 +713,129 @@ export async function getWellbeingDimensionProfile(
       highest: ranked[0] ?? null,
       lowest: ranked[ranked.length - 1] ?? null,
     },
+  };
+}
+
+/* ── evidence-first signal patterns ─────────────────────────────────── */
+
+/** The width covering the middle of a cohort, used as a spread measure. */
+function middleSpread(values: number[]): number {
+  if (values.length < 4) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const at = (fraction: number) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))]!;
+  return at(0.75) - at(0.25);
+}
+
+/**
+ * Builds the aggregate figures the signal engine describes.
+ *
+ * Every number handed to `buildWellbeingSignals` is computed here from rows
+ * that have already been authorised and already passed suppression — a cohort
+ * below the floor never reaches the engine, so no signal can be written about
+ * one. The engine itself performs no I/O, which is what keeps "the evidence
+ * layer owns every figure" true rather than aspirational.
+ */
+export async function getWellbeingSignalPatterns(
+  organizationId: string,
+  instrumentKey: InstrumentKey,
+  dimension: CompareDimension,
+  source: AnalyticsSource = "live",
+): Promise<{ context: WellbeingAnalyticsContext; signals: WellbeingSignal[] }> {
+  const context = await resolveContext(organizationId, instrumentKey);
+  const { rows, counts, teamNames } = await loadAnalyticsRows(
+    organizationId,
+    instrumentKey,
+    source,
+  );
+
+  /* Waves, oldest first, with anything below the floor dropped entirely. */
+  const byWave = new Map<string, { label: string; at: string; scores: number[]; thresholds: number[] }>();
+  for (const row of rows) {
+    const wave = waveKey(row.completed_at);
+    const bucket = byWave.get(wave.key) ?? { label: wave.label, at: wave.at, scores: [], thresholds: [] };
+    bucket.scores.push(reportedScore(row, context.instrument));
+    if (row.threshold_at_completion !== null) bucket.thresholds.push(row.threshold_at_completion);
+    byWave.set(wave.key, bucket);
+  }
+
+  const waves: WaveFigure[] = [...byWave.values()]
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .filter((bucket) => checkSlice(bucket.scores.length, context.minCohort).publishable)
+    .map((bucket) => {
+      const aggregate = aggregateScores(
+        bucket.scores,
+        aggregateOptionsFor(context.instrument, bucket.thresholds[0] ?? context.threshold),
+      );
+      return {
+        label: bucket.label,
+        median: aggregate.median,
+        // Within one wave a person contributes at most one result, so rows
+        // and people coincide here.
+        participants: bucket.scores.length,
+        thresholdShare: context.instrument.hasThreshold ? aggregate.atOrAboveThresholdShare : null,
+        spread: middleSpread(bucket.scores),
+      };
+    });
+
+  /* Dimension medians per wave, for instruments that legitimately have them. */
+  const dimensions: DimensionWave[] = [];
+  if (context.instrument.key === "disc360_wellbeing_v1") {
+    const perDimension = new Map<string, Map<string, number[]>>();
+    for (const row of rows) {
+      const wave = waveKey(row.completed_at);
+      for (const entry of row.wellbeing_result_dimensions ?? []) {
+        const waveMap = perDimension.get(entry.dimension_key) ?? new Map<string, number[]>();
+        waveMap.set(wave.key, [...(waveMap.get(wave.key) ?? []), entry.index_score]);
+        perDimension.set(entry.dimension_key, waveMap);
+      }
+    }
+    const orderedWaves = [...byWave.entries()]
+      .sort((a, b) => a[1].at.localeCompare(b[1].at))
+      .map(([key]) => key);
+
+    const admin = createSupabaseAdminClient();
+    const { data: definitions } = await admin
+      .from("wellbeing_dimensions")
+      .select("key, label, position")
+      .eq("instrument_key", instrumentKey)
+      .order("position");
+
+    for (const definition of definitions ?? []) {
+      const waveMap = perDimension.get(definition.key as string);
+      if (!waveMap) continue;
+      const medians = orderedWaves
+        .map((key) => waveMap.get(key) ?? [])
+        // A wave below the floor contributes no dimension median either.
+        .filter((scores) => checkSlice(scores.length, context.minCohort).publishable)
+        .map((scores) => aggregateScores(scores, aggregateOptionsFor(context.instrument, null)).median);
+      if (medians.length > 0) {
+        dimensions.push({ key: definition.key as string, label: definition.label as string, medians });
+      }
+    }
+  }
+
+  /* Cohorts, already suppressed by the shared comparison path. */
+  const { view } = await getWellbeingComparison(organizationId, instrumentKey, dimension, source);
+  const cohorts: CohortFigure[] = view.cohorts
+    .filter((cohort) => !cohort.suppressed && cohort.stats)
+    .map((cohort) => ({
+      label: cohort.label,
+      participants: cohort.stats!.completed,
+      median: cohort.stats!.median,
+      delta: null,
+    }));
+
+  void counts;
+  void teamNames;
+
+  return {
+    context,
+    signals: buildWellbeingSignals({
+      instrument: context.instrument,
+      waves,
+      dimensions,
+      cohorts,
+      cohortLabel: view.label,
+    }),
   };
 }

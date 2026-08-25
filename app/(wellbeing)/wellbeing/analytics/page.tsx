@@ -6,6 +6,7 @@ import {
   getWellbeingComparison,
   getWellbeingDimensionProfile,
   getWellbeingSignals,
+  getWellbeingSignalPatterns,
   getWellbeingWorkspace,
   parseAnalyticsSource,
   type AnalyticsSource,
@@ -42,10 +43,27 @@ import {
 } from "@/components/wellbeing/analytics/WorkspaceNav";
 import { SourceSwitch } from "@/components/wellbeing/analytics/SourceSwitch";
 import { HowToRead } from "@/components/wellbeing/analytics/HowToRead";
+import { SignalCards } from "@/components/wellbeing/analytics/SignalCards";
 
 export const metadata: Metadata = { title: "Wellbeing analytics" };
 
-const ITEM_IDS = WELLBEING_ITEM_STRUCTURE.map((item) => item.externalId);
+/**
+ * Item identifiers for the selected instrument.
+ *
+ * Previously fixed to GHQ-12's twelve-item structure whatever was selected,
+ * which throws the moment a twenty-eight-item instrument is read: the engine
+ * requires every stored row to be the full length of its own questionnaire.
+ * Deriving the length from the instrument keeps the grid honest for all four.
+ */
+function itemIdsFor(instrumentKey: InstrumentKey): string[] {
+  if (instrumentKey === "ghq12") {
+    return WELLBEING_ITEM_STRUCTURE.map((item) => item.externalId);
+  }
+  return Array.from(
+    { length: INSTRUMENTS[instrumentKey].itemCount },
+    (_, index) => `${instrumentKey}_item_${String(index + 1).padStart(2, "0")}`,
+  );
+}
 
 /** Which comparison dimension each tab drives. */
 const TAB_DIMENSION: Partial<Record<string, CompareDimension>> = {
@@ -492,15 +510,32 @@ async function SignalsSection({
   dimension: CompareDimension;
   minCohort: number;
 }) {
-  const { rows } = await getWellbeingSignals(
-    organizationId,
-    instrumentKey,
-    dimension,
-    ITEM_IDS,
-    source,
-  );
+  const [{ rows }, { signals }] = await Promise.all([
+    getWellbeingSignals(organizationId, instrumentKey, dimension, itemIdsFor(instrumentKey), source),
+    getWellbeingSignalPatterns(organizationId, instrumentKey, dimension, source),
+  ]);
 
   return (
+    <>
+    {/* The evidence-first patterns lead: they are what a facilitator acts on.
+        The item grid below is the supporting detail behind them. */}
+    <section className="pulse-card flex flex-col gap-6 p-6 sm:p-9">
+      <div>
+        <h2 className="font-display text-h3 font-semibold">Areas to explore</h2>
+        <p className="mt-1.5 text-sm leading-relaxed text-slate">
+          Aggregate patterns worth a conversation, strongest evidence first. Every figure below is
+          computed from responses that already passed cohort suppression — none of it describes an
+          individual, and none of it explains why a pattern exists.
+        </p>
+      </div>
+      <SignalCards signals={signals} />
+      <HowToRead
+        seeing="Patterns detected across waves and groups, each with the figures behind it."
+        matters="A single number rarely tells you where to look. A pattern that persists across several waves, or separates one group from another, is the kind of thing worth asking about."
+        notTelling="It does not establish a cause, and it is not a clinical finding. These describe what a group reported — never why, and never about any individual."
+      />
+    </section>
+
     <section className="pulse-card flex flex-col gap-6 p-6 sm:p-9">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -534,6 +569,7 @@ async function SignalsSection({
         notTelling="An item is not a diagnosis and not a subscale. A high share on one item describes a group's answers to one question — it does not identify anyone, and it does not establish why they answered that way."
       />
     </section>
+    </>
   );
 }
 

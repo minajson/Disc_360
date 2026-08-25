@@ -169,7 +169,15 @@ export function buildDemoPopulation(instrumentKey: InstrumentKey): DemoAnalytics
           department_at_completion: department.name,
           work_location_at_completion: workLocation,
           office_location_at_completion: office,
-          item_positions: [],
+          // One response position per item, sized to THIS instrument. An
+          // empty array is not "no data" to the item engine — it is a row of
+          // the wrong length, and it raises rather than silently reporting a
+          // zero. Values stay within 0–3, which is inside every instrument's
+          // response range (GHQ has four positions, WHO-5 six).
+          item_positions: Array.from(
+            { length: instrument.itemCount },
+            (_, item) => Math.abs(SPREAD[(person + wave + item) % SPREAD.length]!) % 4,
+          ),
           wellbeing_result_dimensions:
             instrumentKey === "disc360_wellbeing_v1"
               ? DISC360_WELLBEING_DIMENSIONS.map((dimension, index) => ({
