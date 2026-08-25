@@ -175,3 +175,23 @@ test("the participant counter returns integers only — no identifiers", () => {
   assert.match(migration, /security definer/i);
   assert.match(migration, /revoke all on function/i, "and is not callable by just anyone");
 });
+
+/* ── the organisation is named, not described ────────────────────────── */
+
+test("the organisation name is read with the service role, after authorisation", () => {
+  const context = SOURCE.slice(SOURCE.indexOf("async function resolveContext"));
+  const nameRead = context.slice(0, context.indexOf("return {"));
+  // A wellbeing role is deliberately NOT organisation membership, so RLS on
+  // `organizations` refuses most legitimate analysts and every heading and
+  // exported report fell back to the literal word "Organisation".
+  assert.ok(
+    !/access\.supabase\s*\n?\s*\.from\("organizations"\)/.test(nameRead),
+    "reading the name through the caller's client empties it for most analysts",
+  );
+  assert.match(nameRead, /createSupabaseAdminClient\(\)/, "read it with the service role");
+  // And only AFTER the guard has authorised this caller for this organisation.
+  assert.ok(
+    context.indexOf("requireWellbeingAnalyst") < context.indexOf('from("organizations")'),
+    "authorisation must precede the read",
+  );
+});

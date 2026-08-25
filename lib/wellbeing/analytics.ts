@@ -293,7 +293,19 @@ async function resolveContext(
   const policy = await getWellbeingPolicy(access.supabase, organizationId);
   const instrument = INSTRUMENTS[instrumentKey];
 
-  const { data: organization } = await access.supabase
+  // The organisation's NAME, read with the service role AFTER
+  // `requireWellbeingAnalyst` has authorised this caller for this exact
+  // organisation.
+  //
+  // Read through the caller's own client it comes back empty for most
+  // legitimate analysts: a wellbeing role is deliberately NOT organisation
+  // membership, so RLS on `organizations` refuses them and every heading and
+  // every exported report fell back to the literal word "Organisation".
+  // Withholding only the display name from someone already entitled to that
+  // organisation's aggregate analytics protects nothing and misnames the
+  // document they hand to their board.
+  const admin = createSupabaseAdminClient();
+  const { data: organization } = await admin
     .from("organizations")
     .select("name")
     .eq("id", organizationId)

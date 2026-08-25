@@ -64,3 +64,12 @@ next-env.d.ts
 # never reach a commit.
 __*.mjs
 __prodcreds.json
+
+# Production database dumps taken before a hosted migration. These contain
+# real participant data and auth rows; they belong in secure storage, never in
+# the repository. Kept out by pattern so a hurried `git add -A` cannot take
+# one, whatever the directory is called.
+/backups/
+*.dump
+pre-*-data.sql
+pre-*-auth.sql
