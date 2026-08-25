@@ -9,10 +9,16 @@ import { DEMO_PASSWORD } from "./helpers";
  * journey works at every phone width the brief names, and the privacy
  * boundary is enforced by the server rather than by a hidden menu item.
  *
- * Requires the local Supabase stack seeded with an ACTIVE questionnaire —
- * `scripts/seed-wellbeing-smoke.sql`. Where no version is active the module is
- * deliberately closed, and the flow tests skip rather than fail: "not licensed
- * yet" is a correct product state, not a broken build.
+ * Requires only `npx supabase db reset`. The migrations install DISC360
+ * Wellbeing Pulse V1 as a real, active, runnable questionnaire, and that is
+ * what the assessment flow is tested against — there is no separate smoke
+ * questionnaire, so a test can never pass against content that has drifted
+ * from the shipped instrument.
+ *
+ * GHQ-12, GHQ-28 and WHO-5 stay structure-only. Where no version is active for
+ * an instrument the module is deliberately closed, and the flow tests skip
+ * rather than fail: "not licensed yet" is a correct product state, not a
+ * broken build.
  */
 
 /** Every width the brief requires the participant flow to work at. */

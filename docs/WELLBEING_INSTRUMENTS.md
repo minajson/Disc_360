@@ -188,3 +188,49 @@ Blocked instruments are blocked **structurally**: a `structure_only` or
 `demo_restricted` version cannot be activated, and the licensing gate requires
 non-production *and* an explicit demo flag before a restricted instrument can be
 served at all.
+
+---
+
+## Testing strategy
+
+**Instrument content comes from migrations. Seeds supply people, never
+questionnaires.** That separation is the whole point: a seed that manufactures
+its own questionnaire lets a test keep passing against content that has drifted
+away from the instrument actually shipped. There is no longer a separate
+wellbeing smoke questionnaire — `scripts/seed-wellbeing-smoke.sql` was retired.
+
+| Purpose | Use | Why |
+|---|---|---|
+| Participant / e2e functional testing | **`disc360_wellbeing_v1`**, installed and activated by migrations | It is real, runnable, licensed-to-us content. Testing the flow against the shipped instrument is the only way a passing test means anything. |
+| Management / analytics demo | **`scripts/seed-wellbeing-demo.sql`** | Synthetic participants and results only — four waves, several departments, one deliberately suppressed cohort. It writes no questionnaire. |
+| GHQ-12 · GHQ-28 · WHO-5 | **structure-only** — item counts, response positions, subscale blocks | No wording until authorised content is loaded. They carry no prompts, cannot be activated, and cannot be served. |
+
+Running the wellbeing suite therefore needs nothing but:
+
+```bash
+npx supabase start
+npx supabase db reset                                   # installs DISC360 Wellbeing V1, active
+npm run build && npx playwright test e2e/wellbeing.spec.ts
+```
+
+Add the demo population only when exercising analytics:
+
+```bash
+PGPASSWORD=postgres psql -h 127.0.0.1 -p 54322 -U postgres -d postgres \
+  -f scripts/seed-wellbeing-demo.sql
+```
+
+### Seed scripts fail closed
+
+Every SQL script under `scripts/` that can write refuses a non-local database,
+and the refusal is terminal. Both halves matter: `raise exception` inside a
+`DO` block ends only that block, so without `\set ON_ERROR_STOP on` psql prints
+the refusal and then seeds the database anyway — which is what these scripts
+used to do. The guard accepts loopback and the RFC1918 ranges a local or Docker
+Postgres uses, and refuses everything else, so a hosted instance is rejected on
+its address rather than on a hard-coded list that misses a Docker network.
+
+Both properties are tested rather than asserted in prose:
+`lib/wellbeing/seed-safety.test.ts` checks every writing script for the flag,
+the ranges, and the ORDER of the two, and the privacy harness evaluates the
+guard predicate against real loopback, private and public addresses.

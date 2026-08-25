@@ -13,7 +13,33 @@
 -- by nobody else — including the platform super administrator, for whom both
 -- is_super_admin() and is_team_admin() return true everywhere.
 
+-- Fail closed, not merely loudly.
+--
+-- This harness INSERTS sessions, results and catalogue rows before rolling
+-- them back. A rollback that never runs — an interrupted session, a statement
+-- executed outside the transaction, a future edit — would leave them behind.
+-- So refuse a non-local target outright rather than trusting the rollback, and
+-- abort on the first error so the refusal actually stops the script: a bare
+-- `raise exception` inside a DO block ends the block, and psql would otherwise
+-- carry straight on to the next statement.
 \set ON_ERROR_STOP on
+
+do $guard$
+begin
+  if coalesce(current_database(), '') <> 'postgres' then
+    raise exception 'Refusing to run the privacy harness against database %', current_database();
+  end if;
+  -- Loopback, or a private (RFC1918 / Docker) address. A hosted Supabase
+  -- instance is on neither, so this refuses anything reachable from outside.
+  if inet_server_addr() is not null
+     and not (inet_server_addr() <<= inet '127.0.0.0/8'
+           or inet_server_addr() <<= inet '10.0.0.0/8'
+           or inet_server_addr() <<= inet '172.16.0.0/12'
+           or inet_server_addr() <<= inet '192.168.0.0/16') then
+    raise exception 'Refusing to run the privacy harness against non-local host %', inet_server_addr();
+  end if;
+end;
+$guard$;
 \set QUIET on
 set client_min_messages to notice;
 
@@ -331,9 +357,6 @@ begin
     'a structure-only questionnaire version cannot be activated',
     'update public.wellbeing_versions set is_active = true where version = 1');
 
-  -- Scoped to the version the MIGRATION seeds. A local database may also carry
-  -- scripts/seed-wellbeing-smoke.sql's placeholder version, which is expected
-  -- and is not what this check is about.
   -- Scoped to the THIRD-PARTY instruments. DISC360 Wellbeing is original
   -- content and ships its wording deliberately, so scoping by version number
   -- (all four are version 1) would report it as a violation.
@@ -519,6 +542,30 @@ begin
     'a platform super admin does not inherit catalogue write access to an organisation',
     v_super,
     format('insert into public.wellbeing_departments (organization_id, name) values (%L, ''Injected By Platform Admin'')', v_org_a));
+  /* ── §24 · the seed guard refuses hosted targets ──────────────────── */
+  --
+  -- Proves the PREDICATE the seed scripts use, rather than trusting that it
+  -- reads correctly. Hosted Supabase sits on public addresses; a local or
+  -- Docker Postgres does not.
+
+  select count(*) into v_floor
+  from (values (inet '127.0.0.1'), (inet '172.17.0.1'), (inet '172.18.0.12'),
+               (inet '10.1.2.3'), (inet '192.168.1.5')) as local(a)
+  where not (local.a <<= inet '127.0.0.0/8' or local.a <<= inet '10.0.0.0/8'
+          or local.a <<= inet '172.16.0.0/12' or local.a <<= inet '192.168.0.0/16');
+  perform pg_temp.record(
+    'the seed host guard accepts loopback and private addresses',
+    v_floor = 0, format('%s local address(es) would have been refused', v_floor));
+
+  select count(*) into v_floor
+  from (values (inet '54.229.100.4'), (inet '3.120.55.9'), (inet '18.192.44.7'),
+               (inet '104.18.32.1'), (inet '8.8.8.8')) as public_addr(a)
+  where not (public_addr.a <<= inet '127.0.0.0/8' or public_addr.a <<= inet '10.0.0.0/8'
+          or public_addr.a <<= inet '172.16.0.0/12' or public_addr.a <<= inet '192.168.0.0/16');
+  perform pg_temp.record(
+    'the seed host guard refuses every public (hosted) address',
+    v_floor = 5, format('%s of 5 public addresses refused', v_floor));
+
 end;
 $harness$;
 
