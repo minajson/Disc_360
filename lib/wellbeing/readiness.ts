@@ -44,6 +44,7 @@ import { WELLBEING_SUB_UNIT_LABEL } from "@/data/wellbeing-taxonomy";
  */
 
 export type ReadinessIssueCode =
+  | "infrastructure_unavailable"
   | "no_instrument"
   | "instrument_not_servable"
   | "no_questionnaire_content"
@@ -65,6 +66,47 @@ export interface CampaignReadiness {
   ready: boolean;
   issues: ReadinessIssue[];
 }
+
+/**
+ * A MISSING TABLE AND AN EMPTY CATALOGUE ARE DIFFERENT FACTS.
+ *
+ * This module ran in production against a database that did not yet have
+ * `wellbeing_sub_units` — the code had shipped, the migration had not. The
+ * query errored, `data` came back null, and `(subUnits?.length ?? 0) === 0`
+ * read that as "the catalogue exists and is empty". Every campaign was
+ * reported as unready, and the facilitator was told to add a Sub-unit value
+ * to a table that did not exist. There was no action they could take.
+ *
+ * The participant's message is the same either way, and should be: neither
+ * state is theirs to fix. The facilitator's must not be, because one of them
+ * is a deployment and the other is a minute of configuration.
+ *
+ * PostgREST reports a missing relation as PGRST205, and Postgres as 42P01.
+ * Those are named because they are the case we can describe precisely — but
+ * ANY error means the row count is meaningless, so any error marks the lookup
+ * unavailable rather than empty. Reading a failed query as "zero rows" is the
+ * whole shape of this bug, and it should not survive for the errors nobody
+ * enumerated.
+ */
+const MISSING_RELATION_CODES = new Set(["PGRST205", "42P01"]);
+
+interface LookupProbe {
+  /** Rows found. Meaningless when `unavailable` is true. */
+  count: number;
+  /** The catalogue could not be consulted at all, for any reason. */
+  unavailable: boolean;
+  /** True for the case we can name: the relation does not exist yet. */
+  missingRelation: boolean;
+}
+
+const probe = (result: {
+  data: unknown[] | null;
+  error: { code?: string } | null;
+}): LookupProbe => ({
+  count: result.data?.length ?? 0,
+  unavailable: Boolean(result.error),
+  missingRelation: Boolean(result.error && MISSING_RELATION_CODES.has(result.error.code ?? "")),
+});
 
 /** What a participant is told. Never the configuration detail. */
 export const CAMPAIGN_NOT_READY_PARTICIPANT_MESSAGE =
@@ -149,7 +191,7 @@ export async function checkCampaignReadiness(
   // exception — there is no platform catalogue of them, by design.
 
   if (organizationId) {
-    const [{ data: departments }, { data: subUnits }, { data: offices }] = await Promise.all([
+    const [departmentsResult, subUnitsResult, officesResult] = await Promise.all([
       admin
         .from("wellbeing_departments")
         .select("id")
@@ -170,14 +212,48 @@ export async function checkCampaignReadiness(
         .limit(1),
     ]);
 
-    if ((departments?.length ?? 0) === 0) {
+    const departments = probe(departmentsResult);
+    const subUnits = probe(subUnitsResult);
+    const offices = probe(officesResult);
+
+    // Schema first, and on its own. A deployment that has not finished is one
+    // fact about the platform, not three facts about this organisation's
+    // catalogues — listing "add a Department", "add a Sub-unit" and "add an
+    // Office Location" underneath it would be three instructions nobody can
+    // carry out.
+    const unavailable = [
+      departments.unavailable && "Department / Function",
+      subUnits.unavailable && WELLBEING_SUB_UNIT_LABEL,
+      offices.unavailable && "Office Location",
+    ].filter((label): label is string => typeof label === "string");
+
+    const missing = [departments, subUnits, offices].filter((p) => p.missingRelation).length;
+
+    if (unavailable.length > 0) {
+      issues.push({
+        code: "infrastructure_unavailable",
+        message: "Wellbeing campaign infrastructure is still being activated.",
+        // Named so whoever reads it can tell a deployment engineer what is
+        // missing, without implying the facilitator can configure it.
+        fix: `${unavailable.join(", ")} could not be read on this deployment${
+          missing === 0
+            ? ""
+            : missing === 1
+              ? " — its table is not installed yet"
+              : " — their tables are not installed yet"
+        }. This is resolved by a release, not by configuration; no action is needed from you.`,
+      });
+      return { ready: false, issues };
+    }
+
+    if (departments.count === 0) {
       issues.push({
         code: "no_departments",
         message: "This organisation has no Department / Function values.",
         fix: "Wellbeing governance must add at least one before the campaign opens.",
       });
     }
-    if ((subUnits?.length ?? 0) === 0) {
+    if (subUnits.count === 0) {
       issues.push({
         code: "no_sub_units",
         message: `This organisation has no ${WELLBEING_SUB_UNIT_LABEL} values.`,
@@ -186,7 +262,7 @@ export async function checkCampaignReadiness(
         fix: `Add at least one ${WELLBEING_SUB_UNIT_LABEL} before opening this campaign. If your organisation does not use sub-units, add a single value called “Not Applicable”.`,
       });
     }
-    if ((offices?.length ?? 0) === 0) {
+    if (offices.count === 0) {
       issues.push({
         code: "no_office_locations",
         // Office Location is asked only of office-based respondents, but the

@@ -28,6 +28,29 @@ export const WELLBEING_PRODUCT_NAME = "Wellbeing Pulse";
  */
 export const WELLBEING_PRODUCT_DESCRIPTION = "Workplace wellbeing check-in";
 
+/**
+ * The ACCOUNT consent shown during onboarding to somebody who arrived on a
+ * Wellbeing Pulse invitation.
+ *
+ * Onboarding is shared by both products, and its consent read "I consent to
+ * DISC360 processing my assessment answers to build my behavioral profile" —
+ * which a wellbeing participant was required to tick to continue. It describes
+ * a behavioural assessment they are not taking, and it is the one consent a
+ * wellbeing journey must never ask for.
+ *
+ * This covers what onboarding actually collects: the account. Consent for the
+ * check-in itself is asked separately, on the pulse, where the instrument and
+ * its length are known — see `consentIntro`.
+ *
+ * Split either side of the privacy link so the component composes it rather
+ * than performing surgery on a sentence.
+ */
+export const WELLBEING_ACCOUNT_CONSENT_LEAD =
+  "I consent to DISC360 creating an account for me so I can take part in this " +
+  "wellbeing check-in, as described in the";
+export const WELLBEING_ACCOUNT_CONSENT_TAIL =
+  ". Your answers stay private to you. Required.";
+
 /** Shown on every result, every report and every history view. */
 export const SCREENING_DISCLAIMER =
   "GHQ-12 is a screening questionnaire and does not provide a diagnosis.";

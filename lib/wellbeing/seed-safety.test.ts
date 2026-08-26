@@ -90,3 +90,69 @@ test("no seed script inserts a questionnaire VERSION or ITEM", () => {
     }
   }
 });
+
+/* ── remediations fail closed too, in the other direction ────────────── */
+//
+// A production remediation is the one writing script whose correct target IS a
+// hosted database, so the local-only rule above cannot apply to it. The
+// obligation is the same though — running it anywhere unintended must be an
+// explicit refusal, never a quiet no-op that reads like success — so it is
+// pinned to the identities the audit was performed against.
+//
+// These live in supabase/remediations/ rather than scripts/ precisely so the
+// two rules cannot be confused for one another, and so a seed can never
+// acquire a production-shaped guard by being edited in place.
+
+const REMEDIATIONS_DIR = new URL("../../supabase/remediations/", import.meta.url);
+
+const remediations = readdirSync(REMEDIATIONS_DIR)
+  .filter((name) => name.endsWith(".sql"))
+  .map((name) => ({ name, source: readFileSync(new URL(name, REMEDIATIONS_DIR), "utf8") }));
+
+test("there are remediations to check, so these tests are not vacuous", () => {
+  assert.ok(remediations.length > 0, "no .sql files found under supabase/remediations/");
+});
+
+for (const { name, source } of remediations) {
+  test(`${name} aborts on the first error`, () => {
+    assert.match(
+      source,
+      /^\\set ON_ERROR_STOP on$/m,
+      "without this every guard below is decorative — psql continues past a raised exception",
+    );
+  });
+
+  test(`${name} refuses a database it was not audited against`, () => {
+    const stop = source.indexOf("\\set ON_ERROR_STOP on");
+    const guard = source.indexOf("Refusing:");
+    assert.ok(guard > 0, "it must refuse an unintended database explicitly");
+    assert.ok(stop >= 0 && stop < guard, "ON_ERROR_STOP must come before the refusal");
+    const firstWrite = source
+      .split("\n")
+      .findIndex((line) => /^\s*(insert|update|delete|truncate)\s/i.test(line));
+    const guardLine = source.slice(0, guard).split("\n").length;
+    assert.ok(guardLine < firstWrite + 1, "the guard must come before the first write");
+  });
+
+  test(`${name} writes only through a primary key`, () => {
+    // A remediation is reviewed against specific rows. A predicate that
+    // describes a CLASS of rows can match something added between the audit
+    // and the run; a primary key cannot.
+    const statements = [...source.matchAll(/^\s*(delete|update)\s[^;]+;/gim)].map((m) => m[0]);
+    for (const statement of statements) {
+      assert.match(
+        statement,
+        /where id = /,
+        `${name} writes without a primary-key predicate: ${statement.trim()}`,
+      );
+    }
+  });
+
+  test(`${name} proves it took nothing else with it`, () => {
+    assert.match(
+      source,
+      /raise exception 'ABORT:/,
+      "it must verify the rows it was NOT supposed to touch are still there",
+    );
+  });
+}

@@ -12,6 +12,10 @@ import {
   completeTeamCreatorOnboarding,
   type OnboardingState,
 } from "@/lib/actions/onboarding";
+import {
+  WELLBEING_ACCOUNT_CONSENT_LEAD,
+  WELLBEING_ACCOUNT_CONSENT_TAIL,
+} from "@/data/wellbeing-content";
 
 type Intent =
   | "understand_myself"
@@ -57,6 +61,12 @@ export interface OnboardingInvitation {
   presenterTitle: string | null;
   /** "Today's session" label, e.g. "DISC Behaviour Assessment". */
   sessionLabel: string | null;
+  /**
+   * True when the invitation is a Wellbeing Pulse campaign. Onboarding is
+   * shared by both products, so the one screen that is NOT product-neutral —
+   * the consent — has to be told which journey it is on.
+   */
+  isWellbeing: boolean;
 }
 
 interface OnboardingFlowProps {
@@ -257,6 +267,17 @@ function InvitedFlow({
           submitLabel={`Join ${invitation.teamName}`}
           defaultFullName={defaultFullName}
           extraFields={<input type="hidden" name="join_token" value={invitation.token} />}
+          consentBody={
+            invitation.isWellbeing ? (
+              <>
+                {WELLBEING_ACCOUNT_CONSENT_LEAD}{" "}
+                <a href="/privacy" target="_blank" className="underline hover:text-ink">
+                  privacy policy
+                </a>
+                {WELLBEING_ACCOUNT_CONSENT_TAIL}
+              </>
+            ) : undefined
+          }
         />
       ) : null}
 
@@ -303,11 +324,19 @@ function ProfileForm({
   submitLabel,
   defaultFullName,
   extraFields,
+  consentBody,
 }: {
   action: (prev: OnboardingState, formData: FormData) => Promise<OnboardingState>;
   submitLabel: string;
   defaultFullName: string;
   extraFields?: React.ReactNode;
+  /**
+   * What the required consent actually says. Defaults to the DISC wording,
+   * which is correct for every DISC pathway; a wellbeing invitation passes its
+   * own, because consenting to a behavioural profile is not something a
+   * wellbeing participant is being asked for.
+   */
+  consentBody?: React.ReactNode;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
   const timezones = useMemo(
@@ -348,9 +377,13 @@ function ProfileForm({
         <label className="flex items-start gap-3 text-sm text-slate">
           <input type="checkbox" name="consent" required className="mt-0.5 size-4 accent-[var(--color-botanical)]" />
           <span>
-            I consent to DISC360 processing my assessment answers to build my
-            behavioral profile, as described in the{" "}
-            <a href="/privacy" target="_blank" className="underline hover:text-ink">privacy policy</a>. Required.
+            {consentBody ?? (
+              <>
+                I consent to DISC360 processing my assessment answers to build my
+                behavioral profile, as described in the{" "}
+                <a href="/privacy" target="_blank" className="underline hover:text-ink">privacy policy</a>. Required.
+              </>
+            )}
           </span>
         </label>
         <label className="flex items-start gap-3 text-sm text-slate">

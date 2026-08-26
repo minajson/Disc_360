@@ -222,3 +222,79 @@ test("a renamed lookup never rewrites a completed result", () => {
   const waves = read("supabase/migrations/00034_wellbeing_waves.sql");
   assert.match(waves, /wellbeing_results_immutable/);
 });
+
+/* ── 5 · a missing table is not an empty catalogue ───────────────────── */
+//
+// This module ran in production against a database without
+// `wellbeing_sub_units` — the code shipped, the migration had not. The query
+// errored, `data` was null, and `(subUnits?.length ?? 0) === 0` read that as
+// "the catalogue exists and is empty". Every campaign reported unready, and
+// the facilitator was told to add a Sub-unit value to a table that did not
+// exist. There was no action they could take.
+
+test("readiness tells a missing relation apart from an empty catalogue", () => {
+  const readiness = code("lib/wellbeing/readiness.ts");
+  assert.match(
+    readiness,
+    /MISSING_RELATION_CODES = new Set\(\["PGRST205", "42P01"\]\)/,
+    "PostgREST reports a missing relation as PGRST205, Postgres as 42P01",
+  );
+  assert.match(readiness, /code: "infrastructure_unavailable"/, "which is its own issue code");
+  // The error must actually be READ. The old code destructured `data` only,
+  // which is precisely how the distinction was lost.
+  assert.match(
+    readiness,
+    /unavailable: Boolean\(result\.error\)/,
+    "ANY error means the row count is meaningless — reading a failed query as zero rows is the bug itself",
+  );
+  assert.match(
+    readiness,
+    /missingRelation: Boolean\(result\.error && MISSING_RELATION_CODES\.has/,
+    "and the relation-missing case is named precisely, because it can be",
+  );
+  assert.ok(
+    !/\(subUnits\?\.length \?\? 0\) === 0/.test(readiness),
+    "the count-only test that swallowed the error must be gone",
+  );
+});
+
+test("a schema gap never asks the facilitator to configure something", () => {
+  const readiness = code("lib/wellbeing/readiness.ts");
+  const block = readiness.slice(
+    readiness.indexOf('code: "infrastructure_unavailable"'),
+    readiness.indexOf('if (departments.count === 0)'),
+  );
+  assert.match(block, /still being activated/, "it is described as a deployment in progress");
+  assert.match(block, /no action is needed from you/, "and explicitly not the facilitator's to fix");
+  assert.match(block, /table(s)? (is|are) not installed yet/, "and names the schema case when that is what happened");
+  for (const instruction of ["Add at least one", "Wellbeing governance must add"]) {
+    assert.ok(
+      !block.includes(instruction),
+      `a missing table must not produce "${instruction}"`,
+    );
+  }
+});
+
+test("a schema gap suppresses the catalogue advice entirely", () => {
+  // Otherwise the facilitator gets "infrastructure is activating" followed by
+  // three instructions they cannot carry out.
+  const readiness = code("lib/wellbeing/readiness.ts");
+  assert.match(
+    readiness,
+    /if \(unavailable\.length > 0\) \{[\s\S]{0,600}return \{ ready: false, issues \};/,
+    "it returns immediately rather than falling through to the catalogue checks",
+  );
+});
+
+test("the participant's message is identical either way", () => {
+  // Neither state is theirs to fix, and neither should expose which it is.
+  const readiness = code("lib/wellbeing/readiness.ts");
+  const messages = [...readiness.matchAll(/CAMPAIGN_NOT_READY_PARTICIPANT_MESSAGE\s*=\s*$/gm)];
+  assert.ok(messages.length <= 1, "there is exactly one participant message");
+  const page = code("app/(wellbeing-public)/wellbeing/join/[token]/page.tsx");
+  assert.match(page, /CAMPAIGN_NOT_READY_PARTICIPANT_MESSAGE/);
+  // The participant page must not branch on the issue codes at all.
+  for (const code_ of ["infrastructure_unavailable", "no_sub_units", "no_departments"]) {
+    assert.ok(!page.includes(code_), `the invitation must not surface "${code_}"`);
+  }
+});

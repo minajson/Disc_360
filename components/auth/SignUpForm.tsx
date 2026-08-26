@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/db/browser";
-import { onboardingDestination, parseIntent } from "@/lib/auth/intent";
+import { isSafeNext, onboardingDestination, parseIntent } from "@/lib/auth/intent";
 import { Button } from "@/components/ui/Button";
 import { PasswordField, TextField } from "@/components/auth/fields";
 
@@ -29,12 +29,31 @@ export function SignUpForm() {
     const supabase = createSupabaseBrowserClient();
     const intent = parseIntent(searchParams.get("intent"));
 
+    // The destination the person actually arrived with.
+    //
+    // A Wellbeing Pulse invitation sends them here as
+    // `/sign-up?next=/wellbeing/join/{token}`, and that token is the ONLY
+    // thing that grants them membership of the campaign. Dropping it — which
+    // both branches below used to do — delivered a participant who had just
+    // scanned a printed code into generic onboarding, where they are asked for
+    // a team code they do not have.
+    //
+    // Validated, never trusted: an absolute or protocol-relative URL here
+    // would be an open redirect handed over via a crafted sign-up link. The
+    // callback re-validates it independently.
+    const requestedNext = searchParams.get("next");
+    const safeNext = isSafeNext(requestedNext) ? (requestedNext as string) : null;
+
     // Built with URL rather than interpolation: the previous string produced
     // "?next=/onboarding?intent=team", where the un-encoded "?intent" became a
     // parameter of the callback instead of part of next. The callback owns the
     // onboarding-vs-app decision, so it only needs the intent.
     const callback = new URL("/auth/callback", window.location.origin);
     if (intent) callback.searchParams.set("intent", intent);
+    // Carried through the confirmation email too. With confirmations enabled —
+    // which is how production runs — this link IS the journey, so a `next`
+    // missing here loses the campaign on exactly the deployment that matters.
+    if (safeNext) callback.searchParams.set("next", safeNext);
 
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: String(form.get("email")),
@@ -51,9 +70,10 @@ export function SignUpForm() {
       return;
     }
 
-    // Local/dev without confirmations: session exists → continue directly.
+    // Local/dev without confirmations: session exists → continue directly,
+    // to the invitation when there is one rather than to generic onboarding.
     if (data.session) {
-      router.push(onboardingDestination(intent));
+      router.push(safeNext ?? onboardingDestination(intent));
       router.refresh();
       return;
     }

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
 import { createSupabaseAdminClient } from "@/lib/db/admin";
 import { sendWelcome } from "@/lib/email/notifications";
+import { invitedJoinDestination } from "@/lib/join/destination";
 
 export interface OnboardingState {
   status: "idle" | "error";
@@ -217,7 +218,11 @@ export async function completeInvitedOnboarding(
   );
   if (attachError) return { status: "error", message: attachError };
 
-  redirect("/app");
+  // The invitation decides the product, not this function and not the URL.
+  // A wellbeing participant returns to their invitation — where the token
+  // grants membership and readiness is checked — and never to /app, which is
+  // a different product's dashboard.
+  redirect(invitedJoinDestination(context.assessmentType, parsedToken.data.join_token));
 }
 
 const joinSchema = z.object({
