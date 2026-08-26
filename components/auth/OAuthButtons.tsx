@@ -27,6 +27,19 @@ const ICONS: Record<OAuthProviderId, React.ReactNode> = {
 interface OAuthButtonsProps {
   /** Resolved server-side; carries booleans only, never ids or secrets. */
   providers: OAuthProviderStatus[];
+  /**
+   * Where to land after the provider round trip, when the surface knows.
+   *
+   * The auth pages read this from `?next=` because that is how they were
+   * reached. A Wellbeing Pulse invitation is reached by scanning a printed
+   * code, so it has no query string to read — but it knows exactly which
+   * campaign the person is joining, and losing that is the difference between
+   * landing in their pulse and landing on the DISC360 dashboard.
+   *
+   * Still validated as a safe relative path below, and re-validated by the
+   * callback, so passing it as a prop grants nothing a query string would not.
+   */
+  next?: string;
 }
 
 /**
@@ -38,7 +51,7 @@ interface OAuthButtonsProps {
  * broken Google/Microsoft error page and never surfaced our friendly message.
  * Here the button stays visible and explains itself instead.
  */
-export function OAuthButtons({ providers }: OAuthButtonsProps) {
+export function OAuthButtons({ providers, next: explicitNext }: OAuthButtonsProps) {
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<OAuthProviderId | null>(null);
@@ -59,7 +72,7 @@ export function OAuthButtons({ providers }: OAuthButtonsProps) {
     // relative path; the callback re-validates it regardless.
     const callback = new URL("/auth/callback", window.location.origin);
     const intent = searchParams.get("intent");
-    const next = searchParams.get("next");
+    const next = explicitNext ?? searchParams.get("next");
     if (intent) callback.searchParams.set("intent", intent);
     if (next && next.startsWith("/") && !next.startsWith("//")) {
       callback.searchParams.set("next", next);

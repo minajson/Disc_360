@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireOnboarded } from "@/lib/auth/guards";
-import { getInstrumentAvailability, getMyWellbeingHistory } from "@/lib/wellbeing/queries";
+import {
+  getInstrumentAvailability,
+  getMyWellbeingHistory,
+  getTeamInstrument,
+} from "@/lib/wellbeing/queries";
 import { startWellbeingPulseAction } from "@/lib/actions/wellbeing";
 import {
   CONSENT_AGREE,
   CONSENT_BODY,
+  consentIntro,
   CONSENT_DECLINE,
   CONSENT_HEADING,
   SCREENING_DISCLAIMER_LONG,
@@ -40,11 +45,24 @@ export default async function WellbeingHomePage({
     getMyWellbeingHistory(),
   ]);
 
-  // Which instrument a solo participant would take: the one active instrument
-  // if there is exactly one, otherwise none — the participant is never asked
-  // to choose between questionnaires.
+  // Which instrument this participant is about to answer.
+  //
+  // A CAMPAIGN decides for itself. Falling back to "the one active
+  // instrument" for someone invited to a campaign describes the wrong
+  // questionnaire to the one person entitled to know exactly what they are
+  // being asked — a participant invited to a GHQ-12 campaign was told they
+  // were taking a workplace wellbeing reflection.
+  //
+  // For a solo participant with no campaign, the rule is unchanged: the one
+  // active instrument if there is exactly one, otherwise none. They are never
+  // asked to choose between questionnaires either way.
   const live = availability.filter((entry) => entry.available);
-  const questionnaire = live.length === 1 ? live[0]! : null;
+  const campaignInstrument = team ? await getTeamInstrument(context, team) : null;
+  const questionnaire = campaignInstrument
+    ? (availability.find((entry) => entry.key === campaignInstrument) ?? null)
+    : live.length === 1
+      ? live[0]!
+      : null;
   const completedCount = history.completedInstruments.reduce(
     (total, key) => total + history[key].count,
     0,
@@ -95,7 +113,24 @@ export default async function WellbeingHomePage({
           <div>
             <h2 className="font-display text-h3 font-semibold">{CONSENT_HEADING}</h2>
             <div className="mt-4 flex flex-col gap-3 text-[0.95rem] leading-relaxed text-slate">
-              {CONSENT_BODY.map((paragraph) => (
+              {/*
+                The opening sentence describes THIS campaign's questionnaire.
+                It was hard-coded as "twelve short questions … about three
+                minutes", which is a false statement to anyone invited to
+                WHO-5 (five items) or GHQ-28 (twenty-eight) — and consent that
+                misdescribes what is being asked is not consent.
+              */}
+              {[
+                ...(questionnaire
+                  ? [
+                      consentIntro(
+                        questionnaire.instrument.itemCount,
+                        questionnaire.instrument.minutesToComplete,
+                      ),
+                    ]
+                  : []),
+                ...CONSENT_BODY,
+              ].map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>
               ))}
             </div>

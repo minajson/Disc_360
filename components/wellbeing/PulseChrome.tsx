@@ -23,6 +23,34 @@ export interface PulseNavItem {
 }
 
 /**
+ * The glyph alone.
+ *
+ * Split out because the wordmark is not always wanted beside it: on a surface
+ * that already carries "Wellbeing Pulse" as its heading, the full mark prints
+ * the product name twice in the same breath.
+ */
+export function PulseGlyph({ className = "" }: { className?: string }) {
+  return (
+    // A steady pulse line inside a soft ring — calm, not medical.
+    <svg
+      viewBox="0 0 32 32"
+      aria-hidden="true"
+      className={`h-7 w-7 shrink-0 ${className}`}
+      fill="none"
+    >
+      <circle cx="16" cy="16" r="14.5" stroke="currentColor" strokeOpacity="0.28" />
+      <path
+        d="M5 16.5h5.2l2.6-6 3.4 11.4 2.6-7.2 1.9 4.3H27"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/**
  * `compact` drops the wordmark below the `sm` breakpoint.
  *
  * The header has to hold the mark, a variable number of nav links (an analyst
@@ -41,22 +69,7 @@ export function PulseMark({
 }) {
   return (
     <span className={`flex items-center gap-2.5 ${className}`}>
-      {/* A steady pulse line inside a soft ring — calm, not medical. */}
-      <svg
-        viewBox="0 0 32 32"
-        aria-hidden="true"
-        className="h-7 w-7 shrink-0"
-        fill="none"
-      >
-        <circle cx="16" cy="16" r="14.5" stroke="currentColor" strokeOpacity="0.28" />
-        <path
-          d="M5 16.5h5.2l2.6-6 3.4 11.4 2.6-7.2 1.9 4.3H27"
-          stroke="currentColor"
-          strokeWidth="1.9"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <PulseGlyph />
       <span
         className={`font-display text-[1.05rem] leading-none font-semibold tracking-tight ${
           compact ? "hidden sm:inline" : ""

@@ -42,6 +42,24 @@
  */
 export const WELLBEING_DEPARTMENT_LABEL = "Department / Function";
 
+/**
+ * Sub-unit / Team — the organisational unit, never the assessment team.
+ *
+ * Named "Sub-unit / Team" rather than "Team" on purpose. This platform already
+ * uses "team" for the thing a facilitator runs a session with, and a
+ * participant asked for their "team" inside a campaign reasonably answers with
+ * the campaign. The compound label is slightly clumsy and entirely unambiguous.
+ *
+ * There is deliberately NO default catalogue here, unlike departments and
+ * office locations. A department name is generic enough to ship; a sub-unit
+ * name is always somebody's own org chart, and a shipped list of them would
+ * describe a real customer.
+ */
+export const WELLBEING_SUB_UNIT_LABEL = "Sub-unit / Team";
+
+export const WELLBEING_SUB_UNIT_HELP =
+  "The working unit you belong to. Used only to group answers — your own result is never shown against it.";
+
 export const DEFAULT_WELLBEING_DEPARTMENTS: readonly string[] = [
   "Commercial",
   "Customer Operations",

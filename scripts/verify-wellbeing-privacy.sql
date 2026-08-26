@@ -460,29 +460,42 @@ begin
   -- it, select from it, or inherit it. The platform-level rows are the one
   -- shared surface, and they must therefore describe nobody.
 
-  select m.organization_id, m.profile_id into v_org_a, v_member_a
-  from public.organization_members m order by m.organization_id limit 1;
-  -- Deliberately a member who holds NO wellbeing role in organisation A.
+  -- TWO TENANTS THIS CHECK CREATES FOR ITSELF.
   --
-  -- `can_read_wellbeing_lookup` grants catalogue read to anyone with a
-  -- wellbeing role in that organisation, which is correct and intended. If the
-  -- member picked here happened to hold one, this check would fail while the
-  -- product behaved exactly as designed — a misleading red that sends the
-  -- reader hunting for a bug that is not there. Choosing a member without one
-  -- makes the check test tenant isolation rather than ambient grant state.
-  select m.organization_id, m.profile_id into v_org_b, v_member_b
-  from public.organization_members m
-  where m.organization_id <> v_org_a
-    and not exists (
-      select 1 from public.wellbeing_role_grants g
-      where g.profile_id = m.profile_id
-        and g.organization_id = v_org_a
-        and g.revoked_at is null)
-  order by m.organization_id limit 1;
+  -- It used to scavenge the first two rows of `organization_members`, which
+  -- made the result depend on seed state it does not control. Two ways that
+  -- went wrong in practice: the same demo account belongs to more than one
+  -- seeded organisation, so the "two tenants" were one person; and granting
+  -- that account a wellbeing role in the other organisation turned a correct
+  -- product behaviour into three red checks.
+  --
+  -- A privacy harness must not be able to pass or fail for reasons outside
+  -- the property under test. So it builds its own pair, uses them, and rolls
+  -- them back with everything else.
 
-  if v_member_b is null then
-    raise exception 'No organisation-B member without a wellbeing role in organisation A';
-  end if;
+  -- Two people who cannot sign in: an invalid password hash, an unconfirmed
+  -- address, and the reserved .invalid TLD. Same pattern as the capacity
+  -- fixtures below.
+  insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+    created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
+  values ('00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated',
+    'authenticated', 'isolation-a@harness.invalid', 'NO-LOGIN', now(), now(),
+    '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb)
+  returning id into v_member_a;
+  insert into auth.users (instance_id, id, aud, role, email, encrypted_password,
+    created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
+  values ('00000000-0000-0000-0000-000000000000', gen_random_uuid(), 'authenticated',
+    'authenticated', 'isolation-b@harness.invalid', 'NO-LOGIN', now(), now(),
+    '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb)
+  returning id into v_member_b;
+
+  insert into public.organizations (name, created_by)
+  values ('Isolation Tenant A', v_member_a) returning id into v_org_a;
+  insert into public.organizations (name, created_by)
+  values ('Isolation Tenant B', v_member_b) returning id into v_org_b;
+
+  insert into public.organization_members (organization_id, profile_id, role)
+  values (v_org_a, v_member_a, 'member'), (v_org_b, v_member_b, 'member');
 
   insert into public.wellbeing_departments (organization_id, name, position)
   values (v_org_a, 'Tenant A Confidential Unit', 900),

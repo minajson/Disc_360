@@ -33,7 +33,7 @@ export default async function WellbeingAssessmentPage({
   const { data: session } = await supabase
     .from("wellbeing_sessions")
     .select(
-      "id, profile_id, status, version_id, instrument_key, organization_id, current_index, department_name, work_location, office_location_name, job_title, self_reported_first_time, email_opt_in, contact_email",
+      "id, profile_id, status, version_id, instrument_key, organization_id, current_index, department_name, sub_unit_name, work_location, office_location_name, job_title, self_reported_first_time, email_opt_in, contact_email",
     )
     .eq("id", sessionId)
     .maybeSingle();
@@ -73,8 +73,13 @@ export default async function WellbeingAssessmentPage({
   }
 
   const workLocation = (session.work_location as WorkLocation | null) ?? null;
+  // A session started before the Sub-unit / Team field existed is NOT
+  // complete — it returns to the context step to answer the new question
+  // rather than silently contributing a blank cohort to every comparison it
+  // appears in.
   const contextComplete = Boolean(
     session.department_name &&
+      session.sub_unit_name &&
       workLocation &&
       (workLocation === "field_based" || session.office_location_name),
   );
@@ -89,6 +94,7 @@ export default async function WellbeingAssessmentPage({
         accountEmail={context.profile.email}
         initial={{
           departmentName: (session.department_name as string | null) ?? null,
+          subUnitName: (session.sub_unit_name as string | null) ?? null,
           workLocation,
           officeLocationName: (session.office_location_name as string | null) ?? null,
           jobTitle: (session.job_title as string | null) ?? null,

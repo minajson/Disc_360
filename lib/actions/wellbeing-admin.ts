@@ -32,6 +32,8 @@ import {
 export interface AdminActionResult {
   ok: boolean;
   message: string;
+  /** Where the caller should go on success, e.g. a newly created campaign. */
+  redirectTo?: string;
 }
 
 const grantSchema = z.object({
@@ -237,4 +239,133 @@ export async function setCampaignInstrumentAction(
   revalidatePath(`/wellbeing/admin/campaigns/${teamId as string}`);
   revalidatePath("/wellbeing/analytics");
   return { ok: true, message: `${REGISTRY[requested].name} selected for this campaign.` };
+}
+
+/* ── create a Wellbeing Pulse campaign ──────────────────────────────── */
+
+/**
+ * Creates a campaign for ONE instrument, chosen before the campaign exists.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * WHY THE INSTRUMENT COMES FIRST.
+ *
+ * A campaign's QR code and join link are printed, projected and forwarded.
+ * They have to mean one thing permanently, so the instrument is part of
+ * creating the campaign rather than something configured afterwards — and
+ * 00029 locks it the moment anyone answers.
+ *
+ * The participant is never asked which questionnaire to take. They scan a
+ * code and answer the instrument their facilitator chose.
+ *
+ * WHY IT SETS assessment_type.
+ *
+ * A campaign is stored as a team, and `assessment_type` is what every DISC
+ * surface reads to decide what to render. Creating one without it produced a
+ * wellbeing campaign that displayed the DISC team dashboard — including
+ * Compare Members, a named-person comparison a wellbeing campaign must never
+ * offer. 00032 keeps the two fields in agreement, and this passes it
+ * explicitly so the intent is visible at the call site too.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export async function createWellbeingCampaignAction(
+  formData: FormData,
+): Promise<AdminActionResult> {
+  const { z } = await import("zod");
+  const { requireOnboarded } = await import("@/lib/auth/guards");
+  const { isInstrumentKey, INSTRUMENTS } = await import("@/data/wellbeing-instruments");
+  const { canServeToParticipants } = await import("@/data/wellbeing-instruments");
+  const { isProductionEnvironment, isWellbeingDemoEnabled } = await import(
+    "@/lib/wellbeing/environment"
+  );
+
+  const name = String(formData.get("name") ?? "").trim();
+  const instrumentKey = String(formData.get("instrument_key") ?? "");
+  const organizationId = String(formData.get("organization_id") ?? "");
+  const capacityRaw = String(formData.get("capacity") ?? "").trim();
+
+  if (name.length < 2 || name.length > 120) {
+    return { ok: false, message: "Give the campaign a name." };
+  }
+  if (!z.uuid().safeParse(organizationId).success) {
+    return { ok: false, message: "Invalid organisation." };
+  }
+  if (!isInstrumentKey(instrumentKey)) {
+    return { ok: false, message: "Choose a questionnaire for this campaign." };
+  }
+
+  // The licensing gate decides what may be SERVED, and it is checked here as
+  // well as at the participant's first request. A campaign whose instrument
+  // cannot be served would hand out a QR code that refuses everyone who scans
+  // it — better to refuse the facilitator now, with a reason.
+  const decision = canServeToParticipants(instrumentKey, {
+    isProduction: isProductionEnvironment(),
+    demoEnabled: isWellbeingDemoEnabled(),
+  });
+  if (!decision.allowed) {
+    // `reason` is null only when the decision is "allowed"; a refusal always
+    // carries one. The fallback keeps the type honest rather than asserting.
+    return { ok: false, message: decision.reason ?? "This questionnaire is not available yet." };
+  }
+
+  const capacity = capacityRaw === "" ? null : Number(capacityRaw);
+  if (capacity !== null && (!Number.isInteger(capacity) || capacity < 1)) {
+    return { ok: false, message: "Participant capacity must be a whole number, or left blank." };
+  }
+
+  const { requireWellbeingGovernance } = await import("@/lib/wellbeing/access");
+  let access;
+  try {
+    access = await requireWellbeingGovernance(organizationId);
+  } catch {
+    return { ok: false, message: "You do not hold Wellbeing Pulse governance here." };
+  }
+  const { profile } = await requireOnboarded();
+
+  const stem = name.replace(/[^a-zA-Z]/g, "").slice(0, 5).toUpperCase() || "WELL";
+  const { createSupabaseAdminClient } = await import("@/lib/db/admin");
+  const admin = createSupabaseAdminClient();
+
+  const { data: team, error } = await admin
+    .from("teams")
+    .insert({
+      organization_id: organizationId,
+      name,
+      description: "",
+      // Both, explicitly. 00032 would derive the type from the instrument
+      // anyway; saying it here keeps the boundary readable at the call site.
+      assessment_type: "wellbeing",
+      wellbeing_instrument_key: instrumentKey,
+      wellbeing_pilot_capacity: capacity,
+      team_code: `${stem}-${Math.floor(1000 + Math.random() * 9000)}`,
+      created_by: access.user.id,
+      join_enabled: true,
+    })
+    .select("id")
+    .single();
+
+  if (error || !team) {
+    return { ok: false, message: "Could not create the campaign." };
+  }
+
+  await admin.from("team_members").insert({
+    team_id: team.id,
+    profile_id: access.user.id,
+    display_name: profile.full_name,
+    email: profile.email,
+    role: "team_admin",
+  });
+
+  await admin.from("audit_logs").insert({
+    actor_id: access.user.id,
+    action: "wellbeing.campaign_created",
+    entity_type: "team",
+    entity_id: team.id,
+    metadata: { instrument: INSTRUMENTS[instrumentKey].name, capacity },
+  });
+
+  return {
+    ok: true,
+    message: `${name} created for ${INSTRUMENTS[instrumentKey].name}.`,
+    redirectTo: `/wellbeing/admin/campaigns/${team.id}`,
+  };
 }

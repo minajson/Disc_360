@@ -2,237 +2,364 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
-import { requireTeamAdmin } from "@/lib/auth/guards";
-import { createSupabaseAdminClient } from "@/lib/db/admin";
-import { getPublicBaseUrl } from "@/lib/utils/site-url";
 import {
-  INSTRUMENT_KEYS,
-  INSTRUMENTS,
-  canServeToParticipants,
-  isInstrumentKey,
-  unavailableReason,
-} from "@/data/wellbeing-instruments";
-import { isProductionEnvironment, isWellbeingDemoEnabled } from "@/lib/wellbeing/environment";
+  loadCampaignIdentity,
+  loadCampaignParticipation,
+  describeCurrentPeriod,
+  PARTICIPANT_STATE_LABEL,
+  type ParticipantState,
+} from "@/lib/wellbeing/campaign-workspace";
 import {
-  InstrumentPicker,
-  type InstrumentOption,
-} from "@/components/wellbeing/InstrumentPicker";
-import { PilotPanel } from "@/components/wellbeing/PilotPanel";
-import { readPilotStatus } from "@/lib/wellbeing/pilot";
+  getWellbeingCoverage,
+  getWellbeingDimensionProfile,
+  getWellbeingSignalPatterns,
+  getWellbeingWorkspace,
+  localFixtureOffered,
+  parseAnalyticsSource,
+} from "@/lib/wellbeing/analytics";
+import { CampaignHeader, CampaignNav } from "@/components/wellbeing/campaign/CampaignChrome";
+import { ReadinessPanel } from "@/components/wellbeing/campaign/ReadinessPanel";
+import { checkCampaignReadiness } from "@/lib/wellbeing/readiness";
+import { Section } from "@/components/wellbeing/campaign/Section";
+import { ParticipationProgress } from "@/components/wellbeing/campaign/ParticipationProgress";
+import { CohortCoverage } from "@/components/wellbeing/campaign/CohortCoverage";
+import { DistributionChart } from "@/components/wellbeing/analytics/DistributionChart";
+import { DimensionRadar } from "@/components/wellbeing/analytics/DimensionRadar";
+import { SignalCards } from "@/components/wellbeing/analytics/SignalCards";
+import { SourceSwitch } from "@/components/wellbeing/analytics/SourceSwitch";
+import { SuppressionNotice } from "@/components/wellbeing/analytics/SuppressionNotice";
+import { AGGREGATE_ONLY_NOTICE } from "@/data/wellbeing-content";
 
-export const metadata: Metadata = { title: "Campaign" };
-
-const STATUS_LABEL: Record<string, string> = {
-  active: "Available",
-  demo_restricted: "Awaiting digital-use licence",
-  structure_only: "Content verification required",
-  licensed: "Licensed, not yet activated",
-  retired: "Retired",
-};
+export const metadata: Metadata = { title: "Campaign overview" };
 
 /**
- * The facilitator's Wellbeing Pulse campaign workspace.
+ * The campaign overview.
  *
  * ─────────────────────────────────────────────────────────────────────
- * WHAT A FACILITATOR SEES, AND WHAT THEY DO NOT.
+ * THE QUESTION THIS PAGE ANSWERS.
  *
- * Live Progress shows participation STATE only — not started, in progress,
- * completed. It never shows a score, and it cannot: the query below reads
- * `wellbeing_sessions` for status and never touches `wellbeing_results`, so
- * there is no score in this page's memory to leak through a payload, a log or
- * a future refactor.
+ * "What is happening in this workforce, how confident are we in the data, and
+ * where should management look next?" — in that order, and as one argument
+ * rather than a grid of tiles.
  *
- * Names appear because a facilitator has to chase completion. A name beside a
- * score would be the single worst failure in this product, so the two are kept
- * in different queries against different tables.
+ * So participation comes first, because it decides whether anything below it
+ * is worth reading; the overall pattern second; coverage and confidentiality
+ * before the cohort detail rather than as a footnote after it; and the signals
+ * last, phrased as places to look rather than findings to act on.
+ *
+ * WHAT A FACILITATOR SEES WITHOUT A WELLBEING ROLE.
+ *
+ * Sections 1 and the roster. Nothing else on this page is computed for them —
+ * `identity.canReport` gates the analytics calls themselves, so the figures
+ * are not fetched and then hidden. Running a campaign and reading its
+ * reporting are separate privileges, and this is what that looks like.
  * ─────────────────────────────────────────────────────────────────────
  */
-export default async function WellbeingCampaignPage({
+export default async function CampaignOverviewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ teamId: string }>;
+  searchParams: Promise<{ source?: string }>;
 }) {
   const { teamId } = await params;
   if (!z.uuid().safeParse(teamId).success) notFound();
 
-  const context = await requireTeamAdmin(teamId);
+  const [{ identity }, { source: sourceParam }] = await Promise.all([
+    loadCampaignIdentity(teamId),
+    searchParams,
+  ]);
+  const source = parseAnalyticsSource(sourceParam);
+  const [participation, readiness] = await Promise.all([
+    loadCampaignParticipation(teamId, identity.instrumentKey),
+    checkCampaignReadiness(teamId, identity.instrumentKey),
+  ]);
+  const period = describeCurrentPeriod(
+    participation.waves.map((wave) => wave.label),
+    new Date(),
+  );
 
-  const { data: team } = await context.supabase
-    .from("teams")
-    .select("id, name, session_name, wellbeing_instrument_key, invite_token, organization_id")
-    .eq("id", teamId)
-    .maybeSingle();
-  if (!team) notFound();
-
-  const currentKey =
-    typeof team.wellbeing_instrument_key === "string" &&
-    isInstrumentKey(team.wellbeing_instrument_key)
-      ? team.wellbeing_instrument_key
+  const scope = { campaignId: teamId };
+  const reporting =
+    identity.canReport && identity.instrumentKey
+      ? await Promise.all([
+          getWellbeingWorkspace(identity.organizationId, identity.instrumentKey, source, scope),
+          getWellbeingCoverage(identity.organizationId, identity.instrumentKey, source, scope),
+          getWellbeingDimensionProfile(identity.organizationId, identity.instrumentKey, source, scope),
+          getWellbeingSignalPatterns(
+            identity.organizationId,
+            identity.instrumentKey,
+            "department",
+            source,
+            scope,
+          ),
+        ])
       : null;
 
-  // Service role after the team-admin check: roster and session STATE are
-  // needed to run a campaign, and neither is readable cross-member under RLS.
-  // Note what is not selected anywhere below — no score, no index, no answer.
-  const admin = createSupabaseAdminClient();
-  const [{ data: members }, { data: sessions }] = await Promise.all([
-    admin
-      .from("team_members")
-      .select("id, display_name, email, profile_id")
-      .eq("team_id", teamId)
-      .order("display_name"),
-    admin
-      .from("wellbeing_sessions")
-      .select("profile_id, status, instrument_key, completed_at")
-      .eq("team_id", teamId),
-  ]);
-
-  const roster = members ?? [];
-  const attempts = (sessions ?? []).filter(
-    (session) => !currentKey || session.instrument_key === currentKey,
-  );
-  const byProfile = new Map(attempts.map((session) => [session.profile_id as string, session]));
-
-  const completed = attempts.filter((session) => session.status === "completed").length;
-  const invited = roster.length;
-  const participation = invited > 0 ? Math.round((completed / invited) * 100) : null;
-  const locked = attempts.length > 0;
-
-  const isProduction = isProductionEnvironment();
-  const demoEnabled = isWellbeingDemoEnabled();
-
-  const options: InstrumentOption[] = INSTRUMENT_KEYS.map((key) => {
-    const decision = canServeToParticipants(key, { isProduction, demoEnabled });
-    return {
-      key,
-      status: INSTRUMENTS[key].status,
-      selectable: decision.allowed,
-      statusLabel: STATUS_LABEL[INSTRUMENTS[key].status] ?? unavailableReason(key),
-      contentLoaded: key === "disc360_wellbeing_v1",
-    };
-  });
-
-  const joinUrl = `${getPublicBaseUrl().url}/wellbeing/join/${team.invite_token}`;
-
-  // Four integers describing the pilot. Never an identity — see readPilotStatus.
-  const pilot = await readPilotStatus(teamId);
+  const [workspace, coverage, profile, patterns] = reporting ?? [null, null, null, null];
+  const instrument = identity.instrument;
+  const overview = workspace?.overview ?? null;
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-5 py-10 sm:px-8 sm:py-14">
-      <p className="font-mono text-[11px] tracking-[0.18em] text-pulse-teal uppercase">
-        Wellbeing Pulse campaign
-      </p>
-      <h1 className="mt-3 font-display text-h2 font-semibold tracking-tight">
-        {team.session_name || team.name}
-      </h1>
-      <p className="mt-2 text-sm text-slate">
-        {currentKey ? INSTRUMENTS[currentKey].name : "No instrument selected yet"}
-        {currentKey && locked ? " · locked" : ""}
-      </p>
+    <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-12">
+      {/*
+        The header reports on whatever population is on screen. A synthetic
+        reading gets the synthetic population's participation — a header
+        saying "53 of 54 completed" above two hundred synthetic responses puts
+        two populations on one page, which is the one confusion this workspace
+        cannot afford.
+      */}
+      <CampaignHeader
+        identity={identity}
+        period={period}
+        participation={workspace ? workspace.participation : participation.participation}
+        completed={workspace ? workspace.participants : participation.completed}
+        invited={workspace ? workspace.invited : participation.invited}
+      />
 
-      <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-6">
-        {[
-          // Completed and In progress live in the pilot panel below, which
-          // counts distinct PEOPLE. Showing both here printed the same two
-          // numbers twice under different headings.
-          { label: "Invited", value: String(invited) },
-          { label: "Participation", value: participation === null ? "—" : `${participation}%` },
-        ].map((stat) => (
-          <div key={stat.label} className="flex flex-col gap-1">
-            <dt className="text-[11px] tracking-[0.12em] text-faint uppercase">{stat.label}</dt>
-            <dd className="font-display text-[clamp(1.6rem,4vw,2.1rem)] leading-none font-semibold text-ink tabular-nums">
-              {stat.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
+      <div className="mt-7">
+        <CampaignNav active="overview" campaignId={teamId} canReport={identity.canReport} />
+      </div>
 
-      <section className="pulse-card mt-9 p-6 sm:p-9">
-        <InstrumentPicker
-          teamId={teamId}
-          options={options}
-          current={currentKey}
-          locked={locked}
-          attemptCount={attempts.length}
-        />
-      </section>
-
-      {currentKey && (
-        <PilotPanel
-          campaignName={team.session_name || team.name}
-          joinUrl={joinUrl}
-          fullscreenHref={`/wellbeing/admin/campaigns/${teamId}/qr`}
-          capacity={pilot.capacity}
-          joined={pilot.joined}
-          completed={pilot.completed}
-          inProgress={pilot.inProgress}
-          remaining={pilot.remaining}
-          isFull={pilot.isFull}
-        />
+      {identity.canReport && identity.instrumentKey && (
+        <div className="mt-6">
+          <SourceSwitch
+            source={source}
+            organizationId={identity.organizationId}
+            instrumentKey={identity.instrumentKey}
+            tab="overview"
+            basePath={`/wellbeing/admin/campaigns/${teamId}`}
+            fixtureOffered={localFixtureOffered()}
+          />
+        </div>
       )}
 
-      <section className="pulse-card mt-6 flex flex-col gap-4 p-6 sm:p-9">
-        <div>
-          <h2 className="font-display text-h3 font-semibold">Live progress</h2>
-          <p className="mt-1.5 text-sm leading-relaxed text-slate">
-            Completion state only. Individual wellbeing scores and answers are not available on
-            this page, or anywhere else in the facilitator workspace.
-          </p>
-        </div>
+      <div className="mt-8 flex flex-col gap-6">
+        {/* Before anything else: a campaign nobody can complete. */}
+        <ReadinessPanel readiness={readiness} />
 
-        {roster.length === 0 ? (
-          <p className="text-sm text-slate">No participants on this campaign yet.</p>
-        ) : (
-          <ul className="divide-y divide-[rgba(31,78,95,0.12)]">
-            {roster.map((member) => {
-              const session = member.profile_id
-                ? byProfile.get(member.profile_id as string)
-                : undefined;
-              const state = !session
-                ? "Not started"
-                : session.status === "completed"
-                  ? "Completed"
-                  : "In progress";
-              return (
-                <li key={member.id} className="flex flex-wrap items-center gap-3 py-3">
-                  <span className="text-sm font-medium text-ink">{member.display_name}</span>
-                  <span
-                    className="ml-auto rounded-full px-2.5 py-1 text-xs font-medium"
-                    style={{
-                      background:
-                        state === "Completed"
-                          ? "var(--color-pulse-soft)"
-                          : "var(--color-sand)",
-                      color:
-                        state === "Completed"
-                          ? "var(--color-pulse-deep)"
-                          : "var(--color-slate)",
-                    }}
-                  >
-                    {state}
+        {/* ── 01 · participation ───────────────────────────────────── */}
+        <Section
+          index={1}
+          title="Participation"
+          lead={
+            source === "live"
+              ? "Who has taken part so far. Everything below this line is only as good as this number — a pattern drawn from a third of a workforce describes that third."
+              : "Who has taken part in the LIVE campaign. The figures elsewhere on this page describe the synthetic population selected above, so these two counts are deliberately not the same thing."
+          }
+          aside={
+            participation.participation === null
+              ? "no roster"
+              : `${participation.participation}% complete`
+          }
+        >
+          <ParticipationProgress participation={participation} capacity={identity.capacity} />
+        </Section>
+
+        {/* ── 02 · overall pattern ─────────────────────────────────── */}
+        {reporting && instrument && (
+          <Section
+            index={2}
+            title="Overall pattern"
+            lead={
+              instrument.scoreDirection === "higher_is_more_distress"
+                ? `How this workforce is spread across the ${instrument.primaryScoreMin}–${instrument.primaryScoreMax} ${instrument.primaryScoreLabel.toLowerCase()}. A higher score reports more of what the instrument screens for; it is not a severity rating and not a diagnosis.`
+                : `How this workforce is spread across the ${instrument.primaryScoreMin}–${instrument.primaryScoreMax} ${instrument.primaryScoreLabel.toLowerCase()}. A higher score reports more of the experience described.`
+            }
+            aside={overview ? `median ${overview.median} · mean ${overview.mean}` : undefined}
+          >
+            {overview ? (
+              <>
+                <DistributionChart
+                  distribution={overview.distribution}
+                  threshold={workspace!.context.threshold}
+                  completed={overview.completed}
+                  maxScore={overview.maxScore}
+                  bucketSize={overview.bucketSize}
+                />
+                {workspace!.context.threshold !== null && (
+                  <p className="font-mono text-xs text-slate tabular-nums">
+                    At or above the configured threshold of {workspace!.context.threshold}:{" "}
+                    {overview.atOrAboveThresholdShare}% ({overview.atOrAboveThreshold} of{" "}
+                    {overview.completed} responses)
+                  </p>
+                )}
+              </>
+            ) : (
+              <SuppressionNotice
+                minCohort={workspace!.context.minCohort}
+                detail="Too few people have completed this campaign for any group figure to be published yet. Nothing is being hidden from this page — no figure has been computed."
+              />
+            )}
+          </Section>
+        )}
+
+        {/* ── 03 · dimension profile, where the instrument has one ─── */}
+        {reporting && profile!.view.dimensions && profile!.view.dimensions.length > 0 && (
+          <Section
+            index={3}
+            title={instrument!.subscales.length > 0 ? "Subscale profile" : "Dimension profile"}
+            lead={
+              instrument!.key === "disc360_wellbeing_v1"
+                ? "The six dimensions this instrument measures, as medians across everyone who completed. They share one scale and no rank order — the shape is the reading, not the total."
+                : instrument!.subscaleDescription
+            }
+          >
+            {instrument!.key === "disc360_wellbeing_v1" ? (
+              <DimensionRadar dimensions={profile!.view.dimensions} max={100} />
+            ) : (
+              <ul className="flex flex-col divide-y divide-hairline">
+                {profile!.view.dimensions.map((dimension) => (
+                  <li key={dimension.key} className="flex flex-col gap-2 py-3.5">
+                    <div className="flex flex-wrap items-baseline gap-x-4">
+                      <span className="text-sm font-medium text-ink">{dimension.label}</span>
+                      <span className="ml-auto font-mono text-xs text-slate tabular-nums">
+                        median{" "}
+                        <strong className="font-display text-base text-ink">
+                          {dimension.median}
+                        </strong>
+                      </span>
+                    </div>
+                    <div className="relative h-2 overflow-hidden rounded-full bg-sand">
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-full bg-pulse"
+                        style={{
+                          width: `${Math.min(100, (dimension.median / (instrument!.subscales[0]?.itemCount ?? 100)) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {instrument!.subscales.length > 0 && (
+              <p className="text-xs leading-relaxed text-faint">
+                Each subscale is a profile dimension only. None carries a threshold of its own,
+                and none is reported as a finding about any group or person.
+              </p>
+            )}
+          </Section>
+        )}
+
+        {/* ── 04 · movement ────────────────────────────────────────── */}
+        {reporting && (
+          <Section
+            index={4}
+            title="Movement"
+            lead="How this campaign compares with its own previous wave. Composition changes between waves — different people answer — so a shift describes the responses received, not the same group of individuals moving."
+            aside={
+              workspace!.trend.points.length > 0
+                ? `${workspace!.trend.points.length} wave${workspace!.trend.points.length === 1 ? "" : "s"}`
+                : undefined
+            }
+          >
+            {workspace!.trend.medianChange ? (
+              <div className="flex flex-col gap-3">
+                <p className="text-lead text-ink">
+                  Median {instrument!.primaryScoreLabel.toLowerCase()} is{" "}
+                  <strong className="font-medium">
+                    {workspace!.trend.medianChange.movement === "unchanged"
+                      ? "unchanged"
+                      : `${Math.abs(workspace!.trend.medianChange.delta)} ${
+                          Math.abs(workspace!.trend.medianChange.delta) === 1 ? "point" : "points"
+                        } ${workspace!.trend.medianChange.movement}`}
+                  </strong>{" "}
+                  than the previous comparable wave.
+                </p>
+                <Link
+                  href={`/wellbeing/admin/campaigns/${teamId}/trends?source=${source}`}
+                  className="pulse-focus w-fit text-sm font-medium text-pulse underline underline-offset-4"
+                >
+                  Open the full trend →
+                </Link>
+              </div>
+            ) : (
+              <p className="text-sm leading-relaxed text-slate">
+                {workspace!.trend.points.length <= 1
+                  ? "Only one comparable wave has been recorded, so there is nothing to compare it against yet. A second wave makes this section meaningful."
+                  : "No comparison is being drawn between these waves. Where the configured threshold changed between them, a rate comparison would describe the change in policy rather than a change in the workforce."}
+              </p>
+            )}
+            {workspace!.trendSuppressedWaves > 0 && (
+              <p className="font-mono text-xs text-faint">
+                {workspace!.trendSuppressedWaves} wave
+                {workspace!.trendSuppressedWaves === 1 ? " is" : "s are"} not plotted — too few
+                responses to publish.
+              </p>
+            )}
+          </Section>
+        )}
+
+        {/* ── 05 · coverage and confidentiality ────────────────────── */}
+        {reporting && (
+          <Section
+            index={5}
+            title="Coverage and confidentiality"
+            lead="How much of this workforce can be reported on, before any comparison is read. Groups below the minimum are withheld and are never named, sized or reconstructable."
+            aside={`minimum group ${coverage!.coverage.minCohort}`}
+          >
+            <CohortCoverage coverage={coverage!.coverage} />
+            <p className="rounded-2xl border border-hairline bg-pulse-mist/50 px-5 py-4 text-sm leading-relaxed text-slate">
+              {AGGREGATE_ONLY_NOTICE}
+            </p>
+          </Section>
+        )}
+
+        {/* ── 06 · where to look next ──────────────────────────────── */}
+        {reporting && patterns!.signals.length > 0 && (
+          <Section
+            index={6}
+            title="Where to look next"
+            lead="Patterns the evidence layer found in the aggregate figures above. Each names the figures it is built from. None is a finding about a person, a cause, or a risk."
+          >
+            <SignalCards signals={patterns!.signals} />
+          </Section>
+        )}
+
+        {/* ── roster ───────────────────────────────────────────────── */}
+        <Section
+          index={identity.canReport ? 7 : 2}
+          title="Participants"
+          lead="Administrative status only. Individual wellbeing scores and answers are not available on this page, in this workspace, or to any role in this product. Completing the questionnaire does not make anybody's result visible."
+          aside={`${participation.invited} on the roster`}
+        >
+          {participation.participants.length === 0 ? (
+            <p className="text-sm text-slate">
+              No participants yet. Share the campaign&rsquo;s QR code or join link from Settings.
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-hairline">
+              {participation.participants.map((participant) => (
+                <li key={participant.id} className="flex flex-wrap items-center gap-3 py-3">
+                  <span className="text-sm font-medium text-ink">{participant.name}</span>
+                  <span className="ml-auto">
+                    <StateChip state={participant.state} />
                   </span>
                 </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
-      <nav className="mt-8 flex flex-wrap gap-3">
-        {currentKey && (
-          <Link
-            href={`/wellbeing/analytics?instrument=${currentKey}`}
-            className="pulse-focus rounded-full bg-pulse px-5 py-2.5 text-sm font-medium text-white"
-          >
-            Open analytics
-          </Link>
-        )}
-        <Link
-          href="/wellbeing/admin/instruments"
-          className="pulse-focus rounded-full border border-[rgba(31,78,95,0.24)] px-5 py-2.5 text-sm font-medium text-pulse"
-        >
-          Compare instruments
-        </Link>
-      </nav>
+              ))}
+            </ul>
+          )}
+        </Section>
+      </div>
     </div>
+  );
+}
+
+const STATE_TONE: Record<ParticipantState, { background: string; color: string }> = {
+  completed: { background: "var(--color-pulse-soft)", color: "var(--color-pulse-deep)" },
+  started: { background: "var(--color-pulse-mist)", color: "var(--color-pulse-teal)" },
+  opened: { background: "var(--color-sand)", color: "var(--color-slate)" },
+  pending: { background: "transparent", color: "var(--color-faint)" },
+};
+
+function StateChip({ state }: { state: ParticipantState }) {
+  const tone = STATE_TONE[state];
+  return (
+    <span
+      className="rounded-full px-2.5 py-1 text-xs font-medium"
+      style={{ background: tone.background, color: tone.color }}
+    >
+      {PARTICIPANT_STATE_LABEL[state]}
+    </span>
   );
 }

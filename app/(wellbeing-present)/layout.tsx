@@ -9,16 +9,20 @@ export const metadata: Metadata = {
 /**
  * The Wellbeing Pulse PRESENTATION shell — deliberately no chrome.
  *
- * A projected QR is looked at from across a room, so navigation, an escape
- * hatch back to DISC360 and a privacy footer are all noise competing with the
- * one thing that has to be scannable. The participant shell's header and
- * footer belong on surfaces someone reads; this is a surface someone points a
- * camera at.
+ * Two kinds of surface live here: a projected QR someone points a camera at,
+ * and a deck a room reads from across it. Navigation, an escape hatch back to
+ * DISC360 and a privacy footer are noise on both — and worse than noise on a
+ * screen thirty people are watching, where every control is something clicked
+ * by accident. Each surface inside carries its own single way out.
+ *
+ * The ground is left to the page. A QR needs white for contrast under a
+ * projector; a deck needs the Wellbeing Pulse ground so it does not read as an
+ * unstyled document. A shared background would compromise one for the other.
  *
  * Authorization is unchanged and unaffected: each page inside this group still
  * calls its own guard on the server. Removing chrome removes decoration, never
  * a check.
  */
 export default function WellbeingPresentLayout({ children }: { children: React.ReactNode }) {
-  return <div className="min-h-dvh bg-white">{children}</div>;
+  return <div className="min-h-dvh">{children}</div>;
 }

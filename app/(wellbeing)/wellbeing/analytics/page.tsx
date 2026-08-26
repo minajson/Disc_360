@@ -25,12 +25,12 @@ import {
   DISC_LOWEST_DIMENSION_LABEL,
   DISC_NO_BANDS_ANALYTICS_NOTE,
 } from "@/data/disc360-wellbeing-content";
-import { WELLBEING_ITEM_STRUCTURE } from "@/data/wellbeing-items";
 import {
   AGGREGATE_ONLY_NOTICE,
   NO_COMBINATION_NOTICE,
   THRESHOLD_POLICY_NOTE,
 } from "@/data/wellbeing-content";
+import { itemIdsFor } from "@/lib/wellbeing/instrument-analytics";
 import { DistributionChart } from "@/components/wellbeing/analytics/DistributionChart";
 import { AggregateTrend } from "@/components/wellbeing/analytics/AggregateTrend";
 import { CohortStrip } from "@/components/wellbeing/analytics/CohortStrip";
@@ -48,24 +48,6 @@ import { ReportsPanel } from "@/components/wellbeing/analytics/ReportsPanel";
 import { TwoCohortCompare } from "@/components/wellbeing/analytics/TwoCohortCompare";
 
 export const metadata: Metadata = { title: "Wellbeing analytics" };
-
-/**
- * Item identifiers for the selected instrument.
- *
- * Previously fixed to GHQ-12's twelve-item structure whatever was selected,
- * which throws the moment a twenty-eight-item instrument is read: the engine
- * requires every stored row to be the full length of its own questionnaire.
- * Deriving the length from the instrument keeps the grid honest for all four.
- */
-function itemIdsFor(instrumentKey: InstrumentKey): string[] {
-  if (instrumentKey === "ghq12") {
-    return WELLBEING_ITEM_STRUCTURE.map((item) => item.externalId);
-  }
-  return Array.from(
-    { length: INSTRUMENTS[instrumentKey].itemCount },
-    (_, index) => `${instrumentKey}_item_${String(index + 1).padStart(2, "0")}`,
-  );
-}
 
 /** Which comparison dimension each tab drives. */
 const TAB_DIMENSION: Partial<Record<string, CompareDimension>> = {
@@ -375,7 +357,13 @@ export default async function WellbeingAnalyticsPage({
               </p>
             </div>
             {trend.points.length > 0 ? (
-              <AggregateTrend trend={trend} />
+              <AggregateTrend
+                trend={trend}
+                scoreLabel={instrument.primaryScoreLabel}
+                scoreMax={instrument.primaryScoreMax}
+                hasThreshold={instrument.hasThreshold}
+                showParticipation
+              />
             ) : (
               <SuppressionNotice minCohort={context.minCohort} />
             )}

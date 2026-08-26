@@ -17,6 +17,9 @@ export interface JoinContext {
   invitedEmail: string | null;
   /** Which assessment this team's session runs (participant-safe). */
   assessmentType: string | null;
+  /** The configured instrument, for a wellbeing campaign only. */
+  wellbeingInstrumentKey: string | null;
+  facilitatorName: string | null;
   sessionMode: string | null;
   blocked: string | null;
 }
@@ -63,6 +66,19 @@ export async function getJoinContext(token: string): Promise<JoinContext | null>
     );
   }
 
+  // A wellbeing campaign's questionnaire, so the invitation can say what is
+  // actually being asked and roughly how long it takes. Returns nothing for a
+  // DISC team, so this costs the DISC join one no-op call and changes nothing
+  // about it.
+  let wellbeingInstrumentKey: string | null = null;
+  let facilitatorName: string | null = null;
+  if (row.assessment_type === "wellbeing") {
+    const { data: campaign } = await anon.rpc("wellbeing_join_context", { p_token: token });
+    const context = Array.isArray(campaign) ? campaign[0] : campaign;
+    wellbeingInstrumentKey = (context?.instrument_key as string | null) ?? null;
+    facilitatorName = (context?.facilitator_name as string | null) ?? null;
+  }
+
   return {
     teamId: row.team_id!,
     teamName: row.team_name!,
@@ -75,6 +91,8 @@ export async function getJoinContext(token: string): Promise<JoinContext | null>
     presenterTitle: row.presenter_title,
     invitedEmail: row.invited_email,
     assessmentType: row.assessment_type,
+    wellbeingInstrumentKey,
+    facilitatorName: facilitatorName ?? row.presenter_name ?? null,
     sessionMode: row.session_mode,
     blocked: null,
   };
@@ -84,6 +102,8 @@ function blockedContext(message: string): JoinContext {
   return {
     teamId: "",
     teamName: "",
+    wellbeingInstrumentKey: null,
+    facilitatorName: null,
     organizationName: null,
     sessionName: null,
     clientOrganization: null,

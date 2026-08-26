@@ -26,6 +26,8 @@ export interface WellbeingSnapshot {
   organization_id: string | null;
   team_series_id: string | null;
   department_at_completion: string | null;
+  /** Sub-unit / Team as reported. A later rename never rewrites it. */
+  sub_unit_at_completion: string | null;
   work_location_at_completion: WorkLocation | null;
   office_location_at_completion: string | null;
   job_title_at_completion: string | null;
@@ -39,6 +41,7 @@ export interface WellbeingSnapshotInput {
   teamId: string | null;
   /** The context the participant supplied on this attempt. */
   departmentName: string | null;
+  subUnitName: string | null;
   workLocation: WorkLocation | null;
   officeLocationName: string | null;
   jobTitle: string | null;
@@ -68,6 +71,7 @@ export async function buildWellbeingSnapshot(
     organization_id: null,
     team_series_id: null,
     department_at_completion: input.departmentName,
+    sub_unit_at_completion: input.subUnitName,
     work_location_at_completion: input.workLocation,
     // Field-based work carries no office location, ever — the database
     // enforces it too, but a snapshot that had to be corrected by a constraint

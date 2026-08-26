@@ -87,7 +87,30 @@ export interface InstrumentMetadata {
   scoringVersion: string;
   scoringEngine: string;
 
+  /**
+   * How the score is named in prose. May be generic.
+   *
+   * "Wellbeing Index", "GHQ-12 screening score" — the phrase that reads
+   * naturally inside a sentence.
+   */
   primaryScoreLabel: string;
+  /**
+   * How the score is named BESIDE A FIGURE. Always instrument-qualified.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   * WHY THIS EXISTS SEPARATELY FROM primaryScoreLabel.
+   *
+   * WHO-5 and DISC360 Wellbeing both report on 0–100 and both count upward.
+   * A screen that prints "Wellbeing Score 72" is therefore ambiguous between
+   * two instruments that measure different things by different formulas — and
+   * the ambiguity is invisible, because 72 looks like 72.
+   *
+   * `metricName` is the name that must appear wherever a figure appears:
+   * "WHO-5 Well-Being Score · 72 / 100" and "DISC360 Wellbeing Index · 72 /
+   * 100" cannot be mistaken for each other.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  metricName: string;
   primaryScoreMin: number;
   primaryScoreMax: number;
   scoreDirection: ScoreDirection;
@@ -129,6 +152,7 @@ export const GHQ12: InstrumentMetadata = {
   scoringVersion: "1.0.0",
   scoringEngine: "lib/scoring/wellbeing.ts",
   primaryScoreLabel: "GHQ-12 screening score",
+  metricName: "GHQ-12 Screening Score",
   primaryScoreMin: 0,
   primaryScoreMax: 12,
   scoreDirection: "higher_is_more_distress",
@@ -192,6 +216,7 @@ export const GHQ28: InstrumentMetadata = {
   scoringVersion: "1.0.0",
   scoringEngine: "lib/scoring/ghq28.ts",
   primaryScoreLabel: "GHQ-28 screening score",
+  metricName: "GHQ-28 Screening Score",
   primaryScoreMin: 0,
   primaryScoreMax: 28,
   scoreDirection: "higher_is_more_distress",
@@ -230,6 +255,7 @@ export const WHO5: InstrumentMetadata = {
   scoringVersion: "1.0.0",
   scoringEngine: "lib/scoring/who5.ts",
   primaryScoreLabel: "WHO-5 score",
+  metricName: "WHO-5 Well-Being Score",
   primaryScoreMin: 0,
   primaryScoreMax: 100,
   scoreDirection: "higher_is_stronger_wellbeing",
@@ -272,6 +298,7 @@ export const DISC360_WELLBEING_V1: InstrumentMetadata = {
   scoringVersion: "1.0.0",
   scoringEngine: "lib/scoring/disc360-wellbeing.ts",
   primaryScoreLabel: "Wellbeing Index",
+  metricName: "DISC360 Wellbeing Index",
   primaryScoreMin: 0,
   primaryScoreMax: 100,
   scoreDirection: "higher_is_stronger_wellbeing",
@@ -312,6 +339,37 @@ export function instrumentMeta(key: InstrumentKey): InstrumentMetadata {
 
 export function higherIsBetter(key: InstrumentKey): boolean {
   return INSTRUMENTS[key].scoreDirection === "higher_is_stronger_wellbeing";
+}
+
+/**
+ * The identity of a numeric SCALE, for asserting that two series belong on it.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * A RANGE IS NOT A SCALE.
+ *
+ * WHO-5 and DISC360 Wellbeing are both 0–100 and both count upward. Sharing a
+ * range is exactly what makes them dangerous to each other: any chart written
+ * to accept "a 0–100 series" will happily plot one on the other's axis, and
+ * nothing about the numbers will look wrong.
+ *
+ * So a scale is identified by its INSTRUMENT, not by its bounds. Two series
+ * may share an axis only when this string matches.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export function scoreScaleId(key: InstrumentKey): string {
+  const instrument = INSTRUMENTS[key];
+  return `${key}:${instrument.primaryScoreMin}-${instrument.primaryScoreMax}`;
+}
+
+/** Whether two instruments' figures may share one numeric axis. Never across. */
+export function sharesScale(a: InstrumentKey, b: InstrumentKey): boolean {
+  return scoreScaleId(a) === scoreScaleId(b);
+}
+
+/** "DISC360 Wellbeing Index · 72 / 100" — the unambiguous form beside a figure. */
+export function scoreDisplay(key: InstrumentKey, value: number | string): string {
+  const instrument = INSTRUMENTS[key];
+  return `${instrument.metricName} · ${value} / ${instrument.primaryScoreMax}`;
 }
 
 /* ── the licensing gate ─────────────────────────────────────────────── */

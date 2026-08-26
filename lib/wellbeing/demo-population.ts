@@ -1,7 +1,15 @@
 import type { InstrumentKey } from "../../data/wellbeing-instruments.ts";
 import { INSTRUMENTS } from "../../data/wellbeing-instruments.ts";
-import { DISC360_WELLBEING_DIMENSIONS } from "../../data/disc360-wellbeing-items.ts";
 import type { WorkLocation } from "../../data/wellbeing-taxonomy.ts";
+import {
+  instrumentCentre,
+  itemPositions,
+  rawTotalForIndex,
+  scoreFor,
+  syntheticDimensions,
+  syntheticParticipantCounts,
+  type SyntheticAnalyticsRow,
+} from "./synthetic.ts";
 
 /**
  * The ANALYTICS DEMO population — synthetic, illustrative, and never stored.
@@ -46,21 +54,16 @@ export const ILLUSTRATIVE_DATA_BANNER = "ILLUSTRATIVE DEMO DATA";
 export const DEMO_SOURCE_NOTE =
   "Every figure on this page is synthetic and generated for demonstration. It describes no real person, no real team and no real organisation, and nothing here is stored.";
 
-/** The shape the analytics layer consumes. Mirrors WELLBEING_ANALYTICS_COLUMNS. */
-export interface DemoAnalyticsRow {
-  instrument_key: string;
-  total_score: number;
-  index_score: number | null;
-  threshold_at_completion: number | null;
-  at_or_above_threshold: boolean | null;
-  completed_at: string;
-  team_id: string | null;
-  department_at_completion: string | null;
-  work_location_at_completion: WorkLocation | null;
-  office_location_at_completion: string | null;
-  item_positions: number[];
-  wellbeing_result_dimensions: { dimension_key: string; index_score: number }[] | null;
-}
+/**
+ * The shape the analytics layer consumes, plus the synthetic person key that
+ * distinct-participant counting needs.
+ *
+ * The key is NOT an identifier: there is no person, no profile and no session
+ * behind it. It exists so counting people can never quietly become counting
+ * rows — which is exactly what happens when the person is inferred from row
+ * order and a population later gains uneven per-wave participation.
+ */
+export type DemoAnalyticsRow = SyntheticAnalyticsRow & { person: string };
 
 /**
  * The illustrative organisation.
@@ -84,13 +87,40 @@ const DEPARTMENTS: readonly { name: string; people: number; centre: number }[] =
 
 const OFFICES = ["Head Office", "Regional Office", "Other"] as const;
 
-/** Four quarterly waves, oldest first, on fixed dates. */
-const WAVES: readonly { at: string; drift: number }[] = [
-  { at: "2025-09-15T10:00:00.000Z", drift: 0 },
-  { at: "2025-12-15T10:00:00.000Z", drift: 1 },
-  { at: "2026-03-16T10:00:00.000Z", drift: 2 },
-  { at: "2026-06-15T10:00:00.000Z", drift: 3 },
+/**
+ * Four waves, oldest first, on fixed dates and with explicit identities.
+ *
+ * Identities rather than dates to be rounded: a wave is a thing this
+ * population HAS, exactly as a live campaign does, so the illustration
+ * exercises the same wave path rather than a parallel one.
+ */
+const WAVES: readonly { id: string; number: number; label: string; at: string; drift: number }[] = [
+  { id: "demo-wave-1", number: 1, label: "Baseline", at: "2025-09-15T10:00:00.000Z", drift: 0 },
+  { id: "demo-wave-2", number: 2, label: "", at: "2025-12-15T10:00:00.000Z", drift: 1 },
+  { id: "demo-wave-3", number: 3, label: "", at: "2026-03-16T10:00:00.000Z", drift: 2 },
+  { id: "demo-wave-4", number: 4, label: "", at: "2026-06-15T10:00:00.000Z", drift: 3 },
 ];
+
+/** The illustrative campaign's waves, in the shape the analytics layer reads. */
+export function demoWaves(): {
+  id: string;
+  campaignId: string;
+  campaignName: string;
+  number: number;
+  label: string;
+  openedAt: string;
+  closedAt: string | null;
+}[] {
+  return WAVES.map((wave) => ({
+    id: wave.id,
+    campaignId: TEAMS[0]!.id,
+    campaignName: "Illustrative campaign",
+    number: wave.number,
+    label: wave.label,
+    openedAt: wave.at,
+    closedAt: wave.at,
+  }));
+}
 
 const TEAMS = [
   { id: "demo-team-north", name: "Northern Operations" },
@@ -105,29 +135,6 @@ export const DEMO_TEAM_NAMES = new Map<string, string>(
 
 /** The illustrative headcount, used as the participation denominator. */
 export const DEMO_INVITED = DEPARTMENTS.reduce((total, entry) => total + entry.people, 0) + 12;
-
-/**
- * A small deterministic spread around a centre.
- *
- * Not random: a fixed cycle, so the distribution has a believable shape and
- * the same person in the same wave always lands on the same score.
- */
-const SPREAD = [-11, -6, -3, -1, 0, 2, 4, 7, 9, 13, -8, 5, -4, 11];
-
-/**
- * Spread scaled to the instrument's own range.
- *
- * The offsets are written for a 0–100 scale. Applying them unscaled to a
- * twelve-point instrument overshoots both ends and clamps, which piled ninety
- * of the responses onto the maximum and made the GHQ-12 demonstration look
- * like a workforce in crisis — a demo that misrepresents the instrument is
- * worse than no demo.
- */
-function scoreFor(centre: number, person: number, wave: number, max: number): number {
-  const scale = max / 100;
-  const raw = centre + SPREAD[(person + wave * 3) % SPREAD.length]! * scale + wave * scale;
-  return Math.max(0, Math.min(max, Math.round(raw)));
-}
 
 /**
  * Builds the illustrative population for ONE instrument.
@@ -153,98 +160,34 @@ export function buildDemoPopulation(instrumentKey: InstrumentKey): DemoAnalytics
       // both cohorts above the floor and the comparison is demonstrable.
       const fieldBased = personIndex % 3 === 0;
       const workLocation: WorkLocation = fieldBased ? "field_based" : "office_based";
+      // Field-based work has no office location — the participant form does
+      // not ask for one, so the illustration must not invent one either.
       const office = fieldBased ? null : OFFICES[personIndex % OFFICES.length]!;
       const team = TEAMS[personIndex % TEAMS.length]!;
 
       for (let wave = 0; wave < WAVES.length; wave += 1) {
-        // A higher GHQ score means MORE reported distress, so a department that
-        // reports high wellbeing must land LOW on that scale. Mapping the
-        // wellbeing centre straight across would have described a workforce
-        // reporting 69% wellbeing as scoring 8 of 12 for distress.
-        const distress = instrument.scoreDirection === "higher_is_more_distress";
-        // A screening scale is not the inverse of a wellbeing scale, and it is
-        // not proportional to its own maximum either: GHQ-12 cuts off at 4 of
-        // 12 while GHQ-28 cuts off at 5 of 28. Anchoring the illustrative
-        // centre to the MAXIMUM reported 93% of a demo workforce above the
-        // GHQ-12 cut-off and 71% above GHQ-28's — teaching a management
-        // audience to read either instrument as an alarm.
-        //
-        // So the centre is anchored to the instrument's own THRESHOLD and sits
-        // below it, with department variation around that point. Screening
-        // distributions sit low in a general population; the demonstration
-        // should look like one.
-        const cutOff = instrument.defaultThreshold ?? 4;
-        const centre = distress
-          ? cutOff * (0.4 + (100 - department.centre) / 100)
-          : department.centre;
-        // Drift still runs the same way in EXPERIENCE terms: improving
-        // wellbeing means a falling distress count.
-        const drifted = distress
-          ? centre - WAVES[wave]!.drift * (max / 100)
-          : centre + WAVES[wave]!.drift;
-        const score = scoreFor(drifted, person, wave, max);
+        // Direction, cut-off anchoring and drift are all the shared engine's
+        // business — see lib/wellbeing/synthetic.ts. Reproducing any of it
+        // here is how the demo and the local fixture start disagreeing about
+        // what a figure means.
+        const centre = instrumentCentre(instrument, department.centre, WAVES[wave]!.drift);
+        const score = scoreFor(centre, person, wave, max);
 
         rows.push({
+          person: `demo-p${personIndex}`,
           instrument_key: instrumentKey,
-          total_score: onHundred ? Math.round((score / 100) * (instrumentKey === "who5" ? 25 : 48)) : score,
+          total_score: onHundred ? rawTotalForIndex(instrumentKey, score) : score,
           index_score: onHundred ? score : null,
           threshold_at_completion: threshold,
           at_or_above_threshold: threshold === null ? null : score >= threshold,
           completed_at: WAVES[wave]!.at,
+          wave_id: WAVES[wave]!.id,
           team_id: team.id,
           department_at_completion: department.name,
           work_location_at_completion: workLocation,
           office_location_at_completion: office,
-          // One response position per item, sized to THIS instrument. An
-          // empty array is not "no data" to the item engine — it is a row of
-          // the wrong length, and it raises rather than silently reporting a
-          // zero. Values stay within 0–3, which is inside every instrument's
-          // response range (GHQ has four positions, WHO-5 six).
-          item_positions: Array.from(
-            { length: instrument.itemCount },
-            (_, item) => Math.abs(SPREAD[(person + wave + item) % SPREAD.length]!) % 4,
-          ),
-          // Dimensions ONLY where the instrument legitimately has them:
-          // DISC360 Wellbeing's six, and GHQ-28's four published subscales.
-          // GHQ-12 and WHO-5 get none, because inventing one would assert a
-          // factor structure neither instrument has.
-          wellbeing_result_dimensions:
-            instrumentKey === "disc360_wellbeing_v1"
-              ? DISC360_WELLBEING_DIMENSIONS.map((dimension, index) => ({
-                  dimension_key: dimension.key,
-                  // Recovery & Demand sits persistently lower, so the Signals
-                  // view has a genuine multi-wave pattern to surface.
-                  index_score: Math.max(
-                    0,
-                    Math.min(100, score + SPREAD[(index + person) % SPREAD.length]! -
-                      (dimension.key === "recovery_demand" ? 8 : 0)),
-                  ),
-                }))
-              : instrumentKey === "ghq28"
-                ? instrument.subscales.map((subscale, index) => ({
-                    // The registry stores subscale keys namespaced by
-                    // instrument (`ghq28_somatic`), so an unprefixed key would
-                    // join to nothing and the profile would silently come back
-                    // empty rather than failing loudly.
-                    dimension_key: `ghq28_${subscale.key}`,
-                    // Each subscale is scored 0–7 on its own seven items, and
-                    // carries NO threshold of its own — a subscale is a
-                    // profile dimension here and never a finding.
-                    index_score: Math.max(
-                      0,
-                      Math.min(
-                        subscale.itemCount,
-                        // Offset per subscale so the profile has shape. A demo
-                      // where all four read the same number shows management
-                      // nothing about what a subscale profile is for.
-                      Math.round(score / 4) +
-                          (Math.abs(SPREAD[(index + person) % SPREAD.length]!) % 3) -
-                          1 +
-                          [1, 2, 0, -1][index % 4]!,
-                      ),
-                    ),
-                  }))
-                : null,
+          item_positions: itemPositions(instrument, person, wave),
+          wellbeing_result_dimensions: syntheticDimensions(instrument, score, person),
         });
       }
     }
@@ -256,47 +199,14 @@ export function buildDemoPopulation(instrumentKey: InstrumentKey): DemoAnalytics
 /**
  * Distinct-participant counts for the demo population.
  *
- * Mirrors what `wellbeing_participant_counts` does in the database: counts
- * PEOPLE, not rows. Four people across four waves are sixteen rows and still
- * four people, and the demo must demonstrate that rather than quietly counting
- * rows and publishing a cohort that should have been withheld.
+ * Delegates to the shared counter, which counts PEOPLE from each row's own
+ * synthetic person key. Four people across four waves are sixteen rows and
+ * still four people, and the demo must demonstrate that rather than quietly
+ * counting rows and publishing a cohort that should have been withheld.
  */
 export function demoParticipantCounts(rows: DemoAnalyticsRow[]): {
   overall: number;
   byScope: Map<string, Map<string, number>>;
 } {
-  const perScope = new Map<string, Map<string, Set<string>>>();
-  const overall = new Set<string>();
-
-  // Generation emits one person's waves consecutively, so a person is exactly
-  // WAVES.length consecutive rows and the first of them carries their cohort
-  // membership. There is no participant id here because there is no
-  // participant — which is the point.
-  const people = rows.length / WAVES.length;
-  for (let person = 0; person < people; person += 1) {
-    const row = rows[person * WAVES.length]!;
-    const id = `p${person}`;
-    overall.add(id);
-    const add = (scope: string, cohort: string | null) => {
-      if (cohort === null) return;
-      const byCohort = perScope.get(scope) ?? new Map<string, Set<string>>();
-      const set = byCohort.get(cohort) ?? new Set<string>();
-      set.add(id);
-      byCohort.set(cohort, set);
-      perScope.set(scope, byCohort);
-    };
-    add("department", row.department_at_completion);
-    add("work_location", row.work_location_at_completion);
-    add("office_location", row.office_location_at_completion);
-    add("team", row.team_id);
-  }
-
-  const byScope = new Map<string, Map<string, number>>();
-  for (const [scope, cohorts] of perScope) {
-    const counts = new Map<string, number>();
-    for (const [cohort, set] of cohorts) counts.set(cohort, set.size);
-    byScope.set(scope, counts);
-  }
-
-  return { overall: overall.size, byScope };
+  return syntheticParticipantCounts(rows);
 }

@@ -14,6 +14,7 @@ interface TeamRow {
     department: string | null;
     team_code: string;
     archived_at: string | null;
+    assessment_type: string | null;
   } | null;
 }
 
@@ -28,22 +29,32 @@ export default async function TeamsIndexPage({
   // A platform administrator administers every team (is_team_admin resolves
   // platform-wide), but holds no membership rows — so the membership query
   // would show them an empty list of teams they can in fact open.
+  // Wellbeing Pulse campaigns are stored as teams but are a different product,
+  // managed under /wellbeing. Listing them here sends a facilitator into the
+  // DISC experience for a campaign that has none — which is exactly how one
+  // came to be presented as a DISC Behaviour Assessment team.
   const teams = profile.is_super_admin
     ? ((
         await supabase
           .from("teams")
-          .select("id, name, description, department, team_code, archived_at")
+          .select("id, name, description, department, team_code, archived_at, assessment_type")
           .is("archived_at", null)
+          .neq("assessment_type", "wellbeing")
           .order("name")
       ).data ?? []
       ).map((team) => ({ ...team, memberRole: "team_admin" }))
     : ((
         await supabase
           .from("team_members")
-          .select("role, teams (id, name, description, department, team_code, archived_at)")
+          .select(
+            "role, teams (id, name, description, department, team_code, archived_at, assessment_type)",
+          )
           .eq("profile_id", user.id)
       ).data as unknown as TeamRow[] | null ?? [])
-        .filter((row) => row.teams && !row.teams.archived_at)
+        .filter(
+          (row) =>
+            row.teams && !row.teams.archived_at && row.teams.assessment_type !== "wellbeing",
+        )
         .map((row) => ({ ...row.teams!, memberRole: row.role }));
 
   return (

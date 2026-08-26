@@ -105,7 +105,16 @@ export interface WellbeingAggregateReportInput {
   signals: AggregateSignal[];
   minCohort: number;
   /** True when built from the illustrative population rather than live data. */
-  isDemo: boolean;
+  /**
+   * The banner for a document built from synthetic figures, or null for live.
+   *
+   * A string rather than a boolean because there is more than one synthetic
+   * population — the shipped illustration and the local development fixture —
+   * and a boolean silently labels one of them as the other. It carried
+   * `isDemo` and a fixture-sourced report came out wearing no label at all,
+   * which is the failure this banner exists to prevent.
+   */
+  syntheticBanner: string | null;
   /** Whole-organisation suppression: nothing may be published at all. */
   fullySuppressed: boolean;
 }
@@ -124,9 +133,9 @@ export function buildWellbeingAggregateReport(
   /* ── page 1 · campaign snapshot ───────────────────────────────────── */
 
   const snapshot: string[] = [];
-  if (input.isDemo) {
+  if (input.syntheticBanner) {
     snapshot.push(
-      `${ILLUSTRATIVE_REPORT_BANNER}. Every figure in this document is synthetic and generated for demonstration. It describes no real person, no real team and no real organisation.`,
+      `${input.syntheticBanner}. Every figure in this document is synthetic and generated for demonstration. It describes no real person, no real team and no real organisation.`,
     );
   }
 
@@ -347,9 +356,9 @@ export function buildWellbeingAggregateReport(
       "Cohort sizes count distinct people, never responses. Someone completing four waves is one person in every figure here.",
       "Individual answers and individual scores are readable by the participant alone — not by facilitators, not by organisation administrators and not by platform administrators. None appears in this document.",
       "Wellbeing figures are never added to, averaged with or compared against DISC or Focus Pulse results.",
-      ...(input.isDemo
+      ...(input.syntheticBanner
         ? [
-            `${ILLUSTRATIVE_REPORT_BANNER} — this document was generated from a synthetic population for demonstration and reports on no real workforce.`,
+            `${input.syntheticBanner} — this document was generated from a synthetic population for demonstration and reports on no real workforce.`,
           ]
         : []),
     ],
@@ -370,7 +379,7 @@ function finish(
     // as "Prepared for …" and in the running footer.
     participantName: title,
     productLabel: `${input.instrumentName} · aggregate report`,
-    eyebrow: input.isDemo ? ILLUSTRATIVE_REPORT_BANNER : "Management report",
+    eyebrow: input.syntheticBanner ?? "Management report",
     headline: input.fullySuppressed
       ? "Not yet reportable"
       : `Median ${input.scoreLabel} ${input.median}`,
@@ -388,7 +397,7 @@ function finish(
         ? [{ label: "Participation", value: `${input.participation}%` }]
         : []),
       { label: "Minimum group", value: String(input.minCohort) },
-      ...(input.isDemo ? [{ label: "Data", value: ILLUSTRATIVE_REPORT_BANNER }] : []),
+      ...(input.syntheticBanner ? [{ label: "Data", value: input.syntheticBanner }] : []),
     ],
     sections,
     disclaimer: AGGREGATE_DISCLAIMER,

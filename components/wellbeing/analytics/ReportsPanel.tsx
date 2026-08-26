@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { ILLUSTRATIVE_DATA_BANNER } from "@/lib/wellbeing/demo-population";
+import { LOCAL_FIXTURE_BANNER } from "@/lib/wellbeing/local-fixture";
+import type { AnalyticsSource } from "@/lib/wellbeing/analytics";
 
 /**
  * The Reports tab.
@@ -25,7 +27,7 @@ export function ReportsPanel({
   organizationId: string;
   instrumentKey: string;
   instrumentName: string;
-  source: "live" | "demo";
+  source: AnalyticsSource;
   suppressed: boolean;
   minCohort: number;
 }) {
@@ -39,7 +41,9 @@ export function ReportsPanel({
           A single aggregate document for {instrumentName}, suitable for circulating internally.
           {source === "demo"
             ? ` It is generated from the illustrative population and is labelled ${ILLUSTRATIVE_DATA_BANNER} on the cover, in its metadata and in its method section.`
-            : ""}
+            : source === "fixture"
+              ? ` It is generated from the local development population and is labelled ${LOCAL_FIXTURE_BANNER} on the cover, in its metadata and in its method section.`
+              : ""}
         </p>
       </div>
 

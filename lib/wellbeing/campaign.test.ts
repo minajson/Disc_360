@@ -159,7 +159,8 @@ test("NO page under /wellbeing/admin is reachable on requireOnboarded alone", ()
     "app/(wellbeing)/wellbeing/admin/demo/page.tsx",
     "app/(wellbeing)/wellbeing/admin/demo/[instrument]/page.tsx",
     "app/(wellbeing)/wellbeing/admin/instruments/page.tsx",
-    "app/(wellbeing)/wellbeing/admin/campaigns/[teamId]/page.tsx",
+    "app/(wellbeing)/wellbeing/admin/pilot/page.tsx",
+    "app/(wellbeing)/wellbeing/admin/campaigns/new/page.tsx",
   ]) {
     const source = read(path);
     assert.match(
@@ -170,6 +171,38 @@ test("NO page under /wellbeing/admin is reachable on requireOnboarded alone", ()
     assert.ok(
       !/await requireOnboarded\(\)/.test(source),
       `${path} must not settle for merely being signed in`,
+    );
+  }
+
+  // Every campaign tab authorises through ONE loader rather than each
+  // repeating the guard — repetition is how a seventh tab ships without one.
+  const loader = read("lib/wellbeing/campaign-workspace.ts");
+  assert.match(loader, /export async function loadCampaignIdentity/);
+  assert.match(loader, /await requireTeamAdmin\(teamId\)/, "administration is team administration");
+  const identity = loader.slice(
+    loader.indexOf("export async function loadCampaignIdentity"),
+    loader.indexOf("/* ── participation administration"),
+  );
+  assert.ok(
+    identity.indexOf("requireTeamAdmin") < identity.indexOf("createSupabaseAdminClient"),
+    "the guard must run before the service role is created",
+  );
+  assert.match(
+    identity,
+    /assessment_type !== "wellbeing"/,
+    "and a DISC team must not render the wellbeing workspace either",
+  );
+
+  for (const tab of ["", "/analytics", "/compare", "/trends", "/reports", "/settings"]) {
+    const source = read(`app/(wellbeing)/wellbeing/admin/campaigns/[teamId]${tab}/page.tsx`);
+    assert.match(
+      source,
+      /loadCampaignIdentity\(|loadCampaignReporting\(/,
+      `campaign tab "${tab || "overview"}" must resolve through the guarded loader`,
+    );
+    assert.ok(
+      !/await requireOnboarded\(\)/.test(source),
+      `campaign tab "${tab || "overview"}" must not settle for merely being signed in`,
     );
   }
 });
@@ -201,27 +234,52 @@ test("the participant shell never links to a management demo route", () => {
 
 /* ── the facilitator never sees a score ─────────────────────────────── */
 
-test("the campaign dashboard reads session STATE and never a result", () => {
-  const page = code("app/(wellbeing)/wellbeing/admin/campaigns/[teamId]/page.tsx");
+test("the campaign roster reads session STATE and never a result", () => {
+  const loader = code("lib/wellbeing/campaign-workspace.ts");
   for (const forbidden of [
     "wellbeing_results",
     "wellbeing_result_dimensions",
     "wellbeing_responses",
     "total_score",
     "index_score",
+    "at_or_above_threshold",
   ]) {
     assert.ok(
-      !page.includes(forbidden),
-      `the facilitator dashboard must not read ${forbidden} — names and scores stay apart`,
+      !loader.includes(forbidden),
+      `the campaign workspace must not read ${forbidden} — names and scores stay apart`,
     );
   }
-  assert.match(page, /from\("wellbeing_sessions"\)/);
-  assert.match(page, /"profile_id, status, instrument_key, completed_at"/);
+  assert.match(loader, /from\("wellbeing_sessions"\)/);
+  assert.match(loader, /"profile_id, status, current_index, instrument_key, completed_at"/);
 });
 
-test("live progress reports only not-started, in-progress and completed", () => {
-  const page = read("app/(wellbeing)/wellbeing/admin/campaigns/[teamId]/page.tsx");
-  assert.match(page, /"Not started"/);
-  assert.match(page, /"In progress"/);
-  assert.match(page, /"Completed"/);
+test("participation is a funnel of five states and none of them is a score", () => {
+  const loader = read("lib/wellbeing/campaign-workspace.ts");
+  const states = loader.slice(
+    loader.indexOf("export const PARTICIPANT_STATE_LABEL"),
+    loader.indexOf("export interface CampaignParticipant"),
+  );
+  assert.match(states, /"Not started"/);
+  assert.match(states, /"Opened"/);
+  assert.match(states, /"In progress"/);
+  assert.match(states, /"Completed"/);
+
+  // The vocabulary is closed. A sixth state is the edit that would turn
+  // administrative status into result visibility.
+  assert.match(
+    loader,
+    /export type ParticipantState = "pending" \| "opened" \| "started" \| "completed";/,
+  );
+});
+
+test("completion status grants no route to a result", () => {
+  const page = code("app/(wellbeing)/wellbeing/admin/campaigns/[teamId]/page.tsx");
+  assert.ok(
+    !/\/wellbeing\/result\//.test(page),
+    "no roster row may link to anybody's individual result",
+  );
+  assert.ok(
+    !/api\/wellbeing\/report/.test(page),
+    "and no roster row may link to anybody's individual report",
+  );
 });

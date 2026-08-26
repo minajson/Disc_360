@@ -41,12 +41,35 @@ export const SCREENING_DISCLAIMER_LONG =
 
 /** Consent, in the participant's own terms. */
 export const CONSENT_HEADING = "Taking part is your choice";
+
+/**
+ * The three paragraphs that are true of every instrument.
+ *
+ * The first paragraph — how many questions, how long — is NOT here, because it
+ * is not the same for all four. It was hard-coded as "twelve short questions
+ * … about three minutes", which is right for GHQ-12 and DISC360 Wellbeing and
+ * wrong for WHO-5 (five items) and GHQ-28 (twenty-eight). Consent has to
+ * describe what is actually being asked, so that sentence is built from the
+ * campaign's own instrument by `consentIntro()`.
+ */
 export const CONSENT_BODY: readonly string[] = [
-  "Wellbeing Pulse asks twelve short questions about how you have been feeling over the last few weeks compared with usual. It takes about three minutes.",
   "Your individual answers and your score are private to you. Your manager, your team facilitator and platform administrators cannot see them — not your score, and not any single answer.",
   "Results are only ever reported to your organisation as group figures, and only when a group is large enough that no one in it can be identified.",
   "You can stop at any point, and you do not have to take part at all.",
 ];
+
+/**
+ * The opening sentence of consent, for one instrument.
+ *
+ * Deliberately takes the item count and duration rather than the instrument
+ * key: this module ships participant copy and must not grow a dependency on
+ * the instrument registry, which carries licensing state.
+ */
+export function consentIntro(itemCount: number, minutesToComplete: string): string {
+  return `This check-in asks ${itemCount} short question${
+    itemCount === 1 ? "" : "s"
+  } about how you have been feeling recently. It takes about ${minutesToComplete}.`;
+}
 export const CONSENT_AGREE = "I understand, and I choose to take part";
 export const CONSENT_DECLINE = "I would rather not take part";
 export const CONSENT_DECLINED_HEADING = "That is completely fine";

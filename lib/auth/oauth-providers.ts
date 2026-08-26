@@ -70,3 +70,31 @@ export function getOAuthProviderStatus(
     unconfiguredMessage: `${provider.displayName} sign-in requires provider configuration.`,
   }));
 }
+
+/**
+ * Only the providers that can actually complete a sign-in.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * WHY A SECOND RESOLVER RATHER THAN A CHANGE TO THE FIRST.
+ *
+ * On the sign-in and sign-up pages an unconfigured provider is worth showing:
+ * the person came there to authenticate, they may be looking for Microsoft
+ * specifically, and "Microsoft sign-in requires provider configuration" is a
+ * more useful answer than a button that silently is not there.
+ *
+ * An invitation is different. Somebody has scanned a printed code and is
+ * deciding, in a corridor, whether to take part at all. A button that looks
+ * like a way in and turns out not to be is a reason to give up, and it is the
+ * product's fault rather than theirs. So the invitation offers only what
+ * works, and what does not work is simply absent.
+ *
+ * When Azure is configured this starts returning Microsoft with no code change
+ * — the difference is environment, not a list somebody has to remember to
+ * update.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export function getUsableOAuthProviders(
+  env: Record<string, string | undefined> = process.env,
+): OAuthProviderStatus[] {
+  return getOAuthProviderStatus(env).filter((provider) => provider.configured);
+}

@@ -18,14 +18,32 @@ import {
   type CohortOutcome,
 } from "@/lib/wellbeing/suppression";
 import { WORK_LOCATION_LABEL, type WorkLocation } from "@/data/wellbeing-taxonomy";
+import {
+  aggregationNotice,
+  bucketWaves,
+  waveTitle,
+  type PeriodBucket,
+  type ReportingPeriod,
+  type WellbeingWave,
+} from "@/lib/wellbeing/waves";
 import { INSTRUMENTS, type InstrumentKey, type InstrumentMetadata } from "@/data/wellbeing-instruments";
 import {
   buildDemoPopulation,
   demoParticipantCounts,
+  demoWaves,
   DEMO_INVITED,
   DEMO_TEAM_NAMES,
   type DemoAnalyticsRow,
 } from "@/lib/wellbeing/demo-population";
+import {
+  buildLocalFixture,
+  localFixtureAllowed,
+  localFixtureParticipantCounts,
+  localFixtureWaves,
+  LOCAL_FIXTURE_INVITED,
+  LOCAL_FIXTURE_TEAM_NAMES,
+} from "@/lib/wellbeing/local-fixture";
+import { isProductionEnvironment } from "@/lib/wellbeing/environment";
 import {
   buildWellbeingSignals,
   type CohortFigure,
@@ -66,7 +84,7 @@ import {
  * reporting, so it is a test failure rather than a review comment.
  */
 export const WELLBEING_ANALYTICS_COLUMNS =
-  "instrument_key, total_score, index_score, threshold_at_completion, at_or_above_threshold, completed_at, team_id, department_at_completion, work_location_at_completion, office_location_at_completion, item_positions, wellbeing_result_dimensions (dimension_key, index_score)";
+  "instrument_key, total_score, index_score, threshold_at_completion, at_or_above_threshold, completed_at, team_id, wave_id, department_at_completion, work_location_at_completion, office_location_at_completion, item_positions, wellbeing_result_dimensions (dimension_key, index_score)";
 
 /** Columns that must never appear in an analytics read. */
 export const FORBIDDEN_ANALYTICS_COLUMNS = [
@@ -87,6 +105,14 @@ interface AnalyticsRow {
   at_or_above_threshold: boolean | null;
   completed_at: string;
   team_id: string | null;
+  /**
+   * The campaign occurrence this result was counted in.
+   *
+   * Identifies a WAVE, never a person — see 00034. It is here because the
+   * alternative is deriving a wave from `completed_at`, which is exactly the
+   * calendar-quarter rule that silently merged two pulses in one quarter.
+   */
+  wave_id: string | null;
   department_at_completion: string | null;
   work_location_at_completion: WorkLocation | null;
   office_location_at_completion: string | null;
@@ -124,13 +150,19 @@ function aggregateOptionsFor(
   };
 }
 
-export type CompareDimension = "department" | "work_location" | "office_location" | "team";
+export type CompareDimension =
+  | "department"
+  | "work_location"
+  | "office_location"
+  | "team"
+  | "wave";
 
 export const COMPARE_DIMENSIONS: readonly { key: CompareDimension; label: string }[] = [
   { key: "department", label: "Department / Function" },
+  { key: "team", label: "Team" },
   { key: "work_location", label: "Work Location" },
   { key: "office_location", label: "Office Location" },
-  { key: "team", label: "Team" },
+  { key: "wave", label: "Wave / period" },
 ];
 
 export interface WellbeingAnalyticsContext {
@@ -167,6 +199,20 @@ export interface WellbeingWorkspace {
   participation: number | null;
   trend: WellbeingTrend;
   trendSuppressedWaves: number;
+  /**
+   * The reporting period the trend was built with, and what that cost.
+   *
+   * `aggregatedNote` is non-null exactly when a calendar rollup folded two or
+   * more waves into one point. It is surfaced rather than logged because a
+   * folded point is a legitimate figure that is misleading if the reader
+   * believes it is a single measurement.
+   */
+  period: ReportingPeriod;
+  aggregatedNote: string | null;
+  /** Waves in scope, oldest first — the axis before suppression. */
+  waves: { id: string; title: string; openedAt: string; campaignName: string }[];
+  /** Results belonging to no campaign wave at all (solo attempts). */
+  outsideAnyWave: number;
 }
 
 export interface CohortStats {
@@ -175,6 +221,18 @@ export interface CohortStats {
   mean: number;
   atOrAboveThresholdShare: number;
   participation: number | null;
+  /**
+   * The band covering the middle of the cohort.
+   *
+   * Published instead of a full per-cohort histogram, deliberately. A
+   * histogram of a seven-person group has buckets containing one person, and
+   * "someone in Finance scored 11" is a disclosure a median is not. A middle
+   * band says how spread out the group is — which is the thing a median cannot
+   * tell you and the reason cohorts get compared at all — without placing any
+   * individual anywhere on the scale.
+   */
+  p25: number;
+  p75: number;
 }
 
 export interface ComparisonView {
@@ -238,11 +296,16 @@ async function readOrganizationResults(
 async function readParticipantCounts(
   organizationId: string,
   instrumentKey: InstrumentKey,
+  campaignId: string | null = null,
 ): Promise<{ overall: number; byScope: Map<string, Map<string, number>> }> {
   const admin = createSupabaseAdminClient();
   const { data } = await admin.rpc("wellbeing_participant_counts", {
     p_organization: organizationId,
     p_instrument: instrumentKey,
+    // Null counts the whole organisation. 00034 applies both scopes inside the
+    // function, to every cohort, so no branch of it can be missed.
+    p_team: campaignId ?? undefined,
+    p_wave: undefined,
   });
 
   const byScope = new Map<string, Map<string, number>>();
@@ -265,17 +328,37 @@ const SCOPE_FOR_DIMENSION: Record<CompareDimension, string> = {
   work_location: "work_location",
   office_location: "office_location",
   team: "team",
+  // Waves are counted from the rows themselves — see getWellbeingComparison.
+  // The entry exists so the record stays exhaustive and a new dimension
+  // cannot be added without deciding how its people are counted.
+  wave: "wave",
 };
 
-/** The denominator for participation: people on this organisation's live teams. */
-async function readInvitedCount(organizationId: string): Promise<number> {
+/**
+ * The denominator for participation.
+ *
+ * Everyone on this organisation's live teams, or — for a campaign reading —
+ * everyone on that one campaign's roster. Getting this wrong in the campaign
+ * direction is the more damaging of the two: a campaign of thirty measured
+ * against an organisation of four hundred reports a participation rate of 7%
+ * for a campaign that is nearly complete.
+ */
+async function readInvitedCount(
+  organizationId: string,
+  campaignId: string | null = null,
+): Promise<number> {
   const admin = createSupabaseAdminClient();
   const { data: teams } = await admin
     .from("teams")
     .select("id")
     .eq("organization_id", organizationId)
     .is("archived_at", null);
-  const teamIds = (teams ?? []).map((team) => team.id as string);
+  const teamIds = (teams ?? [])
+    .map((team) => team.id as string)
+    // The campaign must belong to the organisation the caller was authorised
+    // for; intersecting rather than trusting the parameter is what makes that
+    // true even if a caller passes an id from somewhere else.
+    .filter((id) => campaignId === null || id === campaignId);
   if (teamIds.length === 0) return 0;
 
   const { count } = await admin
@@ -331,16 +414,47 @@ async function resolveContext(
 
 /* ── Overview + Trends ──────────────────────────────────────────────── */
 
-/** Groups completions into quarters, so waves compare like with like. */
-function waveKey(iso: string): { key: string; label: string; at: string } {
-  const date = new Date(iso);
-  const quarter = Math.floor(date.getUTCMonth() / 3) + 1;
-  const year = date.getUTCFullYear();
-  return {
-    key: `${year}-Q${quarter}`,
-    label: `Q${quarter} ${String(year).slice(2)}`,
-    at: new Date(Date.UTC(year, (quarter - 1) * 3, 1)).toISOString(),
-  };
+/**
+ * The waves in scope, read from the wave table.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * THIS REPLACED A CALENDAR RULE, AND THAT IS THE WHOLE POINT.
+ *
+ * Waves used to be computed by rounding `completed_at` to a quarter. That
+ * merged a baseline in August with a post-intervention pulse in September —
+ * two measurements the programme existed to compare — into one number, with
+ * nothing on screen to indicate it had happened.
+ *
+ * A wave is now a row with an identity, and a result carries its id from the
+ * moment it is written. Nothing here infers a period from a date.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+async function readWaves(
+  organizationId: string,
+  campaignId: string | null,
+): Promise<WellbeingWave[]> {
+  const admin = createSupabaseAdminClient();
+  let query = admin
+    .from("wellbeing_waves")
+    .select("id, team_id, wave_number, label, opened_at, closed_at, teams (name, session_name)")
+    .eq("organization_id", organizationId)
+    .order("opened_at", { ascending: true });
+  if (campaignId) query = query.eq("team_id", campaignId);
+
+  const { data } = await query;
+  return (data ?? []).map((row) => {
+    const team = Array.isArray(row.teams) ? row.teams[0] : row.teams;
+    const named = team as { name: string; session_name: string | null } | null;
+    return {
+      id: row.id as string,
+      campaignId: row.team_id as string,
+      campaignName: named?.session_name || named?.name || "Campaign",
+      number: row.wave_number as number,
+      label: (row.label as string) ?? "",
+      openedAt: row.opened_at as string,
+      closedAt: (row.closed_at as string | null) ?? null,
+    };
+  });
 }
 
 
@@ -360,10 +474,30 @@ function waveKey(iso: string): { key: string; label: string; at: string } {
  * concatenates them and no default that silently falls back from one to the
  * other. The demo path issues no query against a participant table at all.
  */
-export type AnalyticsSource = "live" | "demo";
+export type AnalyticsSource = "live" | "demo" | "fixture";
 
+/**
+ * Resolves the requested source, refusing anything it does not recognise.
+ *
+ * "live" is the default and the fallback. An unknown value, a missing value,
+ * and "fixture" asked for in production all resolve to live — the reader sees
+ * their own organisation's real figures or nothing, never synthetic figures
+ * they did not ask for.
+ */
 export function parseAnalyticsSource(value: string | undefined): AnalyticsSource {
-  return value === "demo" ? "demo" : "live";
+  if (value === "demo") return "demo";
+  // The fixture is customer-shaped. It exists for local development and
+  // review, and the environment decides — no flag, role or parameter widens
+  // it. In production this branch is unreachable and the value falls through.
+  if (value === "fixture" && localFixtureAllowed({ isProduction: isProductionEnvironment() })) {
+    return "fixture";
+  }
+  return "live";
+}
+
+/** True where the local development fixture may be offered at all. */
+export function localFixtureOffered(): boolean {
+  return localFixtureAllowed({ isProduction: isProductionEnvironment() });
 }
 
 interface LoadedRows {
@@ -371,12 +505,31 @@ interface LoadedRows {
   counts: { overall: number; byScope: Map<string, Map<string, number>> };
   invited: number;
   teamNames: Map<string, string>;
+  /** The waves in scope, oldest first. Read, never derived from a date. */
+  waves: WellbeingWave[];
+}
+
+/**
+ * How much of an organisation a reading covers.
+ *
+ * `null` is the whole organisation — the analytics workspace. A campaign id
+ * narrows every read, every participant count and the participation
+ * denominator to that one campaign, so the campaign dashboard reports on the
+ * campaign it names rather than on everything the organisation has ever run.
+ *
+ * The narrowing happens in the QUERY and in the counting function, never by
+ * filtering a wider result set afterwards. A filter is the kind of thing that
+ * gets refactored away; a WHERE clause is not.
+ */
+export interface AnalyticsScope {
+  campaignId: string;
 }
 
 async function loadAnalyticsRows(
   organizationId: string,
   instrumentKey: InstrumentKey,
   source: AnalyticsSource,
+  scope: AnalyticsScope | null = null,
 ): Promise<LoadedRows> {
   if (source === "demo") {
     // No database read of any kind. The illustrative population is generated,
@@ -388,13 +541,33 @@ async function loadAnalyticsRows(
       counts: demoParticipantCounts(rows as unknown as DemoAnalyticsRow[]),
       invited: DEMO_INVITED,
       teamNames: DEMO_TEAM_NAMES,
+      waves: demoWaves(),
     };
   }
 
-  const [rows, invited, counts] = await Promise.all([
-    readOrganizationResults(organizationId, instrumentKey),
-    readInvitedCount(organizationId),
-    readParticipantCounts(organizationId, instrumentKey),
+  if (source === "fixture") {
+    // Same contract as the demo, and the same absence of any database read.
+    // `buildLocalFixture` throws rather than falls back if it is ever reached
+    // in production, so a misconfiguration fails loudly instead of quietly
+    // publishing customer-shaped synthetic figures.
+    const fixture = buildLocalFixture(instrumentKey, {
+      isProduction: isProductionEnvironment(),
+    });
+    return {
+      rows: fixture as unknown as AnalyticsRow[],
+      counts: localFixtureParticipantCounts(fixture),
+      invited: LOCAL_FIXTURE_INVITED,
+      teamNames: LOCAL_FIXTURE_TEAM_NAMES,
+      waves: localFixtureWaves(),
+    };
+  }
+
+  const campaignId = scope?.campaignId ?? null;
+  const [rows, invited, counts, waves] = await Promise.all([
+    readOrganizationResults(organizationId, instrumentKey, campaignId ? [campaignId] : undefined),
+    readInvitedCount(organizationId, campaignId),
+    readParticipantCounts(organizationId, instrumentKey, campaignId),
+    readWaves(organizationId, campaignId),
   ]);
 
   const teamNames = new Map<string, string>();
@@ -405,35 +578,99 @@ async function loadAnalyticsRows(
     .eq("organization_id", organizationId);
   for (const team of teams ?? []) teamNames.set(team.id as string, team.name as string);
 
-  return { rows, counts, invited, teamNames };
+  return { rows, counts, invited, teamNames, waves };
+}
+
+/* ── grouping rows into the periods a reader asked for ──────────────── */
+
+interface PeriodSeries {
+  buckets: PeriodBucket[];
+  /** wave id → the bucket it belongs to. */
+  bucketFor: Map<string, PeriodBucket>;
+  /** Results that belong to no wave at all — solo attempts outside a campaign. */
+  outsideAnyWave: number;
+}
+
+/**
+ * Builds the period series for a reading.
+ *
+ * `wave` — the default — gives one bucket per wave, whatever the calendar
+ * says. Monthly, quarterly and annual fold waves together, and every folded
+ * bucket is MARKED as folded so the surface can say so.
+ *
+ * Only waves that actually carry a result in this reading appear. A wave
+ * belonging to another instrument's campaign is not an empty point on this
+ * instrument's axis.
+ */
+function periodSeries(
+  rows: readonly AnalyticsRow[],
+  waves: readonly WellbeingWave[],
+  period: ReportingPeriod,
+): PeriodSeries {
+  const present = new Set<string>();
+  let outsideAnyWave = 0;
+  for (const row of rows) {
+    if (row.wave_id) present.add(row.wave_id);
+    else outsideAnyWave += 1;
+  }
+
+  const buckets = bucketWaves(
+    waves.filter((wave) => present.has(wave.id)),
+    period,
+  );
+
+  const bucketFor = new Map<string, PeriodBucket>();
+  for (const bucket of buckets) {
+    for (const waveId of bucket.waveIds) bucketFor.set(waveId, bucket);
+  }
+
+  return { buckets, bucketFor, outsideAnyWave };
 }
 
 export async function getWellbeingWorkspace(
   organizationId: string,
   instrumentKey: InstrumentKey,
   source: AnalyticsSource = "live",
+  scope: AnalyticsScope | null = null,
+  /**
+   * How waves are grouped for the trend. Individual waves unless the reader
+   * explicitly asked for a calendar rollup — see lib/wellbeing/waves.ts.
+   */
+  period: ReportingPeriod = "wave",
 ): Promise<WellbeingWorkspace> {
   const context = await resolveContext(organizationId, instrumentKey);
-  const { rows, counts, invited } = await loadAnalyticsRows(organizationId, instrumentKey, source);
+  const { rows, counts, invited, waves } = await loadAnalyticsRows(
+    organizationId,
+    instrumentKey,
+    source,
+    scope,
+  );
 
   const scores = rows.map((row) => reportedScore(row, context.instrument));
   // People, not rows.
   const slice = checkSlice(counts.overall, context.minCohort);
 
-  // Waves below the floor are dropped entirely rather than plotted as a gap —
-  // a visible gap with a date on it is itself a disclosure about a small wave.
+  // Points come from the WAVE each result was completed in, grouped into the
+  // reporting period the reader asked for — individual waves unless they said
+  // otherwise. Nothing here rounds a date to a period.
+  const series = periodSeries(rows, waves, period);
   const byWave = new Map<
     string,
     { label: string; at: string; scores: number[]; thresholds: number[] }
   >();
+  for (const bucket of series.buckets) {
+    byWave.set(bucket.key, { label: bucket.label, at: bucket.at, scores: [], thresholds: [] });
+  }
   for (const row of rows) {
-    const wave = waveKey(row.completed_at);
-    const bucket = byWave.get(wave.key) ?? { label: wave.label, at: wave.at, scores: [], thresholds: [] };
-    bucket.scores.push(reportedScore(row, context.instrument));
-    if (row.threshold_at_completion !== null) bucket.thresholds.push(row.threshold_at_completion);
-    byWave.set(wave.key, bucket);
+    const bucket = row.wave_id ? series.bucketFor.get(row.wave_id) : undefined;
+    if (!bucket) continue;
+    const entry = byWave.get(bucket.key)!;
+    entry.scores.push(reportedScore(row, context.instrument));
+    if (row.threshold_at_completion !== null) entry.thresholds.push(row.threshold_at_completion);
   }
 
+  // Waves below the floor are dropped entirely rather than plotted as a gap —
+  // a visible gap with a date on it is itself a disclosure about a small wave.
   const points: WavePoint[] = [];
   let trendSuppressedWaves = 0;
   for (const [key, bucket] of byWave) {
@@ -471,6 +708,15 @@ export async function getWellbeingWorkspace(
       : null,
     trend: buildTrend(points),
     trendSuppressedWaves,
+    period,
+    aggregatedNote: aggregationNotice(series.buckets),
+    waves: waves.map((wave) => ({
+      id: wave.id,
+      title: waveTitle(wave),
+      openedAt: wave.openedAt,
+      campaignName: wave.campaignName,
+    })),
+    outsideAnyWave: series.outsideAnyWave,
   };
 }
 
@@ -487,6 +733,10 @@ function cohortKeyFor(row: AnalyticsRow, dimension: CompareDimension): string | 
       return row.office_location_at_completion;
     case "team":
       return row.team_id;
+    case "wave":
+      // The wave the result was completed in, not the period its date falls
+      // in. This is the whole difference 00034 introduced.
+      return row.wave_id;
   }
 }
 
@@ -494,10 +744,20 @@ async function labelFor(
   dimension: CompareDimension,
   key: string,
   teamNames: Map<string, string>,
+  waveTitles: Map<string, string>,
 ): Promise<string> {
   if (dimension === "work_location") return WORK_LOCATION_LABEL[key as WorkLocation] ?? key;
   if (dimension === "team") return teamNames.get(key) ?? "Team";
+  // A wave is named by its own row — "Wave 2 — Post-intervention" — never by
+  // the period its dates happen to fall in.
+  if (dimension === "wave") return waveTitles.get(key) ?? "Wave";
   return key;
+}
+
+/** The value at a fraction through a sorted cohort. */
+function quantile(sorted: number[], fraction: number): number {
+  if (sorted.length === 0) return 0;
+  return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))]!;
 }
 
 export async function getWellbeingComparison(
@@ -505,13 +765,16 @@ export async function getWellbeingComparison(
   instrumentKey: InstrumentKey,
   dimension: CompareDimension,
   source: AnalyticsSource = "live",
+  scope: AnalyticsScope | null = null,
 ): Promise<{ context: WellbeingAnalyticsContext; view: ComparisonView }> {
   const context = await resolveContext(organizationId, instrumentKey);
-  const { rows, counts, teamNames } = await loadAnalyticsRows(
+  const { rows, counts, teamNames, waves } = await loadAnalyticsRows(
     organizationId,
     instrumentKey,
     source,
+    scope,
   );
+  const waveTitles = new Map(waves.map((wave) => [wave.id, waveTitle(wave)]));
 
   const grouped = new Map<string, number[]>();
   for (const row of rows) {
@@ -520,7 +783,15 @@ export async function getWellbeingComparison(
     grouped.set(key, [...(grouped.get(key) ?? []), reportedScore(row, context.instrument)]);
   }
 
-  const scopeCounts = counts.byScope.get(SCOPE_FOR_DIMENSION[dimension]) ?? new Map();
+  // Within a single wave a person contributes at most one result — the
+  // active-attempt indexes enforce it — so for the wave dimension rows and
+  // people coincide and the database counter has nothing to add. Every other
+  // dimension counts distinct PEOPLE, because a person who answered four
+  // times is still one person and suppression is about people.
+  const scopeCounts =
+    dimension === "wave"
+      ? new Map([...grouped.entries()].map(([key, scores]) => [key, scores.length]))
+      : (counts.byScope.get(SCOPE_FOR_DIMENSION[dimension]) ?? new Map());
 
   const cohortInputs = await Promise.all(
     [...grouped.entries()].map(async ([key, scores]) => {
@@ -528,9 +799,10 @@ export async function getWellbeingComparison(
         scores,
         aggregateOptionsFor(context.instrument, context.threshold),
       );
+      const sorted = [...scores].sort((a, b) => a - b);
       return {
         key,
-        label: await labelFor(dimension, key, teamNames),
+        label: await labelFor(dimension, key, teamNames, waveTitles),
         // The suppression decision is made on distinct people in this cohort,
         // never on how many times they answered.
         completed: scopeCounts.get(key) ?? 0,
@@ -543,6 +815,8 @@ export async function getWellbeingComparison(
           mean: aggregate.mean,
           atOrAboveThresholdShare: aggregate.atOrAboveThresholdShare,
           participation: null,
+          p25: quantile(sorted, 0.25),
+          p75: quantile(sorted, 0.75),
         } satisfies CohortStats,
       };
     }),
@@ -556,11 +830,259 @@ export async function getWellbeingComparison(
     view: {
       dimension,
       label: COMPARE_DIMENSIONS.find((entry) => entry.key === dimension)?.label ?? dimension,
-      cohorts: result.cohorts.sort((a, b) => a.label.localeCompare(b.label)),
+      // Alphabetical by label, or chronological for waves (whose keys sort as
+      // `2025-Q4`). NEVER by score: ordering cohorts by their figures turns a
+      // comparison into a league table, and a league table is exactly what
+      // wellbeing reporting must not produce.
+      cohorts: result.cohorts.sort((a, b) => {
+        if (dimension !== "wave") return a.label.localeCompare(b.label);
+        // Chronological by the wave's own opening. Sorting wave LABELS would
+        // put "Wave 10" before "Wave 2".
+        const at = (key: string) => waves.find((wave) => wave.id === key)?.openedAt ?? "";
+        return at(a.key).localeCompare(at(b.key));
+      }),
       publishedCount: result.publishedCount,
       suppressedCount: result.suppressedCount,
       fullySuppressed: result.fullySuppressed,
     },
+  };
+}
+
+/* ── cohort movement across waves ───────────────────────────────────── */
+
+export interface CohortMovementCell {
+  waveKey: string;
+  waveLabel: string;
+  /** Null where this cohort's responses in this wave fall below the floor. */
+  median: number | null;
+  responses: number | null;
+}
+
+export interface CohortMovementRow {
+  key: string;
+  label: string;
+  cells: CohortMovementCell[];
+  suppressed: boolean;
+}
+
+export interface CohortMovementView {
+  dimension: CompareDimension;
+  label: string;
+  waves: { key: string; label: string }[];
+  rows: CohortMovementRow[];
+  scoreMin: number;
+  scoreMax: number;
+}
+
+/**
+ * Each cohort's median, wave by wave.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * SUPPRESSION APPLIES TWICE, AND BOTH TIMES MATTER.
+ *
+ * A cohort large enough to publish overall can still be tiny in one wave —
+ * fourteen people across four waves might be three in the first. So the cohort
+ * passes the ordinary partition first, and then each of its wave CELLS passes
+ * a partition of its own. A cohort withheld at either level contributes no
+ * figure at all.
+ *
+ * The per-cohort cell partition is what stops the subtraction attack inside a
+ * row: a cohort with one hidden wave and three visible ones, beside a visible
+ * total, discloses the hidden one by arithmetic. Withholding a second cell
+ * alongside it is the same complementary rule the cohort comparison uses, and
+ * it is applied by the same engine rather than reimplemented here.
+ *
+ * Within one wave a person contributes at most one result — the active-attempt
+ * indexes enforce it — so rows and people coincide at cell level and the
+ * database counter has nothing to add.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export async function getWellbeingCohortMovement(
+  organizationId: string,
+  instrumentKey: InstrumentKey,
+  dimension: CompareDimension,
+  source: AnalyticsSource = "live",
+  scope: AnalyticsScope | null = null,
+  period: ReportingPeriod = "wave",
+): Promise<{ context: WellbeingAnalyticsContext; view: CohortMovementView }> {
+  const context = await resolveContext(organizationId, instrumentKey);
+  const { rows, waves } = await loadAnalyticsRows(organizationId, instrumentKey, source, scope);
+
+  // The cohort-level decision comes from the shared comparison path, so a
+  // cohort withheld there is withheld here for the same reason and by the
+  // same rule rather than by a second implementation of it.
+  const { view: comparison } = await getWellbeingComparison(
+    organizationId,
+    instrumentKey,
+    dimension,
+    source,
+    scope,
+  );
+
+  const series = periodSeries(rows, waves, period);
+  const byCohortWave = new Map<string, Map<string, number[]>>();
+  for (const row of rows) {
+    const cohortKey = cohortKeyFor(row, dimension);
+    if (!cohortKey) continue;
+    const bucket = row.wave_id ? series.bucketFor.get(row.wave_id) : undefined;
+    if (!bucket) continue;
+    const perWave = byCohortWave.get(cohortKey) ?? new Map<string, number[]>();
+    perWave.set(bucket.key, [
+      ...(perWave.get(bucket.key) ?? []),
+      reportedScore(row, context.instrument),
+    ]);
+    byCohortWave.set(cohortKey, perWave);
+  }
+
+  const orderedWaves = series.buckets.map((bucket) => ({ key: bucket.key, label: bucket.label }));
+
+  const movementRows: CohortMovementRow[] = comparison.cohorts.map((cohort) => {
+    if (cohort.suppressed) {
+      return {
+        key: cohort.key,
+        label: cohort.label,
+        suppressed: true,
+        cells: orderedWaves.map((wave) => ({
+          waveKey: wave.key,
+          waveLabel: wave.label,
+          median: null,
+          responses: null,
+        })),
+      };
+    }
+
+    const perWave = byCohortWave.get(cohort.key) ?? new Map<string, number[]>();
+    const cellDecisions = suppressPartition(
+      orderedWaves.map((wave) => {
+        const scores = perWave.get(wave.key) ?? [];
+        // Within ONE wave a person contributes at most one result — the
+        // active-attempt indexes enforce it — so this is a count of people,
+        // not of rows. Named so, because every other suppression input in this
+        // module comes from the database's distinct-participant counter and a
+        // bare `scores.length` beside them would read as the bug that counter
+        // exists to prevent.
+        const participantsInWave = scores.length;
+        return {
+          key: wave.key,
+          label: wave.label,
+          completed: participantsInWave,
+          stats: scores,
+        };
+      }),
+      { minCohort: context.minCohort },
+    );
+
+    return {
+      key: cohort.key,
+      label: cohort.label,
+      suppressed: false,
+      cells: cellDecisions.cohorts.map((cell) => ({
+        waveKey: cell.key,
+        waveLabel: cell.label,
+        median:
+          cell.suppressed || !cell.stats
+            ? null
+            : aggregateScores(cell.stats, aggregateOptionsFor(context.instrument, null)).median,
+        responses: cell.suppressed ? null : (cell.completed ?? null),
+      })),
+    };
+  });
+
+  return {
+    context,
+    view: {
+      dimension,
+      label: comparison.label,
+      waves: orderedWaves,
+      rows: movementRows,
+      scoreMin: context.instrument.primaryScoreMin,
+      scoreMax: context.instrument.primaryScoreMax,
+    },
+  };
+}
+
+/* ── cohort coverage ────────────────────────────────────────────────── */
+
+export interface CoverageDimension {
+  key: CompareDimension;
+  label: string;
+  /** Cohorts whose figures may be published. */
+  published: number;
+  /** Cohorts withheld, for either reason. */
+  withheld: number;
+  /** People inside the published cohorts. */
+  covered: number;
+}
+
+export interface WellbeingCoverage {
+  dimensions: CoverageDimension[];
+  /** Distinct people who have completed at least one pulse in scope. */
+  participants: number;
+  minCohort: number;
+}
+
+/**
+ * How much of this workforce can actually be reported on, cohort by cohort.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * WHY MANAGEMENT NEEDS THIS BEFORE THEY NEED ANY FIGURE.
+ *
+ * Suppression is usually met one cohort at a time — a reader clicks Compare,
+ * finds two rows withheld, and has no way to tell whether that is a small
+ * detail or most of the workforce. That uncertainty is where people start
+ * trying to reconstruct what was withheld.
+ *
+ * So the coverage is stated up front and honestly: for each way of dividing
+ * the workforce, how many groups can be published, how many are withheld, and
+ * how many people the published groups actually account for. A reader who can
+ * see that Department covers 62 of 73 people has no reason to go hunting, and
+ * a reader who can see that it covers 11 knows not to trust the comparison.
+ *
+ * It reads through the same comparison path the screen uses, so a cohort
+ * counted as published here is exactly a cohort the screen will show.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export async function getWellbeingCoverage(
+  organizationId: string,
+  instrumentKey: InstrumentKey,
+  source: AnalyticsSource = "live",
+  scope: AnalyticsScope | null = null,
+): Promise<{ context: WellbeingAnalyticsContext; coverage: WellbeingCoverage }> {
+  const context = await resolveContext(organizationId, instrumentKey);
+  const { counts } = await loadAnalyticsRows(organizationId, instrumentKey, source, scope);
+
+  const dimensions: CoverageDimension[] = [];
+  for (const entry of COMPARE_DIMENSIONS) {
+    // Coverage is about how the WORKFORCE divides. A wave is a period, not a
+    // part of the workforce, and every participant belongs to every wave they
+    // answered — including it would report coverage above 100%.
+    if (entry.key === "wave") continue;
+    const scopeCounts = counts.byScope.get(SCOPE_FOR_DIMENSION[entry.key]) ?? new Map();
+    // Suppression is applied by the same engine the comparison uses, on the
+    // same distinct-people counts, so this cannot disagree with the screen.
+    const result = suppressPartition(
+      [...scopeCounts.entries()].map(([key, completed]) => ({
+        key,
+        label: key,
+        completed: completed as number,
+        stats: null,
+      })),
+      { minCohort: context.minCohort },
+    );
+    dimensions.push({
+      key: entry.key,
+      label: entry.label,
+      published: result.publishedCount,
+      withheld: result.suppressedCount,
+      covered: result.cohorts
+        .filter((cohort) => !cohort.suppressed)
+        .reduce((total, cohort) => total + (cohort.completed ?? 0), 0),
+    });
+  }
+
+  return {
+    context,
+    coverage: { dimensions, participants: counts.overall, minCohort: context.minCohort },
   };
 }
 
@@ -578,13 +1100,16 @@ export async function getWellbeingSignals(
   dimension: CompareDimension,
   itemIds: readonly string[],
   source: AnalyticsSource = "live",
+  scope: AnalyticsScope | null = null,
 ): Promise<{ context: WellbeingAnalyticsContext; rows: SignalRow[]; organizationWide: ItemSignal[] | null }> {
   const context = await resolveContext(organizationId, instrumentKey);
-  const { rows, counts, teamNames } = await loadAnalyticsRows(
+  const { rows, counts, teamNames, waves } = await loadAnalyticsRows(
     organizationId,
     instrumentKey,
     source,
+    scope,
   );
+  const waveTitles = new Map(waves.map((wave) => [wave.id, waveTitle(wave)]));
 
   const grouped = new Map<string, number[][]>();
   for (const row of rows) {
@@ -598,7 +1123,7 @@ export async function getWellbeingSignals(
   const cohortInputs = await Promise.all(
     [...grouped.entries()].map(async ([key, positions]) => ({
       key,
-      label: await labelFor(dimension, key, teamNames),
+      label: await labelFor(dimension, key, teamNames, waveTitles),
       completed: scopeCounts.get(key) ?? 0,
       stats: itemSignals(positions, itemIds),
     })),
@@ -661,6 +1186,7 @@ export async function getWellbeingDimensionProfile(
   organizationId: string,
   instrumentKey: InstrumentKey,
   source: AnalyticsSource = "live",
+  scope: AnalyticsScope | null = null,
 ): Promise<{ context: WellbeingAnalyticsContext; view: DimensionProfileView }> {
   const context = await resolveContext(organizationId, instrumentKey);
 
@@ -671,7 +1197,7 @@ export async function getWellbeingDimensionProfile(
     };
   }
 
-  const { rows, counts } = await loadAnalyticsRows(organizationId, instrumentKey, source);
+  const { rows, counts } = await loadAnalyticsRows(organizationId, instrumentKey, source, scope);
   const slice = checkSlice(counts.overall, context.minCohort);
   if (!slice.publishable) {
     return {
@@ -752,22 +1278,35 @@ export async function getWellbeingSignalPatterns(
   instrumentKey: InstrumentKey,
   dimension: CompareDimension,
   source: AnalyticsSource = "live",
+  scope: AnalyticsScope | null = null,
 ): Promise<{ context: WellbeingAnalyticsContext; signals: WellbeingSignal[] }> {
   const context = await resolveContext(organizationId, instrumentKey);
-  const { rows, counts, teamNames } = await loadAnalyticsRows(
+  const { rows, counts, teamNames, waves: campaignWaves } = await loadAnalyticsRows(
     organizationId,
     instrumentKey,
     source,
+    scope,
   );
 
-  /* Waves, oldest first, with anything below the floor dropped entirely. */
+  /*
+   * Waves, oldest first, with anything below the floor dropped entirely.
+   *
+   * Always individual waves here, whatever period a screen elsewhere is
+   * showing. The signal engine reasons about consecutive MEASUREMENTS — "the
+   * median has moved in the same direction three waves running" — and a
+   * quarterly rollup that merged two of them would make that sentence false.
+   */
+  const series = periodSeries(rows, campaignWaves, "wave");
   const byWave = new Map<string, { label: string; at: string; scores: number[]; thresholds: number[] }>();
+  for (const bucket of series.buckets) {
+    byWave.set(bucket.key, { label: bucket.label, at: bucket.at, scores: [], thresholds: [] });
+  }
   for (const row of rows) {
-    const wave = waveKey(row.completed_at);
-    const bucket = byWave.get(wave.key) ?? { label: wave.label, at: wave.at, scores: [], thresholds: [] };
-    bucket.scores.push(reportedScore(row, context.instrument));
-    if (row.threshold_at_completion !== null) bucket.thresholds.push(row.threshold_at_completion);
-    byWave.set(wave.key, bucket);
+    const bucket = row.wave_id ? series.bucketFor.get(row.wave_id) : undefined;
+    if (!bucket) continue;
+    const entry = byWave.get(bucket.key)!;
+    entry.scores.push(reportedScore(row, context.instrument));
+    if (row.threshold_at_completion !== null) entry.thresholds.push(row.threshold_at_completion);
   }
 
   const waves: WaveFigure[] = [...byWave.values()]
@@ -794,10 +1333,11 @@ export async function getWellbeingSignalPatterns(
   if (context.instrument.key === "disc360_wellbeing_v1") {
     const perDimension = new Map<string, Map<string, number[]>>();
     for (const row of rows) {
-      const wave = waveKey(row.completed_at);
+      const bucket = row.wave_id ? series.bucketFor.get(row.wave_id) : undefined;
+      if (!bucket) continue;
       for (const entry of row.wellbeing_result_dimensions ?? []) {
         const waveMap = perDimension.get(entry.dimension_key) ?? new Map<string, number[]>();
-        waveMap.set(wave.key, [...(waveMap.get(wave.key) ?? []), entry.index_score]);
+        waveMap.set(bucket.key, [...(waveMap.get(bucket.key) ?? []), entry.index_score]);
         perDimension.set(entry.dimension_key, waveMap);
       }
     }
@@ -827,7 +1367,13 @@ export async function getWellbeingSignalPatterns(
   }
 
   /* Cohorts, already suppressed by the shared comparison path. */
-  const { view } = await getWellbeingComparison(organizationId, instrumentKey, dimension, source);
+  const { view } = await getWellbeingComparison(
+    organizationId,
+    instrumentKey,
+    dimension,
+    source,
+    scope,
+  );
   const cohorts: CohortFigure[] = view.cohorts
     .filter((cohort) => !cohort.suppressed && cohort.stats)
     .map((cohort) => ({

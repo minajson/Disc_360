@@ -2592,12 +2592,14 @@ export type Database = {
           scoring_method: string
           scoring_version: string
           session_id: string
+          sub_unit_at_completion: string | null
           team_id: string | null
           team_name_at_completion: string | null
           team_series_id: string | null
           threshold_at_completion: number | null
           total_score: number
           version_id: string
+          wave_id: string | null
           work_location_at_completion:
             | Database["public"]["Enums"]["wellbeing_work_location"]
             | null
@@ -2622,12 +2624,14 @@ export type Database = {
           scoring_method?: string
           scoring_version: string
           session_id: string
+          sub_unit_at_completion?: string | null
           team_id?: string | null
           team_name_at_completion?: string | null
           team_series_id?: string | null
           threshold_at_completion?: number | null
           total_score: number
           version_id: string
+          wave_id?: string | null
           work_location_at_completion?:
             | Database["public"]["Enums"]["wellbeing_work_location"]
             | null
@@ -2652,12 +2656,14 @@ export type Database = {
           scoring_method?: string
           scoring_version?: string
           session_id?: string
+          sub_unit_at_completion?: string | null
           team_id?: string | null
           team_name_at_completion?: string | null
           team_series_id?: string | null
           threshold_at_completion?: number | null
           total_score?: number
           version_id?: string
+          wave_id?: string | null
           work_location_at_completion?:
             | Database["public"]["Enums"]["wellbeing_work_location"]
             | null
@@ -2710,6 +2716,13 @@ export type Database = {
             columns: ["version_id"]
             isOneToOne: false
             referencedRelation: "wellbeing_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_results_wave_id_fkey"
+            columns: ["wave_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_waves"
             referencedColumns: ["id"]
           },
         ]
@@ -2803,9 +2816,12 @@ export type Database = {
           self_reported_first_time: boolean | null
           started_at: string
           status: Database["public"]["Enums"]["session_status"]
+          sub_unit_id: string | null
+          sub_unit_name: string | null
           team_id: string | null
           updated_at: string
           version_id: string
+          wave_id: string | null
           work_location:
             | Database["public"]["Enums"]["wellbeing_work_location"]
             | null
@@ -2830,9 +2846,12 @@ export type Database = {
           self_reported_first_time?: boolean | null
           started_at?: string
           status?: Database["public"]["Enums"]["session_status"]
+          sub_unit_id?: string | null
+          sub_unit_name?: string | null
           team_id?: string | null
           updated_at?: string
           version_id: string
+          wave_id?: string | null
           work_location?:
             | Database["public"]["Enums"]["wellbeing_work_location"]
             | null
@@ -2857,9 +2876,12 @@ export type Database = {
           self_reported_first_time?: boolean | null
           started_at?: string
           status?: Database["public"]["Enums"]["session_status"]
+          sub_unit_id?: string | null
+          sub_unit_name?: string | null
           team_id?: string | null
           updated_at?: string
           version_id?: string
+          wave_id?: string | null
           work_location?:
             | Database["public"]["Enums"]["wellbeing_work_location"]
             | null
@@ -2901,6 +2923,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "wellbeing_sessions_sub_unit_id_fkey"
+            columns: ["sub_unit_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_sub_units"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "wellbeing_sessions_team_id_fkey"
             columns: ["team_id"]
             isOneToOne: false
@@ -2912,6 +2941,74 @@ export type Database = {
             columns: ["version_id"]
             isOneToOne: false
             referencedRelation: "wellbeing_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_sessions_wave_id_fkey"
+            columns: ["wave_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_waves"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wellbeing_sub_units: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department_id: string | null
+          id: string
+          is_active: boolean
+          name: string
+          normalized_name: string | null
+          organization_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          normalized_name?: string | null
+          organization_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          normalized_name?: string | null
+          organization_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_sub_units_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_sub_units_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_sub_units_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2975,6 +3072,67 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "wellbeing_instruments"
             referencedColumns: ["key"]
+          },
+        ]
+      }
+      wellbeing_waves: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          label: string
+          opened_at: string
+          organization_id: string
+          team_id: string
+          updated_at: string
+          wave_number: number
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string
+          opened_at?: string
+          organization_id: string
+          team_id: string
+          updated_at?: string
+          wave_number: number
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          label?: string
+          opened_at?: string
+          organization_id?: string
+          team_id?: string
+          updated_at?: string
+          wave_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_waves_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_waves_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_waves_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3063,8 +3221,21 @@ export type Database = {
           screening_threshold: number
         }[]
       }
+      wellbeing_join_context: {
+        Args: { p_token: string }
+        Returns: {
+          facilitator_name: string
+          instrument_key: string
+        }[]
+      }
+      wellbeing_open_wave: { Args: { p_team: string }; Returns: string }
       wellbeing_participant_counts: {
-        Args: { p_instrument: string; p_organization: string }
+        Args: {
+          p_instrument: string
+          p_organization: string
+          p_team?: string
+          p_wave?: string
+        }
         Returns: {
           cohort: string
           participants: number

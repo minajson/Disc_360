@@ -11,10 +11,13 @@ import {
   getWellbeingDimensionProfile,
   getWellbeingSignalPatterns,
   getWellbeingWorkspace,
+  type AnalyticsScope,
   type AnalyticsSource,
   type CompareDimension,
 } from "@/lib/wellbeing/analytics";
 import { SIGNAL_PRIORITY_LABEL } from "@/lib/wellbeing/signals";
+import { ILLUSTRATIVE_DATA_BANNER } from "@/lib/wellbeing/demo-population";
+import { LOCAL_FIXTURE_BANNER } from "@/lib/wellbeing/local-fixture";
 import type { InstrumentKey } from "@/data/wellbeing-instruments";
 
 /**
@@ -49,13 +52,24 @@ export async function loadWellbeingAggregateReport(
   instrumentKey: InstrumentKey,
   source: AnalyticsSource,
   dimension: CompareDimension = "department",
+  /**
+   * One campaign, or the whole organisation.
+   *
+   * Passed through to the same functions the screen calls, so a campaign
+   * report describes the campaign it names. Without it a campaign-level
+   * download would quietly contain organisation-wide figures under a campaign
+   * heading — the kind of mismatch nobody notices until it is in a board pack.
+   */
+  scope: (AnalyticsScope & { campaignName: string }) | null = null,
 ): Promise<{ document: ReportDocument; filename: string }> {
+  const analyticsScope: AnalyticsScope | null = scope ? { campaignId: scope.campaignId } : null;
+
   // Every one of these authorises independently and suppresses internally.
   const [workspace, comparison, profile, patterns] = await Promise.all([
-    getWellbeingWorkspace(organizationId, instrumentKey, source),
-    getWellbeingComparison(organizationId, instrumentKey, dimension, source),
-    getWellbeingDimensionProfile(organizationId, instrumentKey, source),
-    getWellbeingSignalPatterns(organizationId, instrumentKey, dimension, source),
+    getWellbeingWorkspace(organizationId, instrumentKey, source, analyticsScope),
+    getWellbeingComparison(organizationId, instrumentKey, dimension, source, analyticsScope),
+    getWellbeingDimensionProfile(organizationId, instrumentKey, source, analyticsScope),
+    getWellbeingSignalPatterns(organizationId, instrumentKey, dimension, source, analyticsScope),
   ]);
 
   const { context, overview, trend } = workspace;
@@ -80,7 +94,7 @@ export async function loadWellbeingAggregateReport(
 
   const input: WellbeingAggregateReportInput = {
     organizationName: context.organizationName,
-    campaignName: null,
+    campaignName: scope?.campaignName ?? null,
     instrumentName: instrument.name,
     instrumentDescriptor: instrument.descriptor,
     scoreLabel: instrument.primaryScoreLabel,
@@ -136,13 +150,24 @@ export async function loadWellbeingAggregateReport(
       considerExploring: signal.considerExploring,
     })),
     minCohort: context.minCohort,
-    isDemo: source === "demo",
+    // Every synthetic source carries its OWN banner. A live report carries
+    // none — and a report built from either synthetic population must never
+    // be indistinguishable from one.
+    syntheticBanner:
+      source === "demo"
+        ? ILLUSTRATIVE_DATA_BANNER
+        : source === "fixture"
+          ? LOCAL_FIXTURE_BANNER
+          : null,
     // The whole organisation is below the floor: nothing may be published.
     fullySuppressed: overview === null,
   };
 
   const document = buildWellbeingAggregateReport(input);
-  const label = source === "demo" ? `${context.organizationName} Demo` : context.organizationName;
+  const label =
+    source === "live"
+      ? (scope?.campaignName ?? context.organizationName)
+      : `${scope?.campaignName ?? context.organizationName} ${source === "demo" ? "Demo" : "Local Fixture"}`;
 
   return { document, filename: reportFilename(label, "wellbeing") };
 }

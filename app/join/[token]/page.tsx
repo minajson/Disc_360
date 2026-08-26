@@ -31,6 +31,27 @@ export default async function JoinTokenPage({
   const { token } = await params;
   const context = await getJoinContext(token);
 
+  // ── the product boundary, at the one place a printed code lands ──────
+  //
+  // A Wellbeing Pulse campaign is stored as a team, so its invite token is a
+  // valid team token and this DISC route resolves it perfectly happily. That
+  // is how a printed Wellbeing Pulse QR came to open "You have been invited to
+  // complete the DISC360 assessment for this team. 24 quick scenarios" — with
+  // a DISC consent checkbox, an Employee / reference ID field, and a button
+  // that starts a behavioural assessment.
+  //
+  // The redirect is here rather than only on the QR generator because the
+  // codes are already printed, projected and forwarded. A fix that only
+  // changes what NEW codes contain leaves every existing one pointing at the
+  // wrong product.
+  //
+  // `assessment_type` comes from `resolve_join_token`, which reads it inside
+  // the database — the same field 00032 keeps in agreement with the campaign's
+  // instrument.
+  if (context && context.assessmentType === "wellbeing") {
+    redirect(`/wellbeing/join/${token}`);
+  }
+
   // Signed-in visitors never re-register. A not-yet-onboarded account (e.g.
   // fresh Google sign-in) carries the invitation into onboarding — consent
   // comes BEFORE membership, and the team code is never asked for. An

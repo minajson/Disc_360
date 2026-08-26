@@ -2,6 +2,7 @@ import { z } from "zod";
 import { loadWellbeingAggregateReport } from "@/lib/wellbeing/aggregate-report";
 import { renderReportPdf } from "@/lib/reports/pdf";
 import { parseAnalyticsSource } from "@/lib/wellbeing/analytics";
+import { loadCampaignIdentity } from "@/lib/wellbeing/campaign-workspace";
 import { isInstrumentKey } from "@/data/wellbeing-instruments";
 
 /**
@@ -25,6 +26,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const organizationId = url.searchParams.get("org") ?? "";
   const instrumentParam = url.searchParams.get("instrument") ?? "";
+  const campaignParam = url.searchParams.get("campaign");
   const source = parseAnalyticsSource(url.searchParams.get("source") ?? undefined);
 
   if (!z.uuid().safeParse(organizationId).success) {
@@ -33,10 +35,35 @@ export async function GET(request: Request) {
   if (!isInstrumentKey(instrumentParam)) {
     return new Response("Not found", { status: 404 });
   }
+  if (campaignParam !== null && !z.uuid().safeParse(campaignParam).success) {
+    return new Response("Not found", { status: 404 });
+  }
 
   let report;
   try {
-    report = await loadWellbeingAggregateReport(organizationId, instrumentParam, source);
+    // A campaign scope is RESOLVED, never trusted. `loadCampaignIdentity`
+    // authorises the caller on that campaign and returns the organisation it
+    // actually belongs to, so a caller cannot pair someone else's campaign id
+    // with an organisation they happen to hold a wellbeing role in.
+    let scope = null;
+    if (campaignParam) {
+      const { identity } = await loadCampaignIdentity(campaignParam);
+      if (identity.organizationId !== organizationId) {
+        return new Response("Not found", { status: 404 });
+      }
+      if (identity.instrumentKey !== instrumentParam) {
+        return new Response("Not found", { status: 404 });
+      }
+      scope = { campaignId: identity.id, campaignName: identity.name };
+    }
+
+    report = await loadWellbeingAggregateReport(
+      organizationId,
+      instrumentParam,
+      source,
+      "department",
+      scope,
+    );
   } catch {
     // The guard refuses by throwing. Answer 404 rather than 403 so that "you
     // may not read this organisation" and "no such organisation" look

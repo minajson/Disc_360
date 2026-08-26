@@ -49,9 +49,26 @@ test("the analytics column list is exactly what group reporting needs", () => {
     "team_id",
     "threshold_at_completion",
     "total_score",
+    // The campaign occurrence this result was completed in. It identifies a
+    // WAVE, not a person — and it is here so a wave is read rather than
+    // inferred from `completed_at`, which is what merged two pulses in one
+    // quarter into a single silent number before 00034.
+    "wave_id",
     "wellbeing_result_dimensions",
     "work_location_at_completion",
   ]);
+});
+
+test("wave identity is read, never derived from a completion date", () => {
+  // The whole defect in one assertion: if analytics ever rounds a date to a
+  // period to decide which wave a result belongs to, two genuine pulses in
+  // one quarter merge with nothing on screen to say so.
+  assert.ok(
+    !/function waveKey\(/.test(SOURCE),
+    "the calendar-quarter wave rule must not come back",
+  );
+  assert.match(SOURCE, /case "wave":\s*\n[\s\S]{0,220}return row\.wave_id;/);
+  assert.match(SOURCE, /async function readWaves\(/, "waves are read from their own table");
 });
 
 test("no identifying column is ever selected by analytics", () => {
@@ -159,6 +176,19 @@ test("cohort suppression is decided on distinct PARTICIPANTS", () => {
     !/completed: scores\.length/.test(SOURCE) && !/completed: positions\.length/.test(SOURCE),
     "no cohort may be gated on, or labelled with, how many results it holds",
   );
+
+  // The one legitimate exception, held explicitly rather than by omission.
+  // Inside a SINGLE wave a person contributes at most one result, so rows and
+  // people coincide there — and the variable has to say so, because a bare
+  // `scores.length` fed to suppressPartition is indistinguishable from the bug
+  // the participant counter exists to prevent.
+  if (/participantsInWave/.test(SOURCE)) {
+    assert.match(
+      SOURCE,
+      /Within ONE wave a person contributes at most one result/,
+      "the per-wave people count must state why rows and people coincide",
+    );
+  }
 });
 
 test("the participant counter returns integers only — no identifiers", () => {

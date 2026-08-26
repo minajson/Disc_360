@@ -61,7 +61,7 @@ const base = (over: Partial<WellbeingAggregateReportInput> = {}): WellbeingAggre
     },
   ],
   minCohort: 7,
-  isDemo: false,
+  syntheticBanner: null,
   fullySuppressed: false,
   ...over,
 });
@@ -164,20 +164,33 @@ test("a single wave produces no trend page", () => {
   assert.ok(!doc.sections.some((s) => s.title === "Movement across waves"));
 });
 
-/* ── demo labelling ──────────────────────────────────────────────────── */
+/* ── synthetic labelling ─────────────────────────────────────────────── */
 
-test("a demo report is labelled illustrative on the cover and in the method", () => {
-  const doc = buildWellbeingAggregateReport(base({ isDemo: true }));
-  assert.equal(doc.eyebrow, ILLUSTRATIVE_REPORT_BANNER);
-  assert.ok(doc.meta.some((m) => m.value === ILLUSTRATIVE_REPORT_BANNER));
-  const text = allText(base({ isDemo: true }));
-  const occurrences = text.split(ILLUSTRATIVE_REPORT_BANNER).length - 1;
-  assert.ok(occurrences >= 3, "the label must survive being read from any page");
-});
+/**
+ * Both synthetic populations, checked the same way.
+ *
+ * This used to take a boolean, which labelled one synthetic source and left
+ * the other — the local development fixture — producing a document
+ * indistinguishable from a real one. The banner is now the input, so every
+ * synthetic source must name itself or carry no label at all, and there is no
+ * third state where a document is synthetic and unlabelled.
+ */
+for (const banner of [ILLUSTRATIVE_REPORT_BANNER, "LOCAL DEVELOPMENT FIXTURE"]) {
+  test(`a ${banner} report is labelled on the cover and in the method`, () => {
+    const doc = buildWellbeingAggregateReport(base({ syntheticBanner: banner }));
+    assert.equal(doc.eyebrow, banner);
+    assert.ok(doc.meta.some((m) => m.value === banner));
+    const text = allText(base({ syntheticBanner: banner }));
+    const occurrences = text.split(banner).length - 1;
+    assert.ok(occurrences >= 3, "the label must survive being read from any page");
+  });
+}
 
-test("a live report is never labelled illustrative", () => {
-  const text = allText(base({ isDemo: false }));
+test("a live report carries no synthetic-data label of any kind", () => {
+  const text = allText(base({ syntheticBanner: null }));
   assert.ok(!text.includes(ILLUSTRATIVE_REPORT_BANNER));
+  assert.ok(!text.includes("LOCAL DEVELOPMENT FIXTURE"));
+  assert.ok(!/synthetic/i.test(text), "and never describes itself as synthetic");
 });
 
 /* ── the document says what it is ────────────────────────────────────── */

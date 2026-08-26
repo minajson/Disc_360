@@ -62,7 +62,21 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && isAuthPage) {
+    // An already-authenticated visitor on an auth page still has an INTENT.
+    //
+    // Someone who scanned a Wellbeing Pulse code and tapped "I already have an
+    // account" arrives here with the campaign in `?next=`. Sending them to
+    // /app discards it and drops them on the DISC360 dashboard — the exact
+    // outcome the whole join fix exists to prevent, reached by a different
+    // door.
+    //
+    // Only a safe relative path is honoured. `//host` is rejected because the
+    // browser reads it as protocol-relative and it would become an open
+    // redirect off this origin.
+    const requested = request.nextUrl.searchParams.get("next");
+    const safe = requested && requested.startsWith("/") && !requested.startsWith("//");
     const url = request.nextUrl.clone();
+    if (safe) return NextResponse.redirect(new URL(requested, request.nextUrl.origin));
     url.pathname = "/app";
     url.search = "";
     return NextResponse.redirect(url);

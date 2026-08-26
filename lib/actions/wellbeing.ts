@@ -111,6 +111,22 @@ export async function beginWellbeingPulse(input: {
     .maybeSingle();
   if (existing) return { ok: true, sessionId: existing.id };
 
+  // A campaign that cannot be completed must not be started.
+  //
+  // The invitation refuses first, but this is the guard that matters: a
+  // participant who is already signed in can reach the start action by a
+  // link, and a session begun against an unready campaign produces a form
+  // with no options and an abandoned attempt in the facilitator's counts.
+  if (teamId) {
+    const { checkCampaignReadiness, CAMPAIGN_NOT_READY_PARTICIPANT_MESSAGE } = await import(
+      "@/lib/wellbeing/readiness"
+    );
+    const readiness = await checkCampaignReadiness(teamId, instrumentKey);
+    if (!readiness.ready) {
+      return { ok: false, error: CAMPAIGN_NOT_READY_PARTICIPANT_MESSAGE };
+    }
+  }
+
   const questionnaire = await getActiveQuestionnaire(context, instrumentKey);
   if (!questionnaire) {
     return {
@@ -181,6 +197,16 @@ const contextSchema = z
     sessionId: z.uuid(),
     departmentId: z.uuid().nullable().optional(),
     departmentName: z.string().trim().min(1).max(120),
+    /**
+     * Sub-unit / Team — organisational context, never an assessment team.
+     *
+     * Required alongside Department / Function, because a cohort comparison
+     * with a hole in it is worse than no comparison: a sub-unit that half the
+     * workforce skipped produces groups that look small for a reason nobody
+     * can see, and a suppression decision made on the wrong denominator.
+     */
+    subUnitId: z.uuid().nullable().optional(),
+    subUnitName: z.string().trim().min(1).max(120),
     workLocation: z.enum(["field_based", "office_based"]),
     officeLocationId: z.uuid().nullable().optional(),
     officeLocationName: z.string().trim().max(120).nullable().optional(),
@@ -225,6 +251,12 @@ export async function saveWellbeingContext(
   const value = parsed.data;
 
   const officeBased = value.workLocation === "office_based";
+
+  // Sub-unit is a governed REQUIRED dimension. The Zod schema above enforces
+  // it; there is no branch here that can make it optional, because a campaign
+  // whose organisation has no catalogue never reaches a participant —
+  // `checkCampaignReadiness` refuses to open it.
+  const subUnitName = value.subUnitName.trim();
   const contactEmail = value.contactEmail?.trim() || null;
   const emailLooksValid = contactEmail ? /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(contactEmail) : true;
   if (value.emailOptIn && contactEmail && !emailLooksValid) {
@@ -236,6 +268,11 @@ export async function saveWellbeingContext(
     .update({
       department_id: value.departmentId ?? null,
       department_name: value.departmentName,
+      sub_unit_id: value.subUnitId ?? null,
+      // Both, exactly as department does it: the id is the live link, the name
+      // is what the result reports under forever. A sub-unit renamed next year
+      // must not restate what somebody said about themselves this year.
+      sub_unit_name: subUnitName,
       work_location: value.workLocation,
       office_location_id: officeBased ? (value.officeLocationId ?? null) : null,
       office_location_name: officeBased ? (value.officeLocationName ?? null) : null,
@@ -347,7 +384,7 @@ export async function completeWellbeingPulse(sessionId: string): Promise<Complet
   const { data: session } = await supabase
     .from("wellbeing_sessions")
     .select(
-      "id, profile_id, status, version_id, instrument_key, team_id, organization_id, consent_given, consent_at, department_name, work_location, office_location_name, job_title",
+      "id, profile_id, status, version_id, instrument_key, team_id, organization_id, consent_given, consent_at, department_name, sub_unit_name, work_location, office_location_name, job_title",
     )
     .eq("id", sessionId)
     .maybeSingle();
@@ -483,6 +520,7 @@ export async function completeWellbeingPulse(sessionId: string): Promise<Complet
     profileId: user.id,
     teamId: (session.team_id as string | null) ?? null,
     departmentName: session.department_name as string,
+    subUnitName: (session.sub_unit_name as string | null) ?? null,
     workLocation: session.work_location as "field_based" | "office_based",
     officeLocationName: (session.office_location_name as string | null) ?? null,
     jobTitle: (session.job_title as string | null) ?? null,

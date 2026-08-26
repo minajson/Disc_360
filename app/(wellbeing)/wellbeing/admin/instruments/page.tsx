@@ -7,6 +7,7 @@ import {
   INSTRUMENTS,
   canServeToParticipants,
   unavailableReason,
+  type InstrumentKey,
   type InstrumentMetadata,
 } from "@/data/wellbeing-instruments";
 import { isWellbeingDemoEnabled, isProductionEnvironment } from "@/lib/wellbeing/environment";
@@ -233,17 +234,76 @@ const ROWS: { label: string; value: (instrument: InstrumentMetadata) => string }
   },
   { label: "Subscales / dimensions", value: (i) => i.subscaleDescription },
   { label: "Threshold model", value: (i) => i.thresholdDescription },
-  { label: "Longitudinal support", value: () => "Full history, trend and movement" },
   {
-    label: "Analytics available",
+    // Every instrument on the platform gets the same longitudinal machinery,
+    // so the useful distinction is not "does it support trends" — it is WHAT
+    // moves, and how often it can reasonably be asked. A row that printed the
+    // same sentence four times helped nobody decide anything.
+    label: "Longitudinal usefulness",
+    value: (i) => LONGITUDINAL[i.key],
+  },
+  {
+    label: "Organisational analytics depth",
     value: (i) =>
       i.subscales.length > 0 || i.key === "disc360_wellbeing_v1"
-        ? "Overview, Compare, Trends, Dimensions, Teams, Locations"
-        : "Overview, Compare, Trends, Teams, Locations",
+        ? "Overview · Compare · Trends · Reports · Presentation, plus a profile view of its own sub-scores"
+        : "Overview · Compare · Trends · Reports · Presentation, on one score",
   },
-  { label: "Licensing status", value: (i) => i.licensingDescription },
-  { label: "Scoring engine", value: (i) => i.scoringMethod },
+  { label: "Workplace specificity", value: (i) => WORKPLACE_SPECIFICITY[i.key] },
+  { label: "Licensing position", value: (i) => i.licensingDescription },
+  { label: "Implementation status", value: (i) => IMPLEMENTATION[i.key] },
+  { label: "Scoring engine", value: (i) => `${i.scoringMethod} · ${i.scoringEngine}` },
 ];
+
+/**
+ * The three judgement rows, written per instrument.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * WORDING RULE FOR THIS WHOLE PAGE.
+ *
+ * A difference is stated as a difference, never as a deficiency. GHQ-12 and
+ * GHQ-28 are not inferior because DISC360 Wellbeing has richer workplace
+ * dimensions — they are validated distress screeners with decades of published
+ * use, which is precisely what the DISC360 instrument is not. WHO-5 is not
+ * inferior because it has five items; five items is why it can be asked
+ * monthly without fatigue, which is a longitudinal strength the longer
+ * instruments do not have.
+ *
+ * So each cell says what the instrument IS good for and what it does not
+ * cover, and no cell contains a comparative adjective.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+const LONGITUDINAL: Record<InstrumentKey, string> = {
+  ghq12:
+    "One total moves. Short enough for frequent waves; a repeat interval below a month is generally considered too short for a distress screener to show anything but noise.",
+  ghq28:
+    "One total plus four subscale profiles move, so a change can be located within the profile. The longer completion time usually means fewer waves per year.",
+  who5: "One transformed score moves. The shortest instrument here, and the one that can be asked most often without response fatigue.",
+  disc360_wellbeing_v1:
+    "An index plus six workplace dimensions move independently, so a flat headline can still show a dimension shifting underneath it.",
+};
+
+const WORKPLACE_SPECIFICITY: Record<InstrumentKey, string> = {
+  ghq12:
+    "General psychological distress. Not written about work, so a result does not point to anything a workplace can act on.",
+  ghq28:
+    "General psychological distress across four domains, including somatic and social. Not written about work.",
+  who5:
+    "General current wellbeing. Not written about work, and phrased positively rather than around symptoms.",
+  disc360_wellbeing_v1:
+    "Written for the workplace: capacity, recovery and demand, connection and safety, purpose and confidence. Dimensions map onto things an organisation can examine.",
+};
+
+const IMPLEMENTATION: Record<InstrumentKey, string> = {
+  ghq12:
+    "Scoring engine, schema, analytics and reporting complete. Item wording is not in this repository and cannot be served to participants until digital-use rights are recorded.",
+  ghq28:
+    "Independent scoring engine and four-subscale schema complete, with analytics and reporting. Item wording is not in this repository; same rights position as GHQ-12.",
+  who5:
+    "Independent scoring engine and the five-item structure are in place. Item wording is pending source and licence confirmation.",
+  disc360_wellbeing_v1:
+    "Complete and live. Original content, so it can be run end to end today.",
+};
 
 
 /**

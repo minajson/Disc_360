@@ -293,7 +293,7 @@ export function buildWellbeingSignals(input: SignalInput): WellbeingSignal[] {
     }
   }
 
-  /* Genuine steadiness is itself worth reporting. */
+  /* Genuine stability is itself worth reporting. */
   if (waves.length >= PERSISTENCE_WAVES && signals.length === 0) {
     const medians = waves.slice(-PERSISTENCE_WAVES).map((wave) => wave.median);
     const range = Math.max(...medians) - Math.min(...medians);

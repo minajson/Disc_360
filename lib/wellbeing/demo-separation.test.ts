@@ -78,10 +78,18 @@ test("the loader returns one source or the other, never both", () => {
 test("live is the default — a missing or unknown source never shows demo data", () => {
   const analytics = read("lib/wellbeing/analytics.ts");
   assert.match(analytics, /source: AnalyticsSource = "live"/, "entry points default to live");
+  const parser = analytics.slice(
+    analytics.indexOf("export function parseAnalyticsSource"),
+    analytics.indexOf("export function localFixtureOffered"),
+  );
+  assert.match(parser, /if \(value === "demo"\) return "demo";/, "demo is matched exactly");
+  assert.match(parser, /return "live";\n\}/, "everything else falls through to live");
+  // The fixture is customer-shaped, so recognising it is conditional on the
+  // environment rather than on the string alone.
   assert.match(
-    analytics,
-    /return value === "demo" \? "demo" : "live"/,
-    "anything that is not exactly \"demo\" resolves to live",
+    parser,
+    /value === "fixture" && localFixtureAllowed\(/,
+    "the fixture is only recognised where the environment permits it",
   );
 });
 
@@ -91,7 +99,12 @@ test("demo surfaces are labelled ILLUSTRATIVE DEMO DATA", () => {
   assert.equal(ILLUSTRATIVE_DATA_BANNER, "ILLUSTRATIVE DEMO DATA");
   const swtch = read("components/wellbeing/analytics/SourceSwitch.tsx");
   assert.match(swtch, /ILLUSTRATIVE_DATA_BANNER/);
-  assert.match(swtch, /source === "demo" &&/, "the banner shows only in demo");
+  // The banner is keyed off the source rather than rendered unconditionally,
+  // and "live" is deliberately absent from the table — a live figure must
+  // never sit under a synthetic-data banner, and vice versa.
+  assert.match(swtch, /demo: \{ label: ILLUSTRATIVE_DATA_BANNER/);
+  assert.ok(!/live: \{ label:/.test(swtch), "live carries no synthetic-data banner");
+  assert.match(swtch, /\{banner && \(/, "the banner renders only when the source has one");
 });
 
 /* ── the demo is honest about the product's real behaviour ───────────── */

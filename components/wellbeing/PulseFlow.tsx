@@ -9,6 +9,8 @@ import {
 } from "@/lib/actions/wellbeing";
 import {
   WELLBEING_DEPARTMENT_LABEL,
+  WELLBEING_SUB_UNIT_HELP,
+  WELLBEING_SUB_UNIT_LABEL,
   WORK_LOCATIONS,
   type WorkLocation,
 } from "@/data/wellbeing-taxonomy";
@@ -38,6 +40,7 @@ export interface PulseFlowProps {
   accountEmail: string;
   initial: {
     departmentName: string | null;
+    subUnitName: string | null;
     workLocation: WorkLocation | null;
     officeLocationName: string | null;
     jobTitle: string | null;
@@ -72,6 +75,7 @@ export function PulseFlow({
   const [error, setError] = useState<string | null>(null);
 
   const [departmentName, setDepartmentName] = useState(initial.departmentName ?? "");
+  const [subUnitName, setSubUnitName] = useState(initial.subUnitName ?? "");
   const [workLocation, setWorkLocation] = useState<WorkLocation | "">(initial.workLocation ?? "");
   const [officeLocationName, setOfficeLocationName] = useState(initial.officeLocationName ?? "");
   const [jobTitle, setJobTitle] = useState(initial.jobTitle ?? "");
@@ -92,6 +96,29 @@ export function PulseFlow({
     () => options.departments.find((entry) => entry.name === departmentName)?.id ?? null,
     [options.departments, departmentName],
   );
+
+  /**
+   * Sub-units offered for the chosen Department / Function.
+   *
+   * A sub-unit with no parent is cross-functional and is always offered. When
+   * a department is chosen, its own sub-units are offered too — and if that
+   * leaves nothing at all, the full list is shown rather than an empty select:
+   * a catalogue that has not been parented yet is a configuration state, not a
+   * reason to block somebody from answering.
+   */
+  const subUnitOptions = useMemo(() => {
+    const unparented = options.subUnits.filter((entry) => entry.departmentId === null);
+    if (!departmentId) return options.subUnits;
+    const matching = options.subUnits.filter((entry) => entry.departmentId === departmentId);
+    const narrowed = [...matching, ...unparented];
+    return narrowed.length > 0 ? narrowed : options.subUnits;
+  }, [options.subUnits, departmentId]);
+
+  const subUnitId = useMemo(
+    () => options.subUnits.find((entry) => entry.name === subUnitName)?.id ?? null,
+    [options.subUnits, subUnitName],
+  );
+
   const officeLocationId = useMemo(
     () => options.officeLocations.find((entry) => entry.name === officeLocationName)?.id ?? null,
     [options.officeLocations, officeLocationName],
@@ -100,7 +127,14 @@ export function PulseFlow({
   function submitContext(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
-    if (!departmentName || !workLocation) {
+    // Sub-unit is a governed REQUIRED dimension, unconditionally.
+    //
+    // It used to be required only where a catalogue existed, which quietly
+    // collected responses with a hole in a dimension the analytics compares
+    // on. A campaign whose organisation has no sub-units does not reach a
+    // participant at all now — `checkCampaignReadiness` refuses it — so by
+    // the time this form renders there is always something to choose.
+    if (!departmentName || !subUnitName || !workLocation) {
       setError("Please choose your Department / Function and Work Location.");
       return;
     }
@@ -114,6 +148,8 @@ export function PulseFlow({
         sessionId,
         departmentId,
         departmentName,
+        subUnitId,
+        subUnitName,
         workLocation,
         // Field-based work sends nothing at all, rather than an empty string.
         officeLocationId: officeRequired ? officeLocationId : null,
@@ -190,7 +226,14 @@ export function PulseFlow({
             id="wb-department"
             required
             value={departmentName}
-            onChange={(event) => setDepartmentName(event.target.value)}
+            onChange={(event) => {
+              setDepartmentName(event.target.value);
+              // Changing department can invalidate the chosen sub-unit.
+              // Cleared here, in the event that caused it, rather than in an
+              // effect reacting to it — the effect version re-rendered twice
+              // and briefly showed a unit that no longer belonged.
+              setSubUnitName("");
+            }}
             className={fieldClasses}
           >
             <option value="">Select…</option>
@@ -200,6 +243,27 @@ export function PulseFlow({
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="wb-sub-unit" className="text-sm font-medium text-ink">
+            {WELLBEING_SUB_UNIT_LABEL}
+          </label>
+          <select
+            id="wb-sub-unit"
+            required
+            value={subUnitName}
+            onChange={(event) => setSubUnitName(event.target.value)}
+            className={fieldClasses}
+          >
+            <option value="">Select…</option>
+            {subUnitOptions.map((entry) => (
+              <option key={entry.id} value={entry.name}>
+                {entry.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs leading-relaxed text-slate">{WELLBEING_SUB_UNIT_HELP}</p>
         </div>
 
         <fieldset className="flex flex-col gap-2">

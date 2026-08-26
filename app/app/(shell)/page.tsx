@@ -13,6 +13,7 @@ import { DiscRadarChart } from "@/components/charts/DiscRadarChart";
 import { ResultGlyph } from "@/components/charts/ResultGlyph";
 import { ResultQuickActions } from "@/components/report/ResultQuickActions";
 import { ProductCards } from "@/components/presentations/ProductCards";
+import { WellbeingWorkspaceEntry } from "@/components/app/WellbeingWorkspaceEntry";
 import { JoinByCodeForm } from "@/components/teams/JoinByCodeForm";
 import { SessionCard, type SessionProgress } from "@/components/teams/SessionCard";
 import { logRouteDiagnostic } from "@/lib/observability/diagnostics";
@@ -85,8 +86,21 @@ export default async function AppDashboardPage({
     ]);
 
   const latest = results?.[0] ?? null;
+  // Wellbeing campaigns are stored as teams and must not be listed as DISC
+  // ones. Everything downstream of this list is the DISC participant
+  // experience — the Teams panel, the facilitated session card, the
+  // "continue your assessment" progress lookup — so a campaign reaching it
+  // offers a participant a DISC assessment for a wellbeing pulse. That is how
+  // "Wellbeing Pulse — Management Pilot" came to sit in a participant's
+  // Teams list beside their real teams.
+  //
+  // The wellbeing workspace is reached from its own entry point, and a
+  // participant's own campaign from their own invitation.
   const teams = ((memberships ?? []) as unknown as TeamMembershipRow[])
-    .filter((row) => row.teams && !row.teams.archived_at)
+    .filter(
+      (row) =>
+        row.teams && !row.teams.archived_at && row.teams.assessment_type !== "wellbeing",
+    )
     .map((row) => ({ ...row.teams!, memberRole: row.role }));
   const isTeamAdmin = teams.some((team) => team.memberRole === "team_admin");
   const showTeamManagement = isTeamAdmin || entitlement.allowed;
@@ -309,6 +323,14 @@ export default async function AppDashboardPage({
           <ProductCards />
         </section>
       )}
+
+      {/*
+        A separate PRODUCT, set apart from the assessment cards above rather
+        than added to them — see WellbeingWorkspaceEntry for why that
+        distinction is load-bearing rather than cosmetic. Renders nothing for
+        anyone with no wellbeing role, campaign or platform scope.
+      */}
+      <WellbeingWorkspaceEntry context={context} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         {/* history */}

@@ -194,8 +194,22 @@ export async function getTeamInstrument(
 
 /* ── form taxonomy ──────────────────────────────────────────────────── */
 
+export interface WellbeingSubUnitOption {
+  id: string;
+  name: string;
+  /**
+   * The Department / Function this sub-unit belongs to, where it has one.
+   *
+   * Null means "offered under any department" — correct for a cross-functional
+   * unit, and the reason the form falls back to showing everything rather than
+   * an empty list when a participant picks a department nothing hangs from.
+   */
+  departmentId: string | null;
+}
+
 export interface WellbeingFormOptions {
   departments: { id: string; name: string }[];
+  subUnits: WellbeingSubUnitOption[];
   officeLocations: { id: string; name: string }[];
 }
 
@@ -223,6 +237,15 @@ export async function getWellbeingFormOptions(
     .is("archived_at", null)
     .order("position")
     .order("name");
+  // Sub-units are always tenant-owned — there is no platform catalogue of
+  // them — so this needs no platform-row union. Retired units are excluded by
+  // `is_active` rather than deleted, so results that name one still read.
+  const subUnitQuery = context.supabase
+    .from("wellbeing_sub_units")
+    .select("id, name, department_id, organization_id, sort_order")
+    .eq("is_active", true)
+    .order("sort_order")
+    .order("name");
 
   // With a known organisation, show its taxonomy plus the platform defaults.
   //
@@ -232,13 +255,14 @@ export async function getWellbeingFormOptions(
   // customised the taxonomy. Leaving the filter off lets RLS decide, and
   // `can_read_wellbeing_lookup` already scopes it to organisations the person
   // genuinely belongs to.
-  const [{ data: departments }, { data: offices }] = await Promise.all([
+  const [{ data: departments }, { data: offices }, { data: subUnits }] = await Promise.all([
     organizationId
       ? departmentQuery.or(`organization_id.eq.${organizationId},organization_id.is.null`)
       : departmentQuery,
     organizationId
       ? officeQuery.or(`organization_id.eq.${organizationId},organization_id.is.null`)
       : officeQuery,
+    organizationId ? subUnitQuery.eq("organization_id", organizationId) : subUnitQuery,
   ]);
 
   // An organisation's own entry outranks a platform entry of the same name, so
@@ -258,6 +282,13 @@ export async function getWellbeingFormOptions(
   return {
     departments: dedupe((departments ?? []) as never),
     officeLocations: dedupe((offices ?? []) as never),
+    // No dedupe: the unique index already guarantees one name per
+    // organisation, and there is no platform layer to override.
+    subUnits: (subUnits ?? []).map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+      departmentId: (row.department_id as string | null) ?? null,
+    })),
   };
 }
 

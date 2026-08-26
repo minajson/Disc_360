@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { requireOnboarded } from "@/lib/auth/guards";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { TeamTabs } from "@/components/teams/TeamTabs";
@@ -23,6 +23,21 @@ export default async function TeamLayout({
     supabase.rpc("is_team_admin", { team: teamId }),
   ]);
   if (!team) notFound();
+
+  // A Wellbeing Pulse campaign is a different PRODUCT, not a variant of a DISC
+  // team. It happens to be stored as a team — it has members, an organisation,
+  // a join token and a facilitator, and duplicating all of that would have
+  // meant two identity models to keep in step — but everything below this
+  // point is the DISC experience: DISC Behaviour Assessment, Compare Members,
+  // Executive Brief, AI Insights.
+  //
+  // Compare Members is the one that matters most. It is a named-person
+  // comparison, and a wellbeing campaign must never offer one. So the boundary
+  // is enforced here, at the layout every DISC team surface passes through,
+  // rather than by hiding tabs one at a time and hoping none is missed.
+  if (team.assessment_type === "wellbeing") {
+    redirect(`/wellbeing/admin/campaigns/${teamId}`);
+  }
 
   return (
     // `print:contents` drops the page padding for print so a designed report

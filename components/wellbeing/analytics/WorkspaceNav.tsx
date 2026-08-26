@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { AnalyticsSource } from "@/lib/wellbeing/analytics";
 
 export const WELLBEING_WORKSPACE_TABS = [
   { key: "overview", label: "Overview" },
@@ -34,7 +35,7 @@ export function WorkspaceNav({
    * silently move the reader between the live pilot and the illustrative
    * demo, which would be the one confusion this workspace cannot afford.
    */
-  source: "live" | "demo";
+  source: AnalyticsSource;
   /**
    * Carried on every tab link. Without it, changing tab silently switched the
    * reader to a different instrument's numbers under the same heading — the
