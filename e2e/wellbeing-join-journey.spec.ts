@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { DEMO_PASSWORD } from "./helpers";
+import { DEMO_PASSWORD, submitSignIn } from "./helpers";
 
 /**
  * The printed code, all the way to the check-in — for somebody with no account.
@@ -56,8 +56,7 @@ async function wellbeingToken(page: Page): Promise<string | null> {
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill("demo@disc360.dev");
   await page.getByLabel("Password", { exact: true }).fill(DEMO_PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL("**/app**");
+  await submitSignIn(page);
 
   await page.goto("/wellbeing/admin/pilot");
   const hrefs = await page
@@ -138,11 +137,9 @@ test("an existing participant is returned to the same campaign", async ({ page }
   await page.goto(`/sign-in?next=${encodeURIComponent(`/wellbeing/join/${token}`)}`);
   await page.getByLabel("Email").fill("solo@disc360.dev");
   await page.getByLabel("Password", { exact: true }).fill(DEMO_PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-
   // Straight to the campaign: already onboarded, so the invitation is not what
   // they need — membership is taken from the token and they go to the pulse.
-  await page.waitForURL(/\/wellbeing(\/|\?)/, { timeout: 30_000 });
+  await submitSignIn(page, /\/wellbeing(\/|\?)/);
   expect(page.url(), "an existing participant must not be routed to /app").not.toMatch(/\/app/);
   await expectNoDiscWording(page);
 });
@@ -153,8 +150,7 @@ test("a DISC invitation still renders the DISC journey", async ({ page }) => {
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill("demo@disc360.dev");
   await page.getByLabel("Password", { exact: true }).fill(DEMO_PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL("**/app**");
+  await submitSignIn(page);
 
   await page.goto("/app/teams/30000000-0000-4000-8000-000000000002/dashboard");
   const href = await page

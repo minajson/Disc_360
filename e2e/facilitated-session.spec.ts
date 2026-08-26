@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { submitSignIn } from "./helpers";
 
 /**
  * Facilitator-led session + QR onboarding regression suite.
@@ -92,8 +93,8 @@ async function signIn(page: Page, email: string, password = PASSWORD) {
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL(/\/(app|onboarding)/, { timeout: 20000 });
+  // Retried: see submitSignIn — a click before React hydrates is swallowed.
+  await submitSignIn(page, /\/(app|onboarding)/);
 }
 
 test.beforeAll(() => {
