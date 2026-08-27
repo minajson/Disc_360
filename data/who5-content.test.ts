@@ -50,11 +50,11 @@ test("the five items are the published items, in the published order", () => {
   assert.deepEqual(
     WHO5_ITEM_STRUCTURE.map((item) => item.prompt),
     [
-      "I have felt cheerful and in good spirits",
-      "I have felt calm and relaxed",
-      "I have felt active and vigorous",
-      "I woke up feeling fresh and rested",
-      "My daily life has been filled with things that interest me",
+      "I have felt cheerful and in good spirits.",
+      "I have felt calm and relaxed.",
+      "I have felt active and vigorous.",
+      "I woke up feeling fresh and rested.",
+      "My daily life has been filled with things that interest me.",
     ],
   );
   // Published numbering is 1-based and administration order is 0-based; they
@@ -72,10 +72,10 @@ test("the six response anchors are the published anchors, with published points"
     [
       ["At no time", 0],
       ["Some of the time", 1],
-      ["Less than half of the time", 2],
-      ["More than half of the time", 3],
+      ["Less than half the time", 2],
+      ["More than half the time", 3],
       ["Most of the time", 4],
-      ["All of the time", 5],
+      ["All the time", 5],
     ],
   );
 });
@@ -89,7 +89,9 @@ test("position and points ascend together, so a stored position reads back corre
 
 test("the instruction and example are the published wording", () => {
   assert.match(WHO5_STEM, /closest to how you have been feeling over the last two weeks/);
-  assert.match(WHO5_STEM, /higher numbers mean better well-being/);
+  // The supplied guide's instruction stops there; the "higher numbers" sentence
+  // belongs to the WHO publication and is deliberately not carried.
+  assert.ok(!/higher numbers/.test(WHO5_STEM));
   assert.match(WHO5_EXAMPLE, /cheerful and in good spirits more than half of the time/);
   assert.match(WHO5_EXAMPLE, /select number three/);
   assert.equal(WHO5_RECALL_WINDOW, "the last two weeks");
@@ -184,7 +186,7 @@ test("the logo prohibition is written down where the content lives", () => {
 
 test("the suggested cut-off is recorded at its published values", () => {
   assert.equal(WHO5_SUGGESTED_CUTOFF_PERCENTAGE, 50);
-  assert.equal(WHO5_SUGGESTED_CUTOFF_RAW, 13);
+  // The supplied guide states "Raw Score <= 12"; WHO states "below 13". Same set.\n  assert.equal(WHO5_SUGGESTED_CUTOFF_RAW, 12);
   assert.equal(INSTRUMENTS.who5.defaultThreshold, WHO5_SUGGESTED_CUTOFF_PERCENTAGE);
 });
 
@@ -211,7 +213,7 @@ test("WHO-5 never claims to diagnose", () => {
 // migration is a questionnaire that tests one way and administers another.
 
 test("the migration seeds exactly the authored items", () => {
-  const migration = read("supabase/migrations/00038_who5_content.sql");
+  const migration = read("supabase/migrations/00040_ghq_content_and_who5_wording.sql");
   for (const item of WHO5_ITEM_STRUCTURE) {
     assert.ok(
       migration.includes(`'${item.externalId}'`),
@@ -225,16 +227,23 @@ test("the migration seeds exactly the authored items", () => {
 });
 
 test("the migration seeds exactly the authored anchors and points", () => {
+  // 00038 established the anchors AND their points; 00040 only re-labels them
+  // to the supplied guide's wording. Points are asserted where they are set.
   const migration = read("supabase/migrations/00038_who5_content.sql");
   for (const option of WHO5_RESPONSE_OPTIONS) {
-    assert.ok(
-      migration.includes(`'${option.label}'`),
-      `migration is missing anchor "${option.label}"`,
-    );
     assert.match(
       migration,
-      new RegExp(`\\(${option.position}, '${option.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}',\\s*${option.points}::smallint\\)`),
-      `anchor "${option.label}" must score ${option.points}`,
+      new RegExp(`\\(${option.position}, '[^']+',\\s*${option.points}::smallint\\)`),
+      `position ${option.position} must score ${option.points}`,
+    );
+  }
+
+  // The wording in force comes from 00040, transcribed from the supplied guide.
+  const rewording = read("supabase/migrations/00040_ghq_content_and_who5_wording.sql");
+  for (const option of WHO5_RESPONSE_OPTIONS) {
+    assert.ok(
+      rewording.includes(`'${option.label}'`),
+      `the re-wording migration is missing anchor "${option.label}"`,
     );
   }
 });
@@ -250,7 +259,8 @@ test("the migration records the licence and checks its own arithmetic", () => {
   assert.match(migration, /expected 25/, "the published raw maximum is asserted");
 });
 
-test("the migration touches no other instrument", () => {
+test("the WHO-5 content migration touches no other instrument", () => {
+  // 00040 deliberately covers all three; 00038 is WHO-5's alone.
   const migration = read("supabase/migrations/00038_who5_content.sql");
   for (const foreign of ["ghq12", "ghq28", "disc360_wellbeing_v1"]) {
     const writes = new RegExp(`(insert|update|delete)[\\s\\S]{0,200}${foreign}`, "i");

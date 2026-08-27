@@ -186,13 +186,27 @@ export const GHQ12: InstrumentMetadata = {
   subscales: [],
   subscaleDescription: "Overall score only — no subscales",
   hasThreshold: true,
-  thresholdDescription: "Configured screening threshold",
+  // The supplied guide put a score of 4 in two bands at once ("3–4 borderline"
+  // and "≥4 clinically significant"). Resolved by the product owner to the 3/4
+  // split, so 4 is the first score in the upper band. Recorded with its
+  // provenance because the document itself cannot be quoted as the authority.
+  thresholdDescription:
+    "Binary GHQ scoring (0-0-1-1), 0–12. Bands 0–3 and 4–12, the 3/4 split confirmed by the " +
+    "product owner after the supplied guide placed 4 in both. A screening indication only — " +
+    "not a diagnosis and not a measure of fitness for work.",
   defaultThreshold: 4,
   licensing: "external_rights_required",
   licensingDescription:
-    "External rights required — digital-use permission is being pursued internally",
+    "Licence confirmed by the product owner for digital use. Content transcribed from " +
+    "GHQ-12_Questionnaire_and_Assessment_Guide.pdf, which carries no attribution statement — " +
+    "see sourceDocument.",
+  sourceDocument: "GHQ-12_Questionnaire_and_Assessment_Guide.pdf",
+  // Deliberately null. GHQ-12 is copyright Goldberg & Williams and licensed
+  // through GL Assessment, so an attribution string is very likely required —
+  // but none appears in the supplied guide, and inventing one would be worse
+  // than leaving the gap visible. It is reported rather than fabricated.
   attribution: null,
-  status: "demo_restricted",
+  status: "active",
   minutesToComplete: "2–3 minutes",
   notClaims: ["not a diagnosis", "not a severity scale", "not a measure of fitness for work"],
 };
@@ -251,13 +265,26 @@ export const GHQ28: InstrumentMetadata = {
   subscaleDescription:
     "Four subscales of seven items. Profile dimensions only — they carry no thresholds of their own.",
   hasThreshold: true,
-  thresholdDescription: "Configured GHQ-28 screening threshold",
+  // FIVE, not the "4 or more" printed in the supplied guide. The product owner
+  // confirmed the 4/5 split, which is also what the registry already held. The
+  // divergence from the document is deliberate and recorded so nobody later
+  // "corrects" this to match it.
+  thresholdDescription:
+    "Binary GHQ scoring (0-0-1-1), 0–28. Bands 0–4 and 5–28, the 4/5 split confirmed by the " +
+    "product owner; the supplied guide states 4. A screening indication only — not a " +
+    "diagnosis, and the four subscales carry no thresholds of their own.",
   defaultThreshold: 5,
   licensing: "external_rights_required",
   licensingDescription:
-    "External rights required — digital-use permission is being pursued internally",
+    "Licence confirmed by the product owner for digital use. Content transcribed from " +
+    "GHQ-28_Questionnaire_and_Assessment_Guide.pdf, which carries no attribution statement — " +
+    "see sourceDocument.",
+  sourceDocument: "GHQ-28_Questionnaire_and_Assessment_Guide.pdf",
+  // Null for the same reason as GHQ-12: copyright Goldberg & Hillier, licensed
+  // through GL Assessment, and the supplied guide carries no attribution to
+  // transcribe. Reported, not fabricated.
   attribution: null,
-  status: "demo_restricted",
+  status: "active",
   minutesToComplete: "5–7 minutes",
   notClaims: [
     "not a diagnosis",

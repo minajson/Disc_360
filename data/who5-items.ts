@@ -50,12 +50,18 @@ export const WHO5_SOURCE_DOCUMENT = "WHO/UCN/MSD/MHE/2024.1";
 export const WHO5_SOURCE_URL =
   "https://www.who.int/publications/m/item/WHO-UCN-MSD-MHE-2024.01";
 
-/** The respondent-facing instruction, verbatim. */
+/** The respondent-facing instruction, verbatim from the supplied guide. */
 export const WHO5_STEM =
   "Please indicate for each of the five statements which is closest to how you have been " +
-  "feeling over the last two weeks. Notice that higher numbers mean better well-being.";
+  "feeling over the last two weeks.";
 
-/** The worked example the publication prints beneath the instruction, verbatim. */
+/**
+ * The worked example.
+ *
+ * The supplied guide omits it; the WHO publication prints it. Kept because it
+ * helps a participant read the scale and adds no interpretation, and marked
+ * here so its provenance is not mistaken for the supplied guide.
+ */
 export const WHO5_EXAMPLE =
   "Example. If you have felt cheerful and in good spirits more than half of the time during " +
   "the last two weeks, select number three.";
@@ -90,10 +96,10 @@ export interface Who5ResponseOption {
 export const WHO5_RESPONSE_OPTIONS: readonly Who5ResponseOption[] = [
   { position: 0, label: "At no time", points: 0 },
   { position: 1, label: "Some of the time", points: 1 },
-  { position: 2, label: "Less than half of the time", points: 2 },
-  { position: 3, label: "More than half of the time", points: 3 },
+  { position: 2, label: "Less than half the time", points: 2 },
+  { position: 3, label: "More than half the time", points: 3 },
   { position: 4, label: "Most of the time", points: 4 },
-  { position: 5, label: "All of the time", points: 5 },
+  { position: 5, label: "All the time", points: 5 },
 ];
 
 /** Raw total across five items. */
@@ -126,7 +132,41 @@ export const WHO5_TRANSFORM_MULTIPLIER = 4;
  *     on the measurement.
  */
 export const WHO5_SUGGESTED_CUTOFF_PERCENTAGE = 50;
-export const WHO5_SUGGESTED_CUTOFF_RAW = 13;
+export const WHO5_SUGGESTED_CUTOFF_RAW = 12;
+
+/**
+ * Whether a score falls on the noteworthy side of the cut-off.
+ *
+ * The supplied guide states "Score ≤ 50 (or Raw Score ≤ 12)"; the WHO
+ * publication states "below 50 (or a raw score below 13)". The two agree on
+ * raw scores — below 13 IS at-or-below 12 — and differ only on whether a
+ * percentage of exactly 50 counts.
+ *
+ * In practice they cannot differ at all: the percentage is the raw total × 4,
+ * so only multiples of 4 are reachable and 50 is not among them. Raw 12 gives
+ * 48 and raw 13 gives 52. The predicate follows the supplied guide, and this
+ * note records why the choice is inconsequential rather than leaving a future
+ * reader to rediscover it.
+ */
+export function who5AtOrBelowCutoff(percentageScore: number): boolean {
+  return percentageScore <= WHO5_SUGGESTED_CUTOFF_PERCENTAGE;
+}
+
+/**
+ * The supplied guide's "> 10% decrease" rule — RECORDED, NOT APPLIED.
+ *
+ * The guide states that a drop of more than 10% between consecutive
+ * assessments "indicates a clinically significant decline in well-being". It
+ * appears nowhere in the WHO publication, and applying it would label a
+ * routine movement on a five-item questionnaire as a clinical event — which
+ * the product owner has separately and explicitly ruled out ("do not label
+ * small score movements as clinical improvement or deterioration").
+ *
+ * So the figure is kept here, traceable to its source, and no code reads it.
+ * Enabling it is a product decision with clinical governance attached, not a
+ * detail to be switched on quietly.
+ */
+export const WHO5_GUIDE_DECLINE_PERCENTAGE = 10;
 
 export interface Who5ItemStructure {
   externalId: string;
@@ -143,30 +183,30 @@ export const WHO5_ITEM_STRUCTURE: readonly Who5ItemStructure[] = [
     externalId: "who5_item_01",
     position: 0,
     number: 1,
-    prompt: "I have felt cheerful and in good spirits",
+    prompt: "I have felt cheerful and in good spirits.",
   },
   {
     externalId: "who5_item_02",
     position: 1,
     number: 2,
-    prompt: "I have felt calm and relaxed",
+    prompt: "I have felt calm and relaxed.",
   },
   {
     externalId: "who5_item_03",
     position: 2,
     number: 3,
-    prompt: "I have felt active and vigorous",
+    prompt: "I have felt active and vigorous.",
   },
   {
     externalId: "who5_item_04",
     position: 3,
     number: 4,
-    prompt: "I woke up feeling fresh and rested",
+    prompt: "I woke up feeling fresh and rested.",
   },
   {
     externalId: "who5_item_05",
     position: 4,
     number: 5,
-    prompt: "My daily life has been filled with things that interest me",
+    prompt: "My daily life has been filled with things that interest me.",
   },
 ];

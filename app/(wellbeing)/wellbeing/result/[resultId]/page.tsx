@@ -6,6 +6,13 @@ import { WELLBEING_MAX_SCORE } from "@/lib/scoring/wellbeing";
 import { DISC_WELLBEING_MAX_RAW, rankDimensions } from "@/lib/scoring/disc360-wellbeing";
 import { ScoreScale } from "@/components/wellbeing/ScoreScale";
 import { Who5Scale } from "@/components/wellbeing/Who5Scale";
+import { hasPositiveSectionD } from "@/lib/wellbeing/ghq28-section-d";
+import {
+  GHQ28_SUPPORT_BODY,
+  GHQ28_SUPPORT_HEADING,
+  GHQ28_SUPPORT_NEXT_STEPS,
+  GHQ28_SUPPORT_PRIVACY_NOTE,
+} from "@/data/ghq28-support-content";
 import { WHO5_RAW_MAX, WHO5_SUGGESTED_CUTOFF_PERCENTAGE } from "@/data/who5-items";
 import {
   who5CutoffCopy,
@@ -350,9 +357,28 @@ function GhqResult({
   const outcome = outcomeCopy(record.atOrAboveThreshold === true);
   const threshold = record.threshold ?? 4;
 
+  // GHQ-28 only, and only on the participant's own result.
+  //
+  // Section D asks directly about not wanting to live. The supplied guide
+  // requires professional evaluation after a positive answer there; this
+  // product cannot notify anybody, because an individual result is private by
+  // design. So the support information goes to the one person who can act on
+  // it. Derived here and discarded — never stored, never sent, never counted.
+  const showSectionDSupport =
+    record.instrumentKey === "ghq28" && hasPositiveSectionD(record.itemPositions);
+
   return (
     <>
       <h1 className="mt-3 font-display text-h2 font-semibold tracking-tight">{RESULT_HEADING}</h1>
+
+      {showSectionDSupport && (
+        <section className="pulse-card mt-8 flex flex-col gap-3 border-l-2 border-l-pulse p-6 sm:p-9">
+          <h2 className="font-display text-h3 font-semibold">{GHQ28_SUPPORT_HEADING}</h2>
+          <p className="text-[0.95rem] leading-relaxed text-ink">{GHQ28_SUPPORT_BODY}</p>
+          <p className="text-[0.95rem] leading-relaxed text-ink">{GHQ28_SUPPORT_NEXT_STEPS}</p>
+          <p className="text-sm leading-relaxed text-slate">{GHQ28_SUPPORT_PRIVACY_NOTE}</p>
+        </section>
+      )}
 
       <section className="pulse-card mt-8 flex flex-col gap-7 p-6 sm:p-9">
         <ScoreScale

@@ -21,17 +21,22 @@ import {
  * ─────────────────────────────────────────────────────────────────────
  * TWO DIFFERENT GATES, FOR TWO DIFFERENT REASONS.
  *
- * · CONTENT-GATED (GHQ-12, GHQ-28) — the wording is not loaded, because the
- *   rights are not confirmed. Nothing to serve, so nothing can be served.
- *
  * · RIGHTS-GATED (WHO-5) — the wording IS loaded and verbatim-correct, under
  *   CC BY-NC-SA 3.0 IGO. That licence is NON-COMMERCIAL, and this platform is
- *   commercial, so being "active" is not sufficient: the organisation running
- *   the campaign must itself be classified `internal_noncommercial`.
+ *   commercial, so being active would not be sufficient: the organisation
+ *   running the campaign must itself be classified `internal_noncommercial`.
  *
- * The distinction matters because the two fail for different reasons and are
- * fixed by different people. A content gate lifts when a licence is signed; a
- * rights gate lifts only for an organisation whose use is actually covered.
+ * · RELEASE-GATED (WHO-5, again) — its result path is still being completed,
+ *   so it stays switched off independently of rights.
+ *
+ * GHQ-12 and GHQ-28 were content-gated until their licences were confirmed and
+ * 00040 loaded their wording. They are now active and commercially licensed,
+ * with no organisation classification required.
+ *
+ * The distinction matters because the gates fail for different reasons and are
+ * lifted by different people. A content gate lifts when a licence is signed; a
+ * rights gate lifts only for an organisation whose use is actually covered;
+ * a release gate lifts when the product is finished.
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -43,8 +48,15 @@ const LOCAL_DEMO = { isProduction: false, demoEnabled: true };
 /** Internal, non-commercial evaluation — the only use WHO-5 is licensed for. */
 const INTERNAL = { organizationUse: "internal_noncommercial" as const };
 
-/** Content not loaded: no licence confirmed, so no wording exists to serve. */
-const RESTRICTED: InstrumentKey[] = ["ghq12", "ghq28"];
+/**
+ * Instruments still withheld from participants.
+ *
+ * GHQ-12 and GHQ-28 used to sit here. Their licences are now confirmed and
+ * their wording is loaded (00040), so they are active. WHO-5 remains withheld
+ * — not for content, which is loaded, but because its result path is still
+ * being completed; see the registry comment on its status.
+ */
+const RESTRICTED: InstrumentKey[] = ["who5"];
 
 /* ── production is closed ───────────────────────────────────────────── */
 
@@ -52,7 +64,12 @@ test("no unlicensed instrument may be served in production", () => {
   for (const key of RESTRICTED) {
     const decision = canServeToParticipants(key, PRODUCTION);
     assert.equal(decision.allowed, false, `${key} must be blocked in production`);
-    assert.equal(decision.reason, NOT_ACTIVE_MESSAGE);
+    // Blocked is the property under test here. WHICH refusal applies depends
+    // on the gate, and each gate has its own dedicated test below.
+    assert.ok(
+      decision.reason === NOT_ACTIVE_MESSAGE || decision.reason === NON_COMMERCIAL_ONLY_MESSAGE,
+      `${key} must give a known refusal, got: ${decision.reason}`,
+    );
   }
 });
 
@@ -78,9 +95,33 @@ test("local alone does not open a restricted instrument either", () => {
 
 /* ── the one door that opens ────────────────────────────────────────── */
 
-test("GHQ-12 and GHQ-28 open only under local + explicit demo flag", () => {
-  assert.equal(canServeToParticipants("ghq12", LOCAL_DEMO).allowed, true);
-  assert.equal(canServeToParticipants("ghq28", LOCAL_DEMO).allowed, true);
+test("GHQ-12 and GHQ-28 are licensed, worded and active", () => {
+  for (const key of ["ghq12", "ghq28"] as const) {
+    assert.equal(INSTRUMENTS[key].status, "active", `${key} must be active`);
+    // No non-commercial restriction: these are commercially licensed, unlike
+    // WHO-5, so nothing gates them on the organisation's classification.
+    assert.notEqual(INSTRUMENTS[key].useClassification, "internal_noncommercial");
+    for (const environment of [PRODUCTION, LOCAL, LOCAL_DEMO, PRODUCTION_WITH_DEMO_FLAG]) {
+      assert.equal(
+        canServeToParticipants(key, environment).allowed,
+        true,
+        `${key} must serve in every environment once licensed`,
+      );
+    }
+  }
+});
+
+test("a licensed instrument still records where its wording came from", () => {
+  // The supplied guides carry no attribution statement, so `attribution` is
+  // null and `sourceDocument` is the only provenance there is. Losing it would
+  // leave licensed third-party content with nothing identifying its origin.
+  for (const key of ["ghq12", "ghq28"] as const) {
+    assert.match(
+      INSTRUMENTS[key].sourceDocument ?? "",
+      /Questionnaire_and_Assessment_Guide\.pdf$/,
+      `${key} must name the document it was transcribed from`,
+    );
+  }
 });
 
 /* ── WHO-5: active content, non-commercial rights ───────────────────── */
@@ -171,8 +212,12 @@ test("DISC360 Wellbeing is active and serves everywhere, including production", 
 test("a blocked decision reveals nothing about the questionnaire", () => {
   for (const key of RESTRICTED) {
     const reason = canServeToParticipants(key, PRODUCTION).reason ?? "";
-    assert.equal(reason, NOT_ACTIVE_MESSAGE);
-    assert.ok(!/item|question|score|threshold/i.test(reason));
+    assert.ok(reason.length > 0, `${key} must give a reason`);
+    // Whichever gate refused, the message must not leak content.
+    assert.ok(
+      !/item|question|score|threshold/i.test(reason),
+      `refusal for ${key} leaks content: ${reason}`,
+    );
   }
 });
 

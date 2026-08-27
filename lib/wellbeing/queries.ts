@@ -311,6 +311,16 @@ export interface WellbeingHistoryRecord {
   /** Null for instruments without a threshold — DISC360 Wellbeing V1 has none. */
   threshold: number | null;
   atOrAboveThreshold: boolean | null;
+  /**
+   * The participant's own response positions, in administration order.
+   *
+   * Loaded ONLY by the own-result query, which is scoped to
+   * `profile_id = <the caller>`. It exists so a participant's own GHQ-28
+   * result can show support information when Section D was answered
+   * positively. It must never be added to a facilitator, analytics or
+   * reporting query — a test asserts that.
+   */
+  itemPositions: number[] | null;
   /** Empty for GHQ. Six entries, in display order, for DISC360 Wellbeing. */
   dimensions: WellbeingDimensionScore[];
   /** Movement of the 0–100 index against the previous pulse of the SAME instrument. */
@@ -356,7 +366,7 @@ export type WellbeingHistoryByInstrument = Record<InstrumentKey, WellbeingHistor
 // One string literal, not a concatenation: supabase-js infers the row shape
 // from the literal type, and `"a" + "b"` widens to `string`.
 const RESULT_COLUMNS =
-  "id, profile_id, session_id, instrument_key, total_score, index_score, likert_score, threshold_at_completion, at_or_above_threshold, attempt_number, completed_at, questionnaire_version, scoring_version, department_at_completion, work_location_at_completion, office_location_at_completion, job_title_at_completion, team_name_at_completion, organization_name_at_completion, wellbeing_result_dimensions (dimension_key, raw_score, index_score)";
+  "id, profile_id, session_id, instrument_key, total_score, index_score, likert_score, item_positions, threshold_at_completion, at_or_above_threshold, attempt_number, completed_at, questionnaire_version, scoring_version, department_at_completion, work_location_at_completion, office_location_at_completion, job_title_at_completion, team_name_at_completion, organization_name_at_completion, wellbeing_result_dimensions (dimension_key, raw_score, index_score)";
 
 /**
  * This participant's complete wellbeing history.
@@ -436,6 +446,7 @@ interface ResultRow {
   completed_at: string;
   questionnaire_version: number;
   scoring_version: string;
+  item_positions: number[] | null;
   department_at_completion: string | null;
   work_location_at_completion: WorkLocation | null;
   office_location_at_completion: string | null;
@@ -470,6 +481,7 @@ function toHistoryRecord(row: ResultRow, previous: ResultRow | null): WellbeingH
     atOrAboveThreshold: row.at_or_above_threshold,
     dimensions,
     attemptNumber: row.attempt_number,
+    itemPositions: (row.item_positions as number[] | null) ?? null,
     departmentAtCompletion: row.department_at_completion,
     workLocationAtCompletion: row.work_location_at_completion,
     officeLocationAtCompletion: row.office_location_at_completion,
