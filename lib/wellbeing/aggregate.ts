@@ -24,7 +24,14 @@ export interface DistributionBucket {
   count: number;
   /** Percentage of completed responses, 0–100, rounded to one decimal. */
   share: number;
-  /** True when this bucket sits at or above the configured threshold. */
+  /**
+   * True when this bucket sits on the instrument's NOTEWORTHY side.
+   *
+   * For GHQ that is at or above the threshold; for WHO-5 it is below the
+   * cut-off, because WHO-5 counts upward toward wellbeing. Kept under the old
+   * name so existing GHQ consumers are unaffected — see `thresholdDirection`,
+   * which says which side this actually means.
+   */
   atOrAboveThreshold: boolean;
 }
 
@@ -40,10 +47,23 @@ export interface WellbeingAggregate {
   mean: number;
   /** Always 13 buckets, 0–12, including empty ones so the axis is stable. */
   distribution: DistributionBucket[];
-  /** Count of responses at or above the configured threshold. */
+  /** Count of responses on the noteworthy side of the threshold. */
   atOrAboveThreshold: number;
   /** That count as a percentage of completed, 0–100. Zero when no threshold. */
   atOrAboveThresholdShare: number;
+  /**
+   * WHICH SIDE the count above refers to, and how to label it.
+   *
+   * GHQ counts upward toward distress, so its noteworthy share is at or above
+   * the threshold. WHO-5 counts upward toward WELLBEING, so its noteworthy
+   * share is BELOW the cut-off — and a facilitator shown "% at or above" for
+   * WHO-5 would read the healthy proportion as the concerning one.
+   *
+   * `thresholdLabel` is the comparator to print ("≥ 4", "< 50") so no display
+   * surface has to hard-code one and get it wrong for half the instruments.
+   */
+  thresholdDirection: ThresholdDirection;
+  thresholdLabel: string | null;
   /** Null for instruments that carry no threshold. */
   threshold: number | null;
   /** The instrument's own maximum, so a chart never guesses its axis. */
@@ -52,9 +72,21 @@ export interface WellbeingAggregate {
   bucketSize: number;
 }
 
+/**
+ * Which side of a threshold is the one worth reporting.
+ *
+ * Not cosmetic: it decides what the headline percentage COUNTS.
+ */
+export type ThresholdDirection = "at_or_above" | "below";
+
 export interface AggregateOptions {
-  /** Null for instruments that carry no threshold (WHO-5, DISC360 V1). */
+  /** Null for an instrument that carries no threshold (DISC360 Wellbeing V1). */
   threshold?: number | null;
+  /**
+   * Defaults to `at_or_above`, which is right for GHQ-12 and GHQ-28 and wrong
+   * for WHO-5. A caller that knows its instrument passes the correct one.
+   */
+  thresholdDirection?: ThresholdDirection;
   invited?: number | null;
   /**
    * The instrument's own maximum. GHQ-12 is 12, GHQ-28 is 28, WHO-5 and the
@@ -92,6 +124,21 @@ export function mean(values: number[]): number {
  * Scores outside 0–12 are a programming error rather than a data condition,
  * so they throw instead of being clamped into a plausible-looking figure.
  */
+/**
+ * Is this score on the side of the threshold that is worth reporting?
+ *
+ * The whole reason this is a function rather than `score >= threshold` inline
+ * is that the answer depends on the instrument. Writing the comparison at each
+ * call site is how a WHO-5 cohort ends up reported as its own opposite.
+ */
+function onNoteworthySide(
+  score: number,
+  threshold: number,
+  direction: ThresholdDirection,
+): boolean {
+  return direction === "below" ? score < threshold : score >= threshold;
+}
+
 export function aggregateScores(
   scores: number[],
   options: AggregateOptions = {},
@@ -104,6 +151,7 @@ export function aggregateScores(
       ? null
       : (options.threshold ?? DEFAULT_SCREENING_THRESHOLD);
   const bucketSize = options.bucketSize ?? 1;
+  const direction: ThresholdDirection = options.thresholdDirection ?? "at_or_above";
 
   for (const score of scores) {
     if (!Number.isInteger(score) || score < 0 || score > maxScore) {
@@ -125,14 +173,16 @@ export function aggregateScores(
       score,
       count,
       share: completed === 0 ? 0 : round1((count / completed) * 100),
-      // False throughout for an instrument with no threshold — nothing is
-      // "at or above" a line that does not exist.
-      atOrAboveThreshold: threshold !== null && score >= threshold,
+      // False throughout for an instrument with no threshold — nothing is on
+      // the noteworthy side of a line that does not exist.
+      atOrAboveThreshold: threshold !== null && onNoteworthySide(score, threshold, direction),
     };
   });
 
   const above =
-    threshold === null ? 0 : scores.filter((score) => score >= threshold).length;
+    threshold === null
+      ? 0
+      : scores.filter((score) => onNoteworthySide(score, threshold, direction)).length;
   const invited = options.invited ?? null;
 
   // Participation needs a denominator that actually contains the numerator.
@@ -152,6 +202,9 @@ export function aggregateScores(
     atOrAboveThreshold: above,
     atOrAboveThresholdShare:
       threshold === null || completed === 0 ? 0 : round1((above / completed) * 100),
+    thresholdDirection: direction,
+    thresholdLabel:
+      threshold === null ? null : direction === "below" ? `< ${threshold}` : `≥ ${threshold}`,
     threshold,
     maxScore,
     bucketSize,

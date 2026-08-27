@@ -146,6 +146,17 @@ function aggregateOptionsFor(
     maxScore: instrument.primaryScoreMax,
     bucketSize: bucketSizeFor(instrument),
     threshold: instrument.hasThreshold ? threshold : null,
+    // Which side of the threshold is worth reporting depends on which way the
+    // instrument counts. GHQ runs upward toward distress, so at-or-above is
+    // the noteworthy share. WHO-5 runs upward toward WELLBEING, so its
+    // noteworthy share is BELOW the cut-off — and a facilitator shown
+    // "% at or above" for WHO-5 would read the healthy proportion as the
+    // concerning one. Derived from the instrument's declared direction rather
+    // than special-cased by key, so a new instrument inherits the right rule.
+    thresholdDirection:
+      instrument.scoreDirection === "higher_is_stronger_wellbeing"
+        ? ("below" as const)
+        : ("at_or_above" as const),
     invited,
   };
 }
@@ -219,7 +230,15 @@ export interface CohortStats {
   completed: number;
   median: number;
   mean: number;
+  /**
+   * Share on the instrument's NOTEWORTHY side of the threshold.
+   *
+   * Read it with `thresholdLabel`, never with a hard-coded "≥": for WHO-5 this
+   * counts responses BELOW the cut-off.
+   */
   atOrAboveThresholdShare: number;
+  /** The comparator to print — "≥ 4" or "< 50". Null when there is none. */
+  thresholdLabel: string | null;
   participation: number | null;
   /**
    * The band covering the middle of the cohort.
@@ -814,6 +833,7 @@ export async function getWellbeingComparison(
           median: aggregate.median,
           mean: aggregate.mean,
           atOrAboveThresholdShare: aggregate.atOrAboveThresholdShare,
+          thresholdLabel: aggregate.thresholdLabel,
           participation: null,
           p25: quantile(sorted, 0.25),
           p75: quantile(sorted, 0.75),

@@ -99,7 +99,12 @@ export function CohortComparison({
                   </span>
                   {threshold !== null && (
                     <span>
-                      ≥{threshold} {cohort.stats!.atOrAboveThresholdShare}%
+                      {/* The comparator comes from the aggregate, never
+                          hard-coded: WHO-5's noteworthy side is BELOW its
+                          cut-off, so a fixed "≥" would label the healthy
+                          proportion as the concerning one. */}
+                      {cohort.stats!.thresholdLabel ?? `≥ ${threshold}`}{" "}
+                      {cohort.stats!.atOrAboveThresholdShare}%
                     </span>
                   )}
                   <span className="text-faint">n = {cohort.completed}</span>

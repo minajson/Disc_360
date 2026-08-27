@@ -123,6 +123,9 @@ export async function loadWellbeingAggregateReport(
     }),
     threshold: context.threshold,
     atOrAboveThresholdShare: context.threshold === null ? null : (overview?.atOrAboveThresholdShare ?? null),
+    // Derived from the instrument's own direction, not assumed.
+    thresholdPhrase:
+      instrument.scoreDirection === "higher_is_stronger_wellbeing" ? "below" : "at or above",
     medianMovement: movement,
     cohortLabel: comparison.view.label,
     cohorts,

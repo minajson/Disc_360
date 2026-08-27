@@ -48,7 +48,8 @@ export function CohortStrip({
                 </span>
                 {threshold !== null && (
                   <span>
-                    ≥{threshold}{" "}
+                    {/* Direction comes from the instrument — see CohortStats. */}
+                    {cohort.stats!.thresholdLabel ?? `≥ ${threshold}`}{" "}
                     <strong className="text-sm text-ink">
                       {cohort.stats!.atOrAboveThresholdShare}%
                     </strong>

@@ -85,6 +85,15 @@ export interface WellbeingAggregateReportInput {
   /** Null for instruments with no validated cut-off. */
   threshold: number | null;
   atOrAboveThresholdShare: number | null;
+  /**
+   * How to describe the side being counted.
+   *
+   * Defaults to GHQ's phrasing. WHO-5 counts upward toward wellbeing, so its
+   * noteworthy share sits BELOW the cut-off — printing "at or above" for it
+   * would describe the healthy proportion as the concerning one, in a document
+   * a facilitator acts on.
+   */
+  thresholdPhrase?: string;
   medianMovement: string | null;
   cohortLabel: string;
   cohorts: AggregateCohort[];
@@ -200,7 +209,9 @@ export function buildWellbeingAggregateReport(
   ];
   if (input.threshold !== null && input.atOrAboveThresholdShare !== null) {
     overall.push(
-      `${input.atOrAboveThresholdShare}% of responses sit at or above the configured threshold of ${input.threshold}. The threshold indicates where a fuller conversation may be warranted. It is a screening cut-off applied to a group total and it establishes nothing about any individual.`,
+      `${input.atOrAboveThresholdShare}% of responses sit ${
+        input.thresholdPhrase ?? "at or above"
+      } the configured threshold of ${input.threshold}. The threshold indicates where a fuller conversation may be warranted. It is a screening cut-off applied to a group total and it establishes nothing about any individual.`,
     );
   }
   if (input.medianMovement) overall.push(input.medianMovement);
