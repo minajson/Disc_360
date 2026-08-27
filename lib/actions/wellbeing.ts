@@ -17,6 +17,17 @@ import {
   DISC_WELLBEING_SCORING_METHOD,
   DISC_WELLBEING_SCORING_VERSION,
 } from "@/lib/scoring/disc360-wellbeing";
+import {
+  computeGhq28Result,
+  GHQ28_SCORING_METHOD,
+  GHQ28_SCORING_VERSION,
+} from "@/lib/scoring/ghq28";
+import {
+  computeWho5Result,
+  WHO5_SCORING_METHOD,
+  WHO5_SCORING_VERSION,
+} from "@/lib/scoring/who5";
+import { WHO5_SUGGESTED_CUTOFF_PERCENTAGE } from "@/data/who5-items";
 import { INSTRUMENTS, isInstrumentKey, type InstrumentKey } from "@/data/wellbeing-instruments";
 import { isOtherDepartment } from "@/data/wellbeing-taxonomy";
 import { normalizeOrgFreeText, ORG_FREE_TEXT_MAX } from "@/lib/wellbeing/free-text";
@@ -523,7 +534,56 @@ export async function completeWellbeingPulse(sessionId: string): Promise<Complet
         threshold_at_completion: scored.thresholdAtCompletion,
         at_or_above_threshold: scored.atOrAboveThreshold,
       };
-    } else {
+    } else if (instrumentKey === "ghq28") {
+      const scored = computeGhq28Result({
+        answers,
+        itemOrder,
+        threshold: policy.screeningThreshold,
+      });
+      scoredRow = {
+        total_score: scored.totalScore,
+        // GHQ normalises nothing — there is no index, and inventing one by
+        // dividing by 28 would create a 0–100 figure that looks comparable to
+        // WHO-5's and is not.
+        index_score: null,
+        likert_score: scored.likertScore,
+        item_positions: scored.itemPositions,
+        scoring_method: GHQ28_SCORING_METHOD,
+        scoring_version: GHQ28_SCORING_VERSION,
+        threshold_at_completion: scored.thresholdAtCompletion,
+        at_or_above_threshold: scored.atOrAboveThreshold,
+      };
+      dimensionRows = scored.subscales.map((subscale) => ({
+        dimension_key: `ghq28_${subscale.key}`,
+        raw_score: subscale.score,
+        // The subscale's own bimodal count, NOT a normalised index. A subscale
+        // is a profile dimension and carries no threshold of its own.
+        index_score: subscale.score,
+      }));
+    } else if (instrumentKey === "who5") {
+      const scored = computeWho5Result({ answers, itemOrder });
+      scoredRow = {
+        // The RAW 0–25 total, matching every other instrument's `total_score`.
+        total_score: scored.rawScore,
+        // The published percentage, raw × 4. WHO-5's own transform, not the
+        // (raw/max)*100 the DISC360 index uses — they agree at the endpoints
+        // and are different rules, and adopting one for the other would be
+        // taking someone else's scale by coincidence.
+        index_score: scored.transformedScore,
+        likert_score: null,
+        item_positions: scored.itemPositions,
+        scoring_method: WHO5_SCORING_METHOD,
+        scoring_version: WHO5_SCORING_VERSION,
+        // The cut-off WHO's own publication documents, recorded AT COMPLETION
+        // so a historical result stays interpretable if the figure is ever
+        // revised. It is instrument documentation, not a DISC360 judgement.
+        threshold_at_completion: WHO5_SUGGESTED_CUTOFF_PERCENTAGE,
+        // WHO-5 counts UPWARD toward wellbeing, so at-or-above its cut-off is
+        // the unremarkable side — the exact opposite of what this flag means
+        // for GHQ. Nothing may read it without knowing the instrument.
+        at_or_above_threshold: scored.transformedScore >= WHO5_SUGGESTED_CUTOFF_PERCENTAGE,
+      };
+    } else if (instrumentKey === "disc360_wellbeing_v1") {
       const scored = computeDiscWellbeingResult({ answers, itemOrder });
       scoredRow = {
         total_score: scored.rawScore,
@@ -542,6 +602,20 @@ export async function completeWellbeingPulse(sessionId: string): Promise<Complet
         raw_score: dimension.raw,
         index_score: dimension.index,
       }));
+    } else {
+      // Exhaustive by construction rather than by a default branch.
+      //
+      // This used to be `else { computeDiscWellbeingResult(...) }`, which meant
+      // every instrument that was not GHQ-12 was scored by the DISC360 engine —
+      // WHO-5 and GHQ-28 included. It failed rather than mis-scored, because
+      // the engines reject a wrong item count, but "scored by the wrong
+      // instrument" must not be reachable at all. A new instrument now has to
+      // be handled here or it cannot be completed.
+      instrumentKey satisfies never;
+      return {
+        ok: false,
+        error: "We could not score this pulse. Please check your answers.",
+      };
     }
   } catch {
     // Both engines reject incomplete or malformed sets rather than returning a

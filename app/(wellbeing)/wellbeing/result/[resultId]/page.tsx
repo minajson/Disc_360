@@ -5,6 +5,19 @@ import { loadOwnWellbeingResult, type WellbeingHistoryRecord } from "@/lib/wellb
 import { WELLBEING_MAX_SCORE } from "@/lib/scoring/wellbeing";
 import { DISC_WELLBEING_MAX_RAW, rankDimensions } from "@/lib/scoring/disc360-wellbeing";
 import { ScoreScale } from "@/components/wellbeing/ScoreScale";
+import { Who5Scale } from "@/components/wellbeing/Who5Scale";
+import { WHO5_RAW_MAX, WHO5_SUGGESTED_CUTOFF_PERCENTAGE } from "@/data/who5-items";
+import {
+  who5CutoffCopy,
+  WHO5_CUTOFF_SOURCE_NOTE,
+  WHO5_DISCLAIMER_LONG,
+  WHO5_MOVEMENT_CAVEAT,
+  WHO5_NEXT_STEPS_BODY,
+  WHO5_NEXT_STEPS_HEADING,
+  WHO5_RESULT_HEADING,
+  WHO5_SCORE_MEANING,
+  WHO5_TREND_HEADING,
+} from "@/data/who5-content";
 import { PulseTrend } from "@/components/wellbeing/PulseTrend";
 import { IndexHero } from "@/components/wellbeing/IndexHero";
 import { DimensionProfile } from "@/components/wellbeing/DimensionProfile";
@@ -80,6 +93,8 @@ export default async function WellbeingResultPage({
 
       {record.instrumentKey === "disc360_wellbeing_v1" ? (
         <DiscWellbeingResult record={record} upToHere={upToHere} />
+      ) : record.instrumentKey === "who5" ? (
+        <Who5Result record={record} upToHere={upToHere} />
       ) : (
         <GhqResult record={record} upToHere={upToHere} />
       )}
@@ -99,7 +114,9 @@ export default async function WellbeingResultPage({
       <p className="mt-8 text-xs leading-relaxed text-slate">
         {record.instrumentKey === "disc360_wellbeing_v1"
           ? DISC_WELLBEING_DISCLAIMER_LONG
-          : SCREENING_DISCLAIMER_LONG}
+          : record.instrumentKey === "who5"
+            ? WHO5_DISCLAIMER_LONG
+            : SCREENING_DISCLAIMER_LONG}
       </p>
 
       {instrument.attribution && (
@@ -214,6 +231,111 @@ function DiscWellbeingResult({
       )}
     </>
   );
+}
+
+/* ── WHO-5 ──────────────────────────────────────────────────────────── */
+//
+// Shares the shell, the privacy model and the report actions with the other
+// instruments, and shares NO numbers and NO sentences with GHQ. WHO-5 counts
+// upward toward wellbeing on 0–100 and its cut-off is a floor; GHQ counts
+// upward toward distress and its threshold is a ceiling. Every string here
+// comes from data/who5-content.ts for that reason.
+
+function Who5Result({
+  record,
+  upToHere,
+}: {
+  record: WellbeingHistoryRecord;
+  upToHere: WellbeingHistoryRecord[];
+}) {
+  // The published percentage is the principal WHO-5 figure. `index_score`
+  // holds it; `total_score` holds the raw 0–25 the transform came from.
+  const score = record.indexScore ?? 0;
+  const cutoff = record.threshold ?? WHO5_SUGGESTED_CUTOFF_PERCENTAGE;
+  const atOrAboveCutoff = score >= cutoff;
+  const outcome = who5CutoffCopy(atOrAboveCutoff);
+
+  const trend = upToHere.filter((entry) => entry.indexScore !== null);
+
+  return (
+    <>
+      <h1 className="mt-3 font-display text-h2 font-semibold tracking-tight">
+        {WHO5_RESULT_HEADING}
+      </h1>
+
+      <section className="pulse-card mt-8 flex flex-col gap-7 p-6 sm:p-9">
+        <Who5Scale
+          score={score}
+          cutoff={cutoff}
+          rawScore={record.totalScore}
+          rawMax={WHO5_RAW_MAX}
+        />
+
+        <div className="flex flex-col gap-3 border-t border-[rgba(31,78,95,0.14)] pt-6">
+          <p className="text-[0.95rem] leading-relaxed text-ink">{WHO5_SCORE_MEANING}</p>
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-[rgba(31,78,95,0.14)] pt-6">
+          <h2 className="font-display text-h3 font-semibold">{outcome.headline}</h2>
+          <p className="text-[0.95rem] leading-relaxed text-ink">{outcome.body}</p>
+          {/* The cut-off never appears without saying whose it is. */}
+          <p className="text-sm leading-relaxed text-slate">{WHO5_CUTOFF_SOURCE_NOTE}</p>
+        </div>
+      </section>
+
+      {record.indexComparison && (
+        <section className="pulse-card mt-6 flex flex-col gap-3 p-6 sm:p-9">
+          <h2 className="font-display text-h3 font-semibold">
+            {DISC_MOVEMENT_LABEL[record.indexComparison.movement]}
+          </h2>
+          <p className="text-[0.95rem] leading-relaxed text-ink">
+            {who5MovementDetail(record.indexComparison.movement, record.indexComparison.delta)}
+          </p>
+          <p className="text-sm leading-relaxed text-slate">{WHO5_MOVEMENT_CAVEAT}</p>
+        </section>
+      )}
+
+      {trend.length > 1 && (
+        <section className="pulse-card mt-6 flex flex-col gap-4 p-6 sm:p-9">
+          <h2 className="font-display text-h3 font-semibold">{WHO5_TREND_HEADING}</h2>
+          <PulseTrend
+            max={100}
+            points={trend.map((entry) => ({
+              label: monthLabel(entry.completedAt),
+              score: entry.indexScore!,
+              // The cut-off is drawn, but `atOrAbove` is left false: on this
+              // chart that flag means "highlight as noteworthy", and WHO-5's
+              // noteworthy side is below the line, not above it. Marking the
+              // line is honest; reusing GHQ's highlight would not be.
+              threshold: entry.threshold,
+              atOrAbove: false,
+            }))}
+          />
+          <p className="text-sm leading-relaxed text-slate">{WHO5_MOVEMENT_CAVEAT}</p>
+        </section>
+      )}
+
+      <section className="pulse-card mt-6 flex flex-col gap-3 p-6 sm:p-9">
+        <h2 className="font-display text-h3 font-semibold">{WHO5_NEXT_STEPS_HEADING}</h2>
+        <p className="text-[0.95rem] leading-relaxed text-ink">{WHO5_NEXT_STEPS_BODY}</p>
+      </section>
+    </>
+  );
+}
+
+/**
+ * Direction and size, and nothing about health.
+ *
+ * "Improved" and "deteriorated" would be clinical claims derived from
+ * arithmetic on five questions, so the movement is described as what it
+ * literally is: the score is higher, lower, or the same.
+ */
+function who5MovementDetail(movement: "higher" | "lower" | "similar", delta: number): string {
+  const points = Math.abs(delta) === 1 ? "1 point" : `${Math.abs(delta)} points`;
+  if (movement === "similar") return "Your score is the same as it was last time.";
+  return movement === "higher"
+    ? `Your score is ${points} higher than your previous check-in.`
+    : `Your score is ${points} lower than your previous check-in.`;
 }
 
 /* ── GHQ ────────────────────────────────────────────────────────────── */
