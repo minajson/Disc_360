@@ -33,6 +33,14 @@ import {
   strongestLine,
 } from "@/data/disc360-wellbeing-content";
 import { DIMENSION_META, type DimensionKey } from "@/data/disc360-wellbeing-items";
+import {
+  who5CutoffCopy,
+  WHO5_CUTOFF_SOURCE_NOTE,
+  WHO5_DISCLAIMER_LONG,
+  WHO5_MOVEMENT_CAVEAT,
+  WHO5_SCORE_MEANING,
+} from "@/data/who5-content";
+import { WHO5_SUGGESTED_CUTOFF_PERCENTAGE } from "@/data/who5-items";
 import { DISC_WELLBEING_MAX_RAW, rankDimensions } from "@/lib/scoring/disc360-wellbeing";
 import type { WellbeingHistoryRecord } from "@/lib/wellbeing/queries";
 import type { AuthContext } from "@/lib/auth/guards";
@@ -80,6 +88,65 @@ export async function loadOwnWellbeingReport(
   if (record.instrumentKey === "disc360_wellbeing_v1") {
     return {
       document: buildDiscWellbeingDocument(participantName, record, upToHere),
+      filename: reportFilename(participantName, "wellbeing"),
+      context,
+      accountEmail: context.profile.email,
+      webPath: `/wellbeing/result/${record.id}`,
+      resultId: record.id,
+    };
+  }
+
+  if (record.instrumentKey === "who5") {
+    // WHO-5's principal figure is the published percentage (raw × 4), and its
+    // noteworthy side is BELOW the cut-off — the opposite of GHQ. Every value
+    // and every string here is WHO-5's own; none is shared with the GHQ branch
+    // below, because sharing them would invert the meaning.
+    const score = record.indexScore ?? 0;
+    const cutoff = record.threshold ?? WHO5_SUGGESTED_CUTOFF_PERCENTAGE;
+    const outcome = who5CutoffCopy(score >= cutoff);
+
+    return {
+      document: buildWellbeingReport({
+        participantName,
+        completedAt: record.completedAt,
+        totalScore: score,
+        maxScore: 100,
+        threshold: cutoff,
+        // Emphasise BELOW the cut-off. Passing `record.atOrAboveThreshold`
+        // straight through would highlight strong wellbeing as the concern.
+        atOrAboveThreshold: score < cutoff,
+        // Named for WHO-5, not inherited from GHQ.
+        scoreLabel: "WHO-5 Well-Being Score",
+        scoreMetaLabel: "WHO-5 score",
+        thresholdMetaLabel: "Suggested threshold",
+        outcomeHeadline: outcome.headline,
+        outcomeBody: outcome.body,
+        outcomeDetail: WHO5_CUTOFF_SOURCE_NOTE,
+        scoreMeaning: WHO5_SCORE_MEANING,
+        disclaimer: WHO5_DISCLAIMER_LONG,
+        history: upToHere
+          .filter((entry) => entry.indexScore !== null)
+          .map((entry) => ({
+            completedAt: entry.completedAt,
+            totalScore: entry.indexScore!,
+            threshold: entry.threshold ?? WHO5_SUGGESTED_CUTOFF_PERCENTAGE,
+          })),
+        movementLabel: record.comparison
+          ? DISC_MOVEMENT_LABEL[record.comparison.movement]
+          : undefined,
+        movementDetail: record.comparison
+          ? who5MovementDetail(record.comparison.movement, record.comparison.delta)
+          : undefined,
+        movementCaveat: record.comparison ? WHO5_MOVEMENT_CAVEAT : undefined,
+        departmentAtCompletion: record.departmentAtCompletion,
+        workLocationAtCompletion: record.workLocationAtCompletion
+          ? WORK_LOCATION_LABEL[record.workLocationAtCompletion]
+          : null,
+        officeLocationAtCompletion: record.officeLocationAtCompletion,
+        questionnaireVersion: record.questionnaireVersion,
+        scoringVersion: record.scoringVersion,
+        attemptNumber: record.attemptNumber,
+      }),
       filename: reportFilename(participantName, "wellbeing"),
       context,
       accountEmail: context.profile.email,
@@ -231,3 +298,18 @@ const DIMENSION_ORDER: DimensionKey[] = [
   "purpose_confidence",
   "everyday_wellbeing",
 ];
+
+
+/**
+ * Direction and size, and nothing about health.
+ *
+ * The same rule as the on-screen result: "improved" and "deteriorated" would
+ * be clinical claims derived from arithmetic on five questions.
+ */
+function who5MovementDetail(movement: "higher" | "lower" | "similar", delta: number): string {
+  const points = Math.abs(delta) === 1 ? "1 point" : `${Math.abs(delta)} points`;
+  if (movement === "similar") return "Your score is the same as it was last time.";
+  return movement === "higher"
+    ? `Your score is ${points} higher than your previous check-in.`
+    : `Your score is ${points} lower than your previous check-in.`;
+}

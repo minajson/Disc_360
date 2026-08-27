@@ -370,7 +370,7 @@ function drawScale(layout: ReportLayout, scale: ReportScale): void {
   const gap = 2.5;
   const cellWidth = (CONTENT_WIDTH - gap * (cellCount - 1)) / cellCount;
   const cellHeight = 22;
-  const tone = scale.atOrAboveThreshold ? PULSE_ATTENTION : PULSE;
+  const tone = scale.emphasise ? PULSE_ATTENTION : PULSE;
 
   layout.reserve(cellHeight + 46);
   const canvas = layout.canvas;

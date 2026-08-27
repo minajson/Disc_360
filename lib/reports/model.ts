@@ -58,7 +58,19 @@ export interface ReportScale {
   threshold: number;
   /** Text beneath the scale, e.g. the at/below-threshold outcome. */
   caption?: string;
-  atOrAboveThreshold?: boolean;
+  /**
+   * Draw this scale in the attention tone.
+   *
+   * PRESENTATIONAL, and deliberately not named for a direction. It used to be
+   * `atOrAboveThreshold`, which silently assumed every instrument counts
+   * upward toward concern. GHQ does; WHO-5 does the opposite, and its
+   * noteworthy side is BELOW its cut-off. A caller that passed its own
+   * "at or above" flag straight through would have emphasised exactly the
+   * wrong half of the scale.
+   *
+   * Each caller decides what is worth emphasising for ITS instrument.
+   */
+  emphasise?: boolean;
 }
 
 export interface ReportSeriesPoint {
@@ -375,6 +387,17 @@ export interface WellbeingReportInput {
   maxScore: number;
   threshold: number;
   atOrAboveThreshold: boolean;
+  /**
+   * What to call the figure and its cut-off, per instrument.
+   *
+   * These defaulted to GHQ-12's wording, which is correct for GHQ-12 and wrong
+   * for anything else — a WHO-5 report rendered through here was labelled
+   * "GHQ-12 screening score" beside a 0-100 wellbeing figure. The instrument is
+   * half the meaning of the number, so each caller names its own.
+   */
+  scoreLabel?: string;
+  scoreMetaLabel?: string;
+  thresholdMetaLabel?: string;
   /** Copy comes from data/wellbeing-content.ts, already safety-screened. */
   outcomeHeadline: string;
   outcomeBody: string;
@@ -413,9 +436,13 @@ const shortDate = (iso: string): string =>
  * prevent.
  */
 export function buildWellbeingReport(input: WellbeingReportInput): ReportDocument {
+  const scoreLabel = input.scoreLabel ?? "GHQ-12 screening score";
   const meta: ReportMetaItem[] = [
-    { label: "Screening score", value: `${input.totalScore} / ${input.maxScore}` },
-    { label: "Screening threshold", value: String(input.threshold) },
+    {
+      label: input.scoreMetaLabel ?? "Screening score",
+      value: `${input.totalScore} / ${input.maxScore}`,
+    },
+    { label: input.thresholdMetaLabel ?? "Screening threshold", value: String(input.threshold) },
     { label: "Completed", value: formatDate(input.completedAt) },
   ];
   if (input.attemptNumber) {
@@ -435,13 +462,15 @@ export function buildWellbeingReport(input: WellbeingReportInput): ReportDocumen
 
   const sections: ReportSection[] = [
     {
-      title: "Your screening score",
+      title: input.scoreMetaLabel ? `Your ${input.scoreMetaLabel.toLowerCase()}` : "Your screening score",
       scale: {
-        label: "GHQ-12 screening score",
+        label: scoreLabel,
         value: input.totalScore,
         max: input.maxScore,
         threshold: input.threshold,
-        atOrAboveThreshold: input.atOrAboveThreshold,
+        // GHQ counts upward toward distress, so at-or-above is its
+        // noteworthy side.
+        emphasise: input.atOrAboveThreshold,
         caption: input.outcomeBody,
       },
       paragraphs: [input.outcomeDetail, input.scoreMeaning],
@@ -598,7 +627,8 @@ export function buildDiscWellbeingReport(input: DiscWellbeingReportInput): Repor
         value: input.wellbeingIndex,
         max: 100,
         threshold: 101,
-        atOrAboveThreshold: false,
+        // V1 carries no threshold at all, so nothing is emphasised.
+        emphasise: false,
         caption: `${input.rawScore} of ${input.rawMax} points across twelve questions.`,
       },
       paragraphs: [input.indexMeaning, input.noBandsNote],
