@@ -237,14 +237,19 @@ export function buildIllustrativeResult(instrumentKey: InstrumentKey): Illustrat
     case "who5":
       return {
         ...base,
+        // 16 raw × 4 = 64, the instrument's own transform.
         headline: 64,
         rawScore: 16,
         rawMax: 25,
         secondaryLabel: null,
         secondaryValue: null,
         secondaryMax: null,
-        threshold: null,
-        atOrAboveThreshold: null,
+        // The cut-off WHO's own publication documents. WHO-5 counts UPWARD, so
+        // "at or above" is the healthy side here — the opposite of GHQ, where
+        // the same flag means more distress. The two must never be read with
+        // one rule.
+        threshold: 50,
+        atOrAboveThreshold: true,
         subscores: [],
         history: [
           { label: "Q1", value: 48 },

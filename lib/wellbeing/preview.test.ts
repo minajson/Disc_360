@@ -145,7 +145,9 @@ test("only instruments with a threshold show one in the preview", () => {
       `${key}: preview threshold must match the registry`,
     );
   }
-  assert.equal(buildIllustrativeResult("who5").threshold, null);
+  // WHO-5 shows the cut-off its own publication documents; the DISC360 index
+  // has none to show, because it defines none.
+  assert.equal(buildIllustrativeResult("who5").threshold, 50);
   assert.equal(buildIllustrativeResult("disc360_wellbeing_v1").threshold, null);
 });
 

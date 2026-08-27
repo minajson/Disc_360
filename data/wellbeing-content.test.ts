@@ -427,8 +427,13 @@ test("both instruments are registered with their own scales and directions", () 
   const who5 = INSTRUMENTS.who5;
   assert.equal(who5.primaryScoreMax, 100);
   assert.equal(who5.scoreDirection, "higher_is_stronger_wellbeing");
-  assert.equal(who5.hasThreshold, false, "no threshold is configured for WHO-5 here");
+  // WHO-5's own publication documents a suggested cut-off, so the instrument
+  // carries one. It is the INSTRUMENT's, traceable to WHO/UCN/MSD/MHE/2024.1,
+  // and is presented as a prompt for further assessment rather than a finding.
+  assert.equal(who5.hasThreshold, true, "WHO-5 documents a suggested cut-off");
+  assert.equal(who5.defaultThreshold, 50);
   assert.equal(who5.licensing, "open_licence");
+  assert.equal(who5.useClassification, "internal_noncommercial");
 
   const disc = INSTRUMENTS.disc360_wellbeing_v1;
   assert.equal(disc.primaryScoreMax, 100);
