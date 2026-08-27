@@ -73,13 +73,15 @@ export default async function WellbeingAssessmentPage({
   }
 
   const workLocation = (session.work_location as WorkLocation | null) ?? null;
-  // A session started before the Sub-unit / Team field existed is NOT
-  // complete — it returns to the context step to answer the new question
-  // rather than silently contributing a blank cohort to every comparison it
-  // appears in.
+  // Exactly the database's own `wellbeing_sessions_completed_is_complete`
+  // predicate — department, work location, and an office when office-based.
+  //
+  // Sub-unit / Team is deliberately NOT here. It is optional, so a blank one
+  // is a complete answer; requiring it would return the participant to the
+  // context step every time they submitted it empty, which is a loop with no
+  // way out rather than a prompt.
   const contextComplete = Boolean(
     session.department_name &&
-      session.sub_unit_name &&
       workLocation &&
       (workLocation === "field_based" || session.office_location_name),
   );

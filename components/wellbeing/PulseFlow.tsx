@@ -9,11 +9,18 @@ import {
 } from "@/lib/actions/wellbeing";
 import {
   WELLBEING_DEPARTMENT_LABEL,
+  WELLBEING_DEPARTMENT_OTHER_LABEL,
   WELLBEING_SUB_UNIT_HELP,
   WELLBEING_SUB_UNIT_LABEL,
   WORK_LOCATIONS,
+  isOtherDepartment,
   type WorkLocation,
 } from "@/data/wellbeing-taxonomy";
+import {
+  ORG_FREE_TEXT_MAX,
+  normalizeOrgFreeText,
+  orgFreeTextCohortKey,
+} from "@/lib/wellbeing/free-text";
 import { EMAIL_OPT_IN_HELP, EMAIL_OPT_IN_LABEL } from "@/data/wellbeing-content";
 import type { WellbeingFormOptions, WellbeingItemView } from "@/lib/wellbeing/queries";
 
@@ -56,6 +63,23 @@ export interface PulseFlowProps {
 const fieldClasses =
   "w-full rounded-xl border border-[rgba(31,78,95,0.22)] bg-paper px-4 py-3 text-[0.95rem] text-ink placeholder:text-faint focus:border-pulse focus:outline-none";
 
+/**
+ * Was this resumed session's department typed rather than chosen?
+ *
+ * The stored value is the participant's own words, not the "Other" sentinel,
+ * so on resume a free-text department matches no catalogue row. Recognising
+ * that restores the select to "Other" with the text alongside it, instead of
+ * showing an empty required field the participant has already answered.
+ */
+function resumedOtherDepartment(
+  stored: string | null | undefined,
+  options: WellbeingFormOptions,
+): boolean {
+  const key = orgFreeTextCohortKey(stored);
+  if (key === null) return false;
+  return !options.departments.some((entry) => entry.name.trim().toLowerCase() === key);
+}
+
 export function PulseFlow({
   sessionId,
   instruction,
@@ -74,7 +98,16 @@ export function PulseFlow({
   const [answers, setAnswers] = useState<Record<string, number>>(initial.answers);
   const [error, setError] = useState<string | null>(null);
 
-  const [departmentName, setDepartmentName] = useState(initial.departmentName ?? "");
+  const [departmentName, setDepartmentName] = useState(() =>
+    // A resumed session stores the typed department, not the sentinel — so a
+    // value that matches no catalogue row is restored as "Other" plus its own
+    // text, and the participant sees what they entered rather than an empty
+    // select.
+    resumedOtherDepartment(initial.departmentName, options) ? "Other" : (initial.departmentName ?? ""),
+  );
+  const [departmentOther, setDepartmentOther] = useState(() =>
+    resumedOtherDepartment(initial.departmentName, options) ? (initial.departmentName ?? "") : "",
+  );
   const [subUnitName, setSubUnitName] = useState(initial.subUnitName ?? "");
   const [workLocation, setWorkLocation] = useState<WorkLocation | "">(initial.workLocation ?? "");
   const [officeLocationName, setOfficeLocationName] = useState(initial.officeLocationName ?? "");
@@ -114,10 +147,19 @@ export function PulseFlow({
     return narrowed.length > 0 ? narrowed : options.subUnits;
   }, [options.subUnits, departmentId]);
 
-  const subUnitId = useMemo(
-    () => options.subUnits.find((entry) => entry.name === subUnitName)?.id ?? null,
-    [options.subUnits, subUnitName],
-  );
+  /**
+   * The catalogue row this typed sub-unit corresponds to, if any.
+   *
+   * Case-insensitive, so someone who types "engineering" is linked to the
+   * configured "Engineering" rather than treated as a separate free-text
+   * answer. Anything else resolves to null and is stored as text alone — the
+   * honest record, since nothing governs it.
+   */
+  const subUnitId = useMemo(() => {
+    const key = orgFreeTextCohortKey(subUnitName);
+    if (key === null) return null;
+    return options.subUnits.find((entry) => entry.name.trim().toLowerCase() === key)?.id ?? null;
+  }, [options.subUnits, subUnitName]);
 
   const officeLocationId = useMemo(
     () => options.officeLocations.find((entry) => entry.name === officeLocationName)?.id ?? null,
@@ -127,15 +169,18 @@ export function PulseFlow({
   function submitContext(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
-    // Sub-unit is a governed REQUIRED dimension, unconditionally.
-    //
-    // It used to be required only where a catalogue existed, which quietly
-    // collected responses with a hole in a dimension the analytics compares
-    // on. A campaign whose organisation has no sub-units does not reach a
-    // participant at all now — `checkCampaignReadiness` refuses it — so by
-    // the time this form renders there is always something to choose.
-    if (!departmentName || !subUnitName || !workLocation) {
+    // Department / Function and Work Location are required, unconditionally.
+    // Sub-unit / Team is not: it is typed rather than chosen, and a blank
+    // answer is a real answer that stores null. See readiness.ts for why the
+    // two dimensions are treated differently.
+    if (!departmentName || !workLocation) {
       setError("Please choose your Department / Function and Work Location.");
+      return;
+    }
+    // "Other" opens the box; leaving the box empty is not an answer. The
+    // server enforces this too — this is the message that arrives sooner.
+    if (isOtherDepartment(departmentName) && !normalizeOrgFreeText(departmentOther)) {
+      setError(`${WELLBEING_DEPARTMENT_OTHER_LABEL}.`);
       return;
     }
     if (officeRequired && !officeLocationName) {
@@ -144,10 +189,13 @@ export function PulseFlow({
     }
 
     startTransition(async () => {
+      const otherDepartment = isOtherDepartment(departmentName);
       const outcome = await saveWellbeingContext({
         sessionId,
-        departmentId,
-        departmentName,
+        // A free-text department carries no catalogue id — "Other" is the
+        // sentinel that opened the box, not the answer being stored.
+        departmentId: otherDepartment ? null : departmentId,
+        departmentName: otherDepartment ? departmentOther : departmentName,
         subUnitId,
         subUnitName,
         workLocation,
@@ -245,24 +293,56 @@ export function PulseFlow({
           </select>
         </div>
 
+        {isOtherDepartment(departmentName) && (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="wb-department-other" className="text-sm font-medium text-ink">
+              {WELLBEING_DEPARTMENT_OTHER_LABEL}
+            </label>
+            <input
+              id="wb-department-other"
+              type="text"
+              required
+              maxLength={ORG_FREE_TEXT_MAX}
+              autoComplete="off"
+              value={departmentOther}
+              onChange={(event) => setDepartmentOther(event.target.value)}
+              className={fieldClasses}
+            />
+            <p className="text-xs leading-relaxed text-slate">
+              Your own words. This is not added to your organisation&rsquo;s list.
+            </p>
+          </div>
+        )}
+
         <div className="flex flex-col gap-1.5">
           <label htmlFor="wb-sub-unit" className="text-sm font-medium text-ink">
-            {WELLBEING_SUB_UNIT_LABEL}
+            {WELLBEING_SUB_UNIT_LABEL}{" "}
+            <span className="font-normal text-slate">(optional)</span>
           </label>
-          <select
+          {/*
+            Free text, not a dropdown. A working unit is renamed and
+            reorganised faster than a catalogue is maintained, and a
+            participant who cannot find theirs either abandons the pulse or
+            picks something untrue. `list` offers whatever the organisation has
+            configured as suggestions without constraining the answer to it.
+          */}
+          <input
             id="wb-sub-unit"
-            required
+            type="text"
+            list={subUnitOptions.length > 0 ? "wb-sub-unit-options" : undefined}
+            maxLength={ORG_FREE_TEXT_MAX}
+            autoComplete="off"
             value={subUnitName}
             onChange={(event) => setSubUnitName(event.target.value)}
             className={fieldClasses}
-          >
-            <option value="">Select…</option>
-            {subUnitOptions.map((entry) => (
-              <option key={entry.id} value={entry.name}>
-                {entry.name}
-              </option>
-            ))}
-          </select>
+          />
+          {subUnitOptions.length > 0 && (
+            <datalist id="wb-sub-unit-options">
+              {subUnitOptions.map((entry) => (
+                <option key={entry.id} value={entry.name} />
+              ))}
+            </datalist>
+          )}
           <p className="text-xs leading-relaxed text-slate">{WELLBEING_SUB_UNIT_HELP}</p>
         </div>
 

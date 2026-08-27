@@ -7,7 +7,6 @@ import {
   type InstrumentKey,
 } from "@/data/wellbeing-instruments";
 import { isProductionEnvironment, isWellbeingDemoEnabled } from "@/lib/wellbeing/environment";
-import { WELLBEING_SUB_UNIT_LABEL } from "@/data/wellbeing-taxonomy";
 
 /**
  * Is this campaign ready for a participant to scan its code?
@@ -23,23 +22,35 @@ import { WELLBEING_SUB_UNIT_LABEL } from "@/data/wellbeing-taxonomy";
  *
  * WHY THE CHECK IS HERE RATHER THAN IN THE FORM.
  *
- * The alternative to this module is what the form used to do: notice that no
- * Sub-unit / Team exists and quietly stop requiring it. That looks like
- * resilience and is actually data loss — every response collected in that
- * window has a hole in a dimension the analytics is built to compare on, and
- * nobody finds out until a cohort comparison is inexplicably thin.
+ * The alternative is what the form used to do: notice a catalogue is empty and
+ * quietly stop requiring the field. That looks like resilience and is actually
+ * data loss — responses collected in that window have a hole in a dimension
+ * the analytics compares on, and nobody finds out until a cohort comparison is
+ * inexplicably thin. It also puts the discovery in the wrong place: a
+ * participant standing in a corridor with a phone cannot fix a missing
+ * catalogue; a facilitator can, in about a minute, if somebody tells them.
  *
- * Worse, it puts the discovery in the wrong place. A participant standing in a
- * corridor with a phone cannot fix a missing catalogue; a facilitator can, in
- * about a minute, if somebody tells them. So an incomplete campaign refuses
- * participants and tells the facilitator exactly what to add.
+ * WHICH DIMENSIONS THIS APPLIES TO, AND WHICH IT NO LONGER DOES.
  *
- * "NOT APPLICABLE" IS A CONFIGURATION, NOT AN EXCEPTION.
+ * Department / Function and Office Location stay here. A participant cannot
+ * invent either — they are reporting dimensions the organisation owns — so an
+ * empty catalogue genuinely is a campaign nobody can finish.
  *
- * An organisation that genuinely has no sub-units is expected to add one
- * controlled value saying so. That keeps the dimension present and honest —
- * "Not Applicable, n = 240" is a fact — rather than making the field
- * conditionally absent and the column conditionally null.
+ * Sub-unit / Team was here too, and required at least one catalogue value
+ * before a campaign could open. That was wrong in practice for two reasons.
+ * Working-unit names change far faster than a governed catalogue is
+ * maintained, so the dropdown was routinely missing the answer the participant
+ * needed. And the catalogue has no product write path at all, which made the
+ * requirement unsatisfiable: a live pilot could not be opened because nothing
+ * in the product could create the row it demanded.
+ *
+ * It is now typed by the participant and optional, so no configuration has to
+ * exist before anybody can answer, and a campaign is READY with zero
+ * `wellbeing_sub_units` rows. The dimension survives — free text is
+ * normalised and case-folded into one cohort per unit, and meets the same
+ * suppression floor as every other cohort — so nothing is published about a
+ * group too small to hide in. A blank answer stores null and forms no cohort
+ * at all, rather than a phantom one.
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -49,7 +60,6 @@ export type ReadinessIssueCode =
   | "instrument_not_servable"
   | "no_questionnaire_content"
   | "no_departments"
-  | "no_sub_units"
   | "no_office_locations";
 
 export interface ReadinessIssue {
@@ -187,22 +197,21 @@ export async function checkCampaignReadiness(
   /* ── the governed lookups the context form is built from ────────── */
   //
   // Platform-level rows (organization_id null) count: an organisation that has
-  // not customised its taxonomy still has a usable form. Sub-units are the
-  // exception — there is no platform catalogue of them, by design.
+  // not customised its taxonomy still has a usable form.
+  //
+  // Sub-unit / Team is deliberately ABSENT from this check. It is typed by the
+  // participant, not chosen from a catalogue, so no configuration has to exist
+  // before somebody can answer — and a campaign is ready with zero
+  // `wellbeing_sub_units` rows. Readiness asks only about the dimensions a
+  // participant genuinely cannot supply for themselves.
 
   if (organizationId) {
-    const [departmentsResult, subUnitsResult, officesResult] = await Promise.all([
+    const [departmentsResult, officesResult] = await Promise.all([
       admin
         .from("wellbeing_departments")
         .select("id")
         .is("archived_at", null)
         .or(`organization_id.eq.${organizationId},organization_id.is.null`)
-        .limit(1),
-      admin
-        .from("wellbeing_sub_units")
-        .select("id")
-        .eq("organization_id", organizationId)
-        .eq("is_active", true)
         .limit(1),
       admin
         .from("wellbeing_office_locations")
@@ -213,21 +222,18 @@ export async function checkCampaignReadiness(
     ]);
 
     const departments = probe(departmentsResult);
-    const subUnits = probe(subUnitsResult);
     const offices = probe(officesResult);
 
     // Schema first, and on its own. A deployment that has not finished is one
-    // fact about the platform, not three facts about this organisation's
-    // catalogues — listing "add a Department", "add a Sub-unit" and "add an
-    // Office Location" underneath it would be three instructions nobody can
-    // carry out.
+    // fact about the platform, not two facts about this organisation's
+    // catalogues — listing "add a Department" and "add an Office Location"
+    // underneath it would be instructions nobody can carry out.
     const unavailable = [
       departments.unavailable && "Department / Function",
-      subUnits.unavailable && WELLBEING_SUB_UNIT_LABEL,
       offices.unavailable && "Office Location",
     ].filter((label): label is string => typeof label === "string");
 
-    const missing = [departments, subUnits, offices].filter((p) => p.missingRelation).length;
+    const missing = [departments, offices].filter((p) => p.missingRelation).length;
 
     if (unavailable.length > 0) {
       issues.push({
@@ -251,15 +257,6 @@ export async function checkCampaignReadiness(
         code: "no_departments",
         message: "This organisation has no Department / Function values.",
         fix: "Wellbeing governance must add at least one before the campaign opens.",
-      });
-    }
-    if (subUnits.count === 0) {
-      issues.push({
-        code: "no_sub_units",
-        message: `This organisation has no ${WELLBEING_SUB_UNIT_LABEL} values.`,
-        // The explicit escape hatch, stated as configuration rather than left
-        // for somebody to work out.
-        fix: `Add at least one ${WELLBEING_SUB_UNIT_LABEL} before opening this campaign. If your organisation does not use sub-units, add a single value called “Not Applicable”.`,
       });
     }
     if (offices.count === 0) {

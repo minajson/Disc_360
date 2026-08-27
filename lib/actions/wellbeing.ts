@@ -18,6 +18,8 @@ import {
   DISC_WELLBEING_SCORING_VERSION,
 } from "@/lib/scoring/disc360-wellbeing";
 import { INSTRUMENTS, isInstrumentKey, type InstrumentKey } from "@/data/wellbeing-instruments";
+import { isOtherDepartment } from "@/data/wellbeing-taxonomy";
+import { normalizeOrgFreeText, ORG_FREE_TEXT_MAX } from "@/lib/wellbeing/free-text";
 import { buildWellbeingSnapshot } from "@/lib/wellbeing/snapshot";
 
 /**
@@ -200,13 +202,20 @@ const contextSchema = z
     /**
      * Sub-unit / Team — organisational context, never an assessment team.
      *
-     * Required alongside Department / Function, because a cohort comparison
-     * with a hole in it is worse than no comparison: a sub-unit that half the
-     * workforce skipped produces groups that look small for a reason nobody
-     * can see, and a suppression decision made on the wrong denominator.
+     * OPTIONAL, and typed rather than chosen. A working unit is renamed and
+     * reorganised far more often than a governed catalogue can keep up with,
+     * so requiring a catalogue entry before anybody may answer made the
+     * questionnaire hostage to an administrative task — and, with no write
+     * path for that catalogue, unopenable.
+     *
+     * The earlier reasoning — that an optional dimension produces cohorts with
+     * holes in them — still holds, and is answered where it belongs: a blank
+     * sub-unit is `null`, never an empty string, so it forms no cohort at all
+     * rather than a phantom one, and typed values are case-folded into a
+     * single group before they meet the suppression floor.
      */
     subUnitId: z.uuid().nullable().optional(),
-    subUnitName: z.string().trim().min(1).max(120),
+    subUnitName: z.string().max(ORG_FREE_TEXT_MAX).nullable().optional(),
     workLocation: z.enum(["field_based", "office_based"]),
     officeLocationId: z.uuid().nullable().optional(),
     officeLocationName: z.string().trim().max(120).nullable().optional(),
@@ -252,11 +261,32 @@ export async function saveWellbeingContext(
 
   const officeBased = value.workLocation === "office_based";
 
-  // Sub-unit is a governed REQUIRED dimension. The Zod schema above enforces
-  // it; there is no branch here that can make it optional, because a campaign
-  // whose organisation has no catalogue never reaches a participant —
-  // `checkCampaignReadiness` refuses to open it.
-  const subUnitName = value.subUnitName.trim();
+  // Blank, whitespace, or invisible characters only all collapse to null —
+  // one representation of "not answered", so it cannot become a cohort of its
+  // own. Case is preserved for display; case-folding happens at grouping time.
+  const subUnitName = normalizeOrgFreeText(value.subUnitName);
+
+  // A typed department is only linked to a catalogue row when it IS one. When
+  // the participant chose "Other" and typed their own, the id is dropped: a
+  // stale id would make a free-text answer look governed, and would resolve to
+  // the wrong name if that catalogue row were later renamed.
+  const departmentName = normalizeOrgFreeText(value.departmentName);
+  if (departmentName === null) {
+    return { ok: false, error: "Please enter your Department / Function." };
+  }
+
+  // "Other" is the sentinel that opens the free-text box, never an answer in
+  // itself. Enforced here rather than only in the form, because the form's
+  // check is a convenience and this is the control: a request that arrives
+  // with the sentinel intact is one where the box was left empty, and storing
+  // it would put every such participant into one meaningless "Other" cohort —
+  // the exact loss of reporting value the free-text box exists to avoid.
+  if (isOtherDepartment(departmentName)) {
+    return { ok: false, error: "Please enter your Department / Function." };
+  }
+
+  const departmentIsCatalogued = value.departmentId != null;
+
   const contactEmail = value.contactEmail?.trim() || null;
   const emailLooksValid = contactEmail ? /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(contactEmail) : true;
   if (value.emailOptIn && contactEmail && !emailLooksValid) {
@@ -266,12 +296,15 @@ export async function saveWellbeingContext(
   const { error } = await supabase
     .from("wellbeing_sessions")
     .update({
-      department_id: value.departmentId ?? null,
-      department_name: value.departmentName,
-      sub_unit_id: value.subUnitId ?? null,
-      // Both, exactly as department does it: the id is the live link, the name
-      // is what the result reports under forever. A sub-unit renamed next year
-      // must not restate what somebody said about themselves this year.
+      department_id: departmentIsCatalogued ? value.departmentId : null,
+      department_name: departmentName,
+      // Only ever set when the participant's text matches a catalogue row the
+      // client resolved. Free text carries no id, and that is the honest
+      // record: nothing governs it.
+      sub_unit_id: subUnitName === null ? null : (value.subUnitId ?? null),
+      // The name is what the result reports under forever. A sub-unit renamed
+      // next year must not restate what somebody said about themselves this
+      // year — which is why the result snapshots text, not this id.
       sub_unit_name: subUnitName,
       work_location: value.workLocation,
       office_location_id: officeBased ? (value.officeLocationId ?? null) : null,

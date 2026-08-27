@@ -58,7 +58,24 @@ export const WELLBEING_DEPARTMENT_LABEL = "Department / Function";
 export const WELLBEING_SUB_UNIT_LABEL = "Sub-unit / Team";
 
 export const WELLBEING_SUB_UNIT_HELP =
-  "The working unit you belong to. Used only to group answers — your own result is never shown against it.";
+  "Optional. The working unit you belong to — type it in your own words. Used only to group answers, and only once a group is large enough that no one in it can be identified.";
+
+/**
+ * The catalogue value that opens a free-text box instead of answering.
+ *
+ * "Other" ships last in `DEFAULT_WELLBEING_DEPARTMENTS` and exists in the
+ * platform floor already, so this names an option that is present rather than
+ * introducing one. Matched case-insensitively at the point of use: an
+ * organisation that renamed its own row to "other" must still get the box.
+ */
+export const WELLBEING_DEPARTMENT_OTHER = "Other";
+
+/** Asked only once "Other" is chosen, and required from that moment. */
+export const WELLBEING_DEPARTMENT_OTHER_LABEL = "Enter your Department / Function";
+
+export function isOtherDepartment(name: string | null | undefined): boolean {
+  return (name ?? "").trim().toLowerCase() === WELLBEING_DEPARTMENT_OTHER.toLowerCase();
+}
 
 export const DEFAULT_WELLBEING_DEPARTMENTS: readonly string[] = [
   "Commercial",
