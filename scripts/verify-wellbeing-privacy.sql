@@ -357,27 +357,59 @@ begin
 
   /* ── §32 · unlicensed content cannot reach a participant ──────────── */
 
+  -- Every shipped version is now licensed, so this constructs a structure-only
+  -- one and proves it still cannot be switched on. Testing the rule against
+  -- whatever happens to be in the table would have quietly stopped testing it
+  -- the moment the last placeholder was filled.
+  insert into public.wellbeing_versions
+    (id, name, version, questionnaire_code, instrument_key, content_status, item_count, is_active)
+  values ('00000000-0000-4000-8000-00000000ff01', 'Placeholder', 99, 'ghq12', 'ghq12',
+          'structure_only', 12, false);
+
   perform pg_temp.expect_rejected(
     'a structure-only questionnaire version cannot be activated',
-    'update public.wellbeing_versions set is_active = true where version = 1');
+    'update public.wellbeing_versions set is_active = true where version = 99');
 
-  -- Scoped to the THIRD-PARTY instruments. DISC360 Wellbeing is original
-  -- content and ships its wording deliberately, so scoping by version number
-  -- (all four are version 1) would report it as a violation.
+  -- Third-party wording now EXISTS, because the licences are confirmed. So the
+  -- invariant is no longer "none of it is here" but "none of it is here
+  -- WITHOUT a licence recorded on its own row". That is the property which
+  -- actually protects the licensor, and it keeps holding as instruments are
+  -- added rather than needing rewriting each time.
   perform pg_temp.record(
-    'no third-party instrument carries item wording',
-    (select count(*) from public.wellbeing_items i
-      join public.wellbeing_versions v on v.id = i.version_id
-      where v.instrument_key in ('ghq12','ghq28','who5') and i.prompt is not null) = 0
-    and (select count(*) from public.wellbeing_item_options o
-      join public.wellbeing_items i on i.id = o.item_id
-      join public.wellbeing_versions v on v.id = i.version_id
-      where v.instrument_key in ('ghq12','ghq28','who5') and o.label is not null) = 0);
+    'no third-party wording exists without a licence recorded on its row',
+    not exists (
+      select 1
+      from public.wellbeing_versions v
+      join public.wellbeing_items i on i.version_id = v.id
+      where v.instrument_key in ('ghq12','ghq28','who5')
+        and i.prompt is not null
+        and (v.licence_holder is null or v.licence_reference is null)));
+
+  -- And the converse: a version may not claim licensed status while any of its
+  -- wording is still missing.
+  perform pg_temp.record(
+    'a version claiming licensed status actually carries its wording',
+    not exists (
+      select 1
+      from public.wellbeing_versions v
+      where v.content_status = 'licensed'
+        and exists (select 1 from public.wellbeing_items i
+                    where i.version_id = v.id and i.prompt is null)));
+
+  -- All four instruments are now licensed and active. What must remain true is
+  -- that nothing UNLICENSED is active, and that each instrument has exactly
+  -- one active version — otherwise "which questionnaire did this person
+  -- answer" depends on row order, and a result stops being reproducible.
+  perform pg_temp.record(
+    'no unlicensed version is active',
+    not exists (select 1 from public.wellbeing_versions
+                where is_active and content_status <> 'licensed'));
 
   perform pg_temp.record(
-    'only DISC360 Wellbeing has an active questionnaire version',
-    (select coalesce(array_agg(instrument_key order by instrument_key), array[]::text[])
-     from public.wellbeing_versions where is_active) = array['disc360_wellbeing_v1']);
+    'each instrument has exactly one active version',
+    not exists (
+      select 1 from public.wellbeing_versions where is_active
+      group by instrument_key having count(*) <> 1));
 
   perform pg_temp.expect_rejected(
     'a non-GHQ instrument cannot carry a screening threshold',
@@ -678,12 +710,13 @@ begin
     'setting capacity to NULL lifts the cap without any other change', v_i = 4,
     format('%s distinct participants once unrestricted', v_i));
 
-  -- Capacity is not a licensing decision: a free place does not make a
-  -- structure-only instrument runnable.
+  -- Capacity is not a licensing decision. Freeing a place must not change
+  -- which versions are servable — asserted as "nothing unlicensed became
+  -- active", which stays meaningful now that all four are licensed.
   perform pg_temp.record(
     'a free place does not activate a restricted instrument',
-    (select coalesce(array_agg(instrument_key order by instrument_key), array[]::text[])
-       from public.wellbeing_versions where is_active) = array['disc360_wellbeing_v1']);
+    not exists (select 1 from public.wellbeing_versions
+                where is_active and content_status <> 'licensed'));
 
   -- The status function reports counts, and only counts. Read the function's
   -- actual signature from the catalogue: every OUT parameter must be an

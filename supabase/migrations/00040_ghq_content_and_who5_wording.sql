@@ -154,8 +154,23 @@ where o.item_id = i.id
   and i.external_id = w.external_id
   and o.position = w.position;
 
+-- Licence metadata belongs ON THE ROW, because that is what the governance
+-- invariant checks: wording may exist only where a licence is recorded
+-- alongside it. `licence_note` states plainly that the formal attribution
+-- string is still outstanding, so the gap is visible in the database rather
+-- than only in a conversation.
 update public.wellbeing_versions
-set name = 'GHQ-12', content_status = 'licensed', is_active = true, updated_at = now()
+set name = 'GHQ-12',
+    content_status = 'licensed',
+    licence_holder = 'Goldberg & Williams (GL Assessment)',
+    licence_reference = 'GHQ-12_Questionnaire_and_Assessment_Guide.pdf',
+    licence_note =
+      'Digital-use licence confirmed by the product owner. Content transcribed verbatim from '
+      || 'the supplied implementation guide, which carries no copyright line or attribution '
+      || 'statement. The exact attribution wording required by the licensor is OUTSTANDING and '
+      || 'must be confirmed with GL Assessment before external production release.',
+    is_active = true,
+    updated_at = now()
 where id = '00000000-0000-4000-8000-0000000000e1';
 
 -- ── 2 · GHQ-28 wording ───────────────────────────────────────────────
@@ -319,7 +334,19 @@ where o.item_id = i.id
   and o.position = w.position;
 
 update public.wellbeing_versions
-set name = 'GHQ-28', content_status = 'licensed', is_active = true, updated_at = now()
+set name = 'GHQ-28',
+    content_status = 'licensed',
+    licence_holder = 'Goldberg & Hillier (GL Assessment)',
+    licence_reference = 'GHQ-28_Questionnaire_and_Assessment_Guide.pdf',
+    licence_note =
+      'Digital-use licence confirmed by the product owner. Content transcribed verbatim from '
+      || 'the supplied implementation guide, which carries no copyright line or attribution '
+      || 'statement. The exact attribution wording required by the licensor is OUTSTANDING and '
+      || 'must be confirmed with GL Assessment before external production release. Section D '
+      || 'contains suicidality items; the participant-facing safeguard wording awaits '
+      || 'Occupational Health approval.',
+    is_active = true,
+    updated_at = now()
 where id = '00000000-0000-4000-8000-0000000000c1';
 
 -- ── 3 · WHO-5 wording, aligned to the supplied guide ─────────────────
@@ -428,5 +455,29 @@ begin
     raise exception 'no active version for: %', v_missing;
   end if;
   raise notice 'all four instruments have exactly one active version';
+end;
+$$;
+
+-- ── 7 · wording exists only where a licence is recorded ──────────────
+--
+-- The governance invariant behind the whole gate, asserted at the point the
+-- wording lands rather than only in the privacy harness. Third-party content
+-- without a recorded licence on its own row is the state this product must
+-- never be in.
+
+do $$
+declare
+  v_bad text;
+begin
+  select string_agg(distinct v.instrument_key, ', ') into v_bad
+  from public.wellbeing_versions v
+  join public.wellbeing_items i on i.version_id = v.id
+  where v.instrument_key in ('ghq12', 'ghq28', 'who5')
+    and i.prompt is not null
+    and (v.licence_holder is null or v.licence_reference is null);
+  if v_bad is not null then
+    raise exception 'third-party wording without a recorded licence: %', v_bad;
+  end if;
+  raise notice 'every worded third-party version records its licence';
 end;
 $$;
