@@ -4,7 +4,6 @@ import {
   canServeToParticipants,
   INSTRUMENTS,
   INSTRUMENT_KEYS,
-  NON_COMMERCIAL_ONLY_MESSAGE,
   NOT_ACTIVE_MESSAGE,
   unavailableReason,
   type InstrumentKey,
@@ -45,18 +44,29 @@ const PRODUCTION_WITH_DEMO_FLAG = { isProduction: true, demoEnabled: true };
 const LOCAL = { isProduction: false, demoEnabled: false };
 const LOCAL_DEMO = { isProduction: false, demoEnabled: true };
 
-/** Internal, non-commercial evaluation — the only use WHO-5 is licensed for. */
-const INTERNAL = { organizationUse: "internal_noncommercial" as const };
-
 /**
- * Instruments still withheld from participants.
+ * Instruments withheld from participants — which is now ALL THIRD-PARTY ONES.
  *
- * GHQ-12 and GHQ-28 used to sit here. Their licences are now confirmed and
- * their wording is loaded (00040), so they are active. WHO-5 remains withheld
- * — not for content, which is loaded, but because its result path is still
- * being completed; see the registry comment on its status.
+ * ─────────────────────────────────────────────────────────────────────
+ * GHQ-12 RETURNED TO THIS LIST, AND THAT IS THE POINT.
+ *
+ * It was briefly `active`, on the reasoning that its licence was confirmed for
+ * digital use. But `attribution` is null: the exact wording GL Assessment
+ * requires has never been supplied, and the content migration's own
+ * licence_note says it "must be confirmed with GL Assessment before external
+ * production release".
+ *
+ * Meanwhile GHQ-12 was never actually reachable in production — its version
+ * there carries no wording — so `active` was describing an intention, not a
+ * state, and the only thing keeping it closed was an empty table. That is
+ * fail-closed by accident, and it becomes fail-OPEN the moment the content is
+ * loaded.
+ *
+ * So the registry now states the governance position instead of relying on a
+ * database being empty. Only DISC360's own content is active.
+ * ─────────────────────────────────────────────────────────────────────
  */
-const RESTRICTED: InstrumentKey[] = ["who5"];
+const RESTRICTED: InstrumentKey[] = ["ghq12", "ghq28", "who5"];
 
 /* ── production is closed ───────────────────────────────────────────── */
 
@@ -64,12 +74,7 @@ test("no unlicensed instrument may be served in production", () => {
   for (const key of RESTRICTED) {
     const decision = canServeToParticipants(key, PRODUCTION);
     assert.equal(decision.allowed, false, `${key} must be blocked in production`);
-    // Blocked is the property under test here. WHICH refusal applies depends
-    // on the gate, and each gate has its own dedicated test below.
-    assert.ok(
-      decision.reason === NOT_ACTIVE_MESSAGE || decision.reason === NON_COMMERCIAL_ONLY_MESSAGE,
-      `${key} must give a known refusal, got: ${decision.reason}`,
-    );
+    assert.equal(decision.reason, NOT_ACTIVE_MESSAGE);
   }
 });
 
@@ -95,20 +100,38 @@ test("local alone does not open a restricted instrument either", () => {
 
 /* ── the one door that opens ────────────────────────────────────────── */
 
-test("GHQ-12 and GHQ-28 are licensed, worded and active", () => {
-  for (const key of ["ghq12", "ghq28"] as const) {
-    assert.equal(INSTRUMENTS[key].status, "active", `${key} must be active`);
-    // No non-commercial restriction: these are commercially licensed, unlike
-    // WHO-5, so nothing gates them on the organisation's classification.
-    assert.notEqual(INSTRUMENTS[key].useClassification, "internal_noncommercial");
-    for (const environment of [PRODUCTION, LOCAL, LOCAL_DEMO, PRODUCTION_WITH_DEMO_FLAG]) {
-      assert.equal(
-        canServeToParticipants(key, environment).allowed,
-        true,
-        `${key} must serve in every environment once licensed`,
-      );
-    }
-  }
+test("GHQ-12 is held until its required attribution wording is confirmed", () => {
+  // Held for a LICENSING reason, not a technical one. The engine, scoring,
+  // threshold governance and reports are complete and under test.
+  assert.equal(INSTRUMENTS.ghq12.status, "licensed");
+  // No non-commercial restriction: commercially licensed, unlike WHO-5.
+  assert.notEqual(INSTRUMENTS.ghq12.useClassification, "internal_noncommercial");
+
+  // The gap that holds it, stated rather than filled in.
+  assert.equal(
+    INSTRUMENTS.ghq12.attribution,
+    null,
+    "an attribution string must never be invented to unblock a release",
+  );
+
+  // Closed in production, with or without the demo flag.
+  assert.equal(canServeToParticipants("ghq12", PRODUCTION).allowed, false);
+  assert.equal(canServeToParticipants("ghq12", PRODUCTION_WITH_DEMO_FLAG).allowed, false);
+  // Open for authorised internal testing, by the same controlled mechanism
+  // GHQ-28 and WHO-5 use — nothing bespoke, nothing that can reach hosted.
+  assert.equal(canServeToParticipants("ghq12", LOCAL_DEMO).allowed, true);
+  assert.equal(canServeToParticipants("ghq12", LOCAL).allowed, false);
+});
+
+test("GHQ-28 is worded and complete, and still refused in production", () => {
+  // Held for a CLINICAL reason, not a licensing one: Section D asks directly
+  // about not wanting to live, and the participant-facing support wording must
+  // come from Occupational Health. The engine is finished; the door is shut.
+  assert.equal(INSTRUMENTS.ghq28.status, "licensed");
+  assert.equal(canServeToParticipants("ghq28", PRODUCTION).allowed, false);
+  assert.equal(canServeToParticipants("ghq28", PRODUCTION_WITH_DEMO_FLAG).allowed, false);
+  // Exercisable locally so its scoring and subscales stay under test.
+  assert.equal(canServeToParticipants("ghq28", LOCAL_DEMO).allowed, true);
 });
 
 test("a licensed instrument still records where its wording came from", () => {
@@ -134,57 +157,52 @@ test("WHO-5 content is loaded, and the instrument is still switched off", () => 
   assert.equal(INSTRUMENTS.who5.useClassification, "internal_noncommercial");
 });
 
-test("WHO-5 cannot reach a participant, by either gate independently", () => {
-  // Two gates, and each must hold on its own. Relying on one means a single
-  // edit can expose the instrument.
-  //
-  // Gate 1 — rights: no organisation classification.
-  assert.equal(canServeToParticipants("who5", PRODUCTION).allowed, false);
-  // Gate 2 — release readiness: even WITH the licensed use, it stays closed
-  // while the result path would render it through GHQ semantics.
-  assert.equal(canServeToParticipants("who5", { ...PRODUCTION, ...INTERNAL }).allowed, false);
-  assert.equal(canServeToParticipants("who5", { ...LOCAL_DEMO, ...INTERNAL }).allowed, false);
-});
-
-test("WHO-5 is refused for an organisation not classified non-commercial", () => {
-  // Being active is a fact about CONTENT. It says nothing about rights, and
-  // must never be sufficient on its own.
-  for (const environment of [PRODUCTION, LOCAL, LOCAL_DEMO, PRODUCTION_WITH_DEMO_FLAG]) {
+test("WHO-5 is refused in production, with or without the demo flag", () => {
+  // The property that matters. A held instrument may be exercised locally so
+  // it can be verified before release — but production must refuse it, and no
+  // flag may talk production out of that.
+  for (const environment of [PRODUCTION, PRODUCTION_WITH_DEMO_FLAG]) {
     const decision = canServeToParticipants("who5", environment);
-    assert.equal(decision.allowed, false, "an unclassified organisation must be refused");
-    assert.equal(decision.reason, NON_COMMERCIAL_ONLY_MESSAGE);
+    assert.equal(decision.allowed, false, "production must refuse a held instrument");
+    assert.equal(decision.reason, NOT_ACTIVE_MESSAGE);
   }
-  // Explicitly unrestricted is a commercial customer, and is refused too.
-  assert.equal(
-    canServeToParticipants("who5", { ...PRODUCTION, organizationUse: "unrestricted" }).allowed,
-    false,
-  );
 });
 
-test("the non-commercial gate is checked before status, not after", () => {
-  // Otherwise flipping a status could open licensed content to a commercial
-  // customer on its own — the single change most likely to be made casually.
-  // Proven by the refusal REASON: an unclassified organisation is turned away
-  // on rights, not on the instrument merely being switched off.
-  assert.equal(
-    canServeToParticipants("who5", PRODUCTION).reason,
-    NON_COMMERCIAL_ONLY_MESSAGE,
-    "rights are evaluated before release status",
-  );
-  // With the rights satisfied, the release gate is what remains.
-  assert.equal(
-    canServeToParticipants("who5", { ...PRODUCTION, ...INTERNAL }).reason,
-    NOT_ACTIVE_MESSAGE,
-  );
+test("WHO-5 is refused locally too, unless the demo flag is explicitly set", () => {
+  // Non-production alone is not enough. Both conditions, always.
+  assert.equal(canServeToParticipants("who5", LOCAL).allowed, false);
 });
 
-test("the non-commercial refusal names rights, not availability", () => {
-  // "Not available" would send somebody to wait for a release that will never
-  // change this. The reason has to say it is a licence boundary.
-  assert.match(NON_COMMERCIAL_ONLY_MESSAGE, /non-commercial/i);
-  assert.match(NON_COMMERCIAL_ONLY_MESSAGE, /licence/i);
-  // And still leaks nothing about the questionnaire itself.
-  assert.ok(!/item|question|score|threshold/i.test(NON_COMMERCIAL_ONLY_MESSAGE));
+test("WHO-5 serves ONLY in a non-production deployment with the demo flag", () => {
+  // This is the authorised path that makes an end-to-end test possible without
+  // flipping the instrument to active.
+  assert.equal(canServeToParticipants("who5", LOCAL_DEMO).allowed, true);
+});
+
+test("a held instrument and a demo-restricted one obey the same rule", () => {
+  // Stated as an equivalence so the two cannot drift apart: whatever opens one
+  // must open the other, and whatever closes one must close the other.
+  for (const environment of [PRODUCTION, LOCAL, LOCAL_DEMO, PRODUCTION_WITH_DEMO_FLAG]) {
+    const held = canServeToParticipants("who5", environment).allowed;
+    // GHQ-12 is active now, so construct the comparison from the rule itself.
+    const expected = !environment.isProduction && environment.demoEnabled;
+    assert.equal(held, expected, `held instrument must serve iff !production && demo`);
+  }
+});
+
+test("WHO-5's non-commercial basis is recorded and surfaced", () => {
+  // It was briefly a hard gate keyed on an organisation classification that no
+  // caller ever supplied, so it defaulted closed and WHO-5 could not be served
+  // by anybody. The owner has confirmed no additional licence is needed, so the
+  // block is gone — but the fact remains true and must stay visible to anyone
+  // considering a commercial deployment.
+  assert.equal(INSTRUMENTS.who5.useClassification, "internal_noncommercial");
+  assert.match(INSTRUMENTS.who5.licensingDescription, /non-commercial/i);
+  assert.match(INSTRUMENTS.who5.attribution ?? "", /CC BY-NC-SA 3\.0 IGO/);
+});
+
+test("the refusal message still leaks nothing about the questionnaire", () => {
+  assert.ok(!/item|question|score|threshold/i.test(NOT_ACTIVE_MESSAGE));
 });
 
 test("the non-commercial gate applies to WHO-5 alone", () => {

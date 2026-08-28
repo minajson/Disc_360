@@ -1,7 +1,7 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/db/admin";
 import { requireWellbeingAnalyst, type WellbeingRole } from "@/lib/wellbeing/access";
-import { getWellbeingPolicy } from "@/lib/wellbeing/policy";
+import { getWellbeingPolicy, resolveInstrumentThreshold } from "@/lib/wellbeing/policy";
 import {
   aggregateScores,
   buildTrend,
@@ -26,7 +26,12 @@ import {
   type ReportingPeriod,
   type WellbeingWave,
 } from "@/lib/wellbeing/waves";
-import { INSTRUMENTS, type InstrumentKey, type InstrumentMetadata } from "@/data/wellbeing-instruments";
+import {
+  INSTRUMENTS,
+  reportedScoreFor,
+  type InstrumentKey,
+  type InstrumentMetadata,
+} from "@/data/wellbeing-instruments";
 import {
   buildDemoPopulation,
   demoParticipantCounts,
@@ -129,12 +134,15 @@ interface AnalyticsRow {
  * once, here, from the instrument's own declared scale.
  */
 function reportedScore(row: AnalyticsRow, instrument: InstrumentMetadata): number {
-  return instrument.primaryScoreMax === 100 ? (row.index_score ?? 0) : row.total_score;
+  return reportedScoreFor(instrument.key, {
+    totalScore: row.total_score,
+    indexScore: row.index_score,
+  });
 }
 
 /** How a 0–100 scale is bucketed for display; point scales are not bucketed. */
 function bucketSizeFor(instrument: InstrumentMetadata): number {
-  return instrument.primaryScoreMax === 100 ? 10 : 1;
+  return instrument.reportedOn === "index" ? 10 : 1;
 }
 
 function aggregateOptionsFor(
@@ -421,11 +429,11 @@ async function resolveContext(
     instrument,
     // An instrument without a threshold gets null, not the GHQ policy value —
     // otherwise a governed GHQ cut-off would leak onto an unvalidated scale.
-    threshold: instrument.hasThreshold
-      ? (instrument.key === "ghq28"
-          ? (instrument.defaultThreshold ?? policy.screeningThreshold)
-          : policy.screeningThreshold)
-      : null,
+    // The SAME resolver the completion action scores against, so the cut-off a
+    // facilitator reads is by construction the one stored results were
+    // classified by. This was an `instrument.key === "ghq28"` special case —
+    // patched on the read side only, which is how the two came to disagree.
+    threshold: resolveInstrumentThreshold(policy, instrumentKey),
     minCohort: policy.minCohortSize,
     policyIsDefault: policy.isDefault,
   };

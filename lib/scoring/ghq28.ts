@@ -92,7 +92,12 @@ export interface Ghq28Result {
 export interface ComputeGhq28Input {
   answers: Ghq28AnswerInput[];
   itemOrder?: readonly string[];
-  threshold?: number;
+  /**
+   * Null is accepted and means "use this instrument's own governed default".
+   * The resolver returns null for an instrument with no policy of its own, and
+   * an engine must not be handed another instrument's number to avoid it.
+   */
+  threshold?: number | null;
 }
 
 const DEFAULT_ITEM_ORDER: readonly string[] = GHQ28_ITEM_STRUCTURE.map(

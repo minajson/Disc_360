@@ -98,7 +98,12 @@ export interface ComputeWellbeingInput {
    */
   itemOrder?: readonly string[];
   /** Cut-off in force for this attempt. Defaults to the platform default. */
-  threshold?: number;
+  /**
+   * Null is accepted and means "use this instrument's own governed default".
+   * The resolver returns null for an instrument with no policy of its own, and
+   * an engine must not be handed another instrument's number to avoid it.
+   */
+  threshold?: number | null;
 }
 
 const DEFAULT_ITEM_ORDER: readonly string[] = WELLBEING_ITEM_STRUCTURE.map(

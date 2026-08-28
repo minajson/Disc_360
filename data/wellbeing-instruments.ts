@@ -40,7 +40,10 @@ export const INSTRUMENT_KEYS: readonly InstrumentKey[] = [
  * · demo_restricted — wording may exist locally for internal evaluation, but
  *                     the instrument is barred from participant use until
  *                     rights are confirmed.
- * · licensed        — rights are recorded, not yet switched on.
+ * · licensed        — rights are recorded and content is loaded, but the
+ *                     instrument is not switched on for participants. Serves
+ *                     ONLY in a non-production deployment with the demo flag,
+ *                     so it can be verified end to end before release.
  * · active          — live for participants.
  * · retired         — superseded; historical results still resolve against it.
  */
@@ -61,10 +64,12 @@ export type ScoreDirection =
  * What the deployment's rights permit, as distinct from what the licence is.
  *
  * `internal_noncommercial` exists because CC BY-NC-SA is a NON-COMMERCIAL
- * licence and this platform is commercial. Recording the classification is not
- * enough on its own — `canServeToParticipants` refuses to put such an
- * instrument in front of a participant in an organisation that does not carry
- * the same classification, so the boundary is enforced rather than documented.
+ * licence and this platform is commercial. It is RECORDED and surfaced, not
+ * enforced: the product owner has confirmed no additional licence is required
+ * for this implementation's intended use. It stays because it remains true and
+ * because anyone considering a commercial deployment of that instrument needs
+ * to see it — see canServeToParticipants for why enforcing it needs somewhere
+ * to read an organisation's classification from first.
  */
 export type UseClassification = "unrestricted" | "internal_noncommercial";
 
@@ -126,6 +131,56 @@ export interface InstrumentMetadata {
   primaryScoreMax: number;
   scoreDirection: ScoreDirection;
 
+  /**
+   * The bound on the STORED RAW total (`wellbeing_results.total_score`).
+   *
+   * ───────────────────────────────────────────────────────────────────
+   * WHY THIS IS NOT primaryScoreMax.
+   *
+   * For GHQ they are the same number, and that coincidence is what made the
+   * database constraints wrong. WHO-5's PRIMARY score is the published
+   * percentage (0–100) while its RAW total is 0–25, and the two are stored in
+   * different columns. A rule that reads `primaryScoreMax` and applies it to
+   * `total_score` is therefore correct for three instruments and silently
+   * wrong for the fourth.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  rawScoreMax: number;
+  /**
+   * The bound on the stored Likert total, or null where none exists.
+   *
+   * GHQ's secondary continuous measure only. Null means the instrument must
+   * store no Likert score at all — which is a rule, not an absence.
+   */
+  likertScoreMax: number | null;
+  /**
+   * WHICH STORED COLUMN CARRIES THE PRIMARY SCORE.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   * THE ASSUMPTION THIS FIELD EXISTS TO DELETE.
+   *
+   * `at_or_above_threshold` was defined in the schema as
+   * `total_score >= threshold_at_completion`. That is GHQ's arithmetic, and it
+   * was written when GHQ was the only instrument with a cut-off.
+   *
+   * WHO-5's cut-off of 50 is a number on its TRANSFORMED scale, stored in
+   * `index_score`. Compared against its raw 0–25 total it is not merely
+   * inaccurate — it is unreachable, so every WHO-5 result at or above the
+   * cut-off was rejected outright at insert.
+   *
+   * Reading surfaces had the same assumption in a milder form: they picked the
+   * column by testing `primaryScoreMax === 100`, which gets the right answer
+   * for all four instruments today purely by coincidence — every instrument
+   * that tops out at 100 happens to be one that normalises. An instrument with
+   * a raw 0–100 count would satisfy that test and be read from a null column,
+   * reporting zero for everybody.
+   *
+   * So the column is DECLARED. A threshold, where one exists, is stated on this
+   * same scale — see `thresholdScaleFor`, which derives rather than repeats it.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  reportedOn: "raw" | "index";
+
   itemCount: number;
   responseOptionCount: number;
 
@@ -147,7 +202,8 @@ export interface InstrumentMetadata {
    * a psychometric fact that never changes, while what we are permitted to do
    * with it is a legal position that can. `unrestricted` means the content is
    * DISC360's own or otherwise unencumbered. `internal_noncommercial` means a
-   * non-commercial licence governs it, and serving is gated accordingly.
+   * non-commercial licence governs it, which is surfaced to whoever configures
+   * a campaign rather than enforced in code.
    */
   useClassification?: UseClassification;
   /** Publication identifier of the exact source the content was taken from. */
@@ -181,6 +237,11 @@ export const GHQ12: InstrumentMetadata = {
   primaryScoreMin: 0,
   primaryScoreMax: 12,
   scoreDirection: "higher_is_more_distress",
+  // Raw and primary coincide here — the coincidence that made a shared rule
+  // look correct for years.
+  rawScoreMax: 12,
+  likertScoreMax: 36,
+  reportedOn: "raw",
   itemCount: 12,
   responseOptionCount: 4,
   subscales: [],
@@ -206,7 +267,38 @@ export const GHQ12: InstrumentMetadata = {
   // but none appears in the supplied guide, and inventing one would be worse
   // than leaving the gap visible. It is reported rather than fabricated.
   attribution: null,
-  status: "active",
+  /*
+   * HELD, and held for a LICENSING reason rather than a technical one.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   * WHY THIS IS NOT `active`.
+   *
+   * It was. Nothing about the engine has changed: GHQ-12's scoring, threshold
+   * governance, reports and tests are complete and passing.
+   *
+   * What changed is that `active` was doing no work and hiding a gap. GHQ-12
+   * has never been servable in production — its version there is
+   * `structure_only` with no wording — so the only thing keeping it off was the
+   * ABSENCE OF CONTENT, not a decision. `canServeToParticipants` said yes; the
+   * questionnaire loader happened to find nothing. That is fail-closed by
+   * accident, and it would have become fail-OPEN the moment the content
+   * migration ran.
+   *
+   * The real position is the one directly above: `attribution` is null because
+   * the exact wording GL Assessment requires has not been confirmed, and
+   * 00040's own licence_note says it "must be confirmed with GL Assessment
+   * before external production release". An instrument whose required
+   * attribution is unknown is not ready to be served, so the registry now says
+   * so instead of relying on a database happening to be empty.
+   *
+   * `licensed` still permits authorised internal testing — a non-production
+   * deployment with WELLBEING_DEMO_MODE set — which is the same controlled
+   * mechanism GHQ-28 and WHO-5 use, and it cannot open the hosted product.
+   * Flip this to `active` when the attribution wording is recorded, and not
+   * before.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  status: "licensed",
   minutesToComplete: "2–3 minutes",
   notClaims: ["not a diagnosis", "not a severity scale", "not a measure of fitness for work"],
 };
@@ -259,6 +351,11 @@ export const GHQ28: InstrumentMetadata = {
   primaryScoreMin: 0,
   primaryScoreMax: 28,
   scoreDirection: "higher_is_more_distress",
+  rawScoreMax: 28,
+  // 28 items x 3. GHQ-12's 36 was applied to this column platform-wide, so a
+  // GHQ-28 result scoring above 36 on the Likert measure was rejected.
+  likertScoreMax: 84,
+  reportedOn: "raw",
   itemCount: 28,
   responseOptionCount: 4,
   subscales: GHQ28_SUBSCALES,
@@ -284,7 +381,20 @@ export const GHQ28: InstrumentMetadata = {
   // through GL Assessment, and the supplied guide carries no attribution to
   // transcribe. Reported, not fabricated.
   attribution: null,
-  status: "active",
+  // HELD, and not for a licensing reason.
+  //
+  // Section D asks directly about not wanting to live. The supplied guide
+  // requires professional evaluation after a positive answer there, and this
+  // product cannot notify anybody because an individual result is private by
+  // design. The resolution is participant-facing support information, and its
+  // wording must come from the Occupational Health team — it is not something
+  // this product may compose for itself.
+  //
+  // So GHQ-28 stays non-servable in production until that wording exists. The
+  // engine, scoring, subscales, reporting, analytics and tests are complete and
+  // exercised locally; only the participant-facing route is closed. See
+  // GHQ28_SUPPORT_APPROVED in data/ghq28-support-content.ts.
+  status: "licensed",
   minutesToComplete: "5–7 minutes",
   notClaims: [
     "not a diagnosis",
@@ -311,6 +421,11 @@ export const WHO5: InstrumentMetadata = {
   primaryScoreMin: 0,
   primaryScoreMax: 100,
   scoreDirection: "higher_is_stronger_wellbeing",
+  // The raw total, BEFORE the x4 transform. The cut-off of 50 lives on the
+  // transformed scale and is nonsense against this number.
+  rawScoreMax: 25,
+  likertScoreMax: null,
+  reportedOn: "index",
   itemCount: 5,
   responseOptionCount: 6,
   subscales: [],
@@ -340,21 +455,14 @@ export const WHO5: InstrumentMetadata = {
     "WHO-5 Well-Being Index © World Health Organization, used under CC BY-NC-SA 3.0 IGO. " +
     "The World Health Organization does not endorse DISC360 or Wellbeing Pulse, and is not " +
     "responsible for any interpretation presented here.",
-  // `licensed`, not `active`, and the distinction is a release blocker rather
-  // than bookkeeping.
+  // HELD at `licensed` until the full E2E gate passes.
   //
-  // The rights ARE confirmed and the verbatim content IS loaded (00038). What
-  // is missing is a WHO-5 result path: the result surface currently dispatches
-  // `disc360_wellbeing_v1` and sends everything else to GhqResult. GHQ counts
-  // UPWARD TOWARD DISTRESS on 0–12; WHO-5 counts upward toward WELLBEING on
-  // 0–100, and its suggested cut-off is a floor, not a ceiling. Rendering a
-  // WHO-5 score through that component would show a participant with good
-  // wellbeing the concerning outcome — the interpretation exactly inverted.
-  //
-  // So it stays switched off here, where one word governs it, rather than
-  // relying on no organisation happening to carry the non-commercial
-  // classification. Flip to "active" only once Who5Result exists and the
-  // result, history and report paths are proven not to touch GHQ code.
+  // The five directional assumptions that made WHO-5 unsafe are all fixed —
+  // result dispatch, scoring dispatch, report label, emphasis flag and
+  // aggregate share — and its result, report and analytics paths are complete.
+  // What remains is proving the participant journey end to end rather than
+  // asserting it. Flipping this word is the whole act of opening WHO-5, so it
+  // waits for that evidence.
   status: "licensed",
   minutesToComplete: "1–2 minutes",
   notClaims: [
@@ -381,6 +489,11 @@ export const DISC360_WELLBEING_V1: InstrumentMetadata = {
   primaryScoreMin: 0,
   primaryScoreMax: 100,
   scoreDirection: "higher_is_stronger_wellbeing",
+  rawScoreMax: 48,
+  likertScoreMax: null,
+  // Reported on its 0–100 index, and carrying NO threshold — the two facts are
+  // independent, which is why they are no longer one field.
+  reportedOn: "index",
   itemCount: 12,
   responseOptionCount: 5,
   subscales: [],
@@ -418,6 +531,140 @@ export function instrumentMeta(key: InstrumentKey): InstrumentMetadata {
 
 export function higherIsBetter(key: InstrumentKey): boolean {
   return INSTRUMENTS[key].scoreDirection === "higher_is_stronger_wellbeing";
+}
+
+/**
+ * The largest number that could be a meaningful threshold for an instrument.
+ *
+ * A threshold is stated on whichever scale the instrument declares, so its
+ * bound follows that declaration: GHQ's cut-offs are counts on the raw scale,
+ * WHO-5's is a percentage on the transformed one. Null where the instrument
+ * carries no threshold — there is no range, not an unbounded one.
+ */
+export function thresholdMaxFor(key: InstrumentKey): number | null {
+  const instrument = INSTRUMENTS[key];
+  if (!instrument.hasThreshold) return null;
+  return instrument.reportedOn === "index" ? instrument.primaryScoreMax : instrument.rawScoreMax;
+}
+
+/**
+ * The scale an instrument's cut-off is stated on, or null where it has none.
+ *
+ * DERIVED, not declared: a threshold is always a number on the same scale the
+ * instrument is reported on. Storing it twice would create two facts that can
+ * disagree, and disagreeing facts about a scale is the whole subject of this
+ * file.
+ */
+export function thresholdScaleFor(key: InstrumentKey): "raw" | "index" | null {
+  const instrument = INSTRUMENTS[key];
+  return instrument.hasThreshold ? instrument.reportedOn : null;
+}
+
+/** The instrument a governed policy row was written for, by its scoring method. */
+export function instrumentForScoringMethod(method: string): InstrumentKey | null {
+  return INSTRUMENT_KEYS.find((key) => INSTRUMENTS[key].scoringMethod === method) ?? null;
+}
+
+/**
+ * A governed policy row, reduced to the two fields a threshold rule needs.
+ *
+ * Structural rather than an import, so this rule lives beside the metadata it
+ * derives from and stays testable — `lib/wellbeing/policy.ts` is `server-only`
+ * and cannot be loaded by the unit runner.
+ */
+export interface GovernedPolicy {
+  screeningThreshold: number;
+  /** The scoring method — and therefore the instrument — this policy governs. */
+  scoringMethod: string;
+}
+
+/**
+ * The threshold to score and classify a given instrument against.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * A POLICY GOVERNS THE INSTRUMENT IT NAMES, AND NO OTHER.
+ *
+ * `wellbeing_policies.screening_threshold` was read as one organisation-wide
+ * number and applied to whatever was being scored. With GHQ-12 alone that was
+ * indistinguishable from correct. With two threshold-carrying instruments it
+ * meant GHQ-28 was classified against GHQ-12's 3/4 split rather than its own
+ * 4/5 — and the analytics surface had separately been patched to DISPLAY
+ * GHQ-28's 5, so the cut-off a facilitator read was not the cut-off the stored
+ * results were classified by.
+ *
+ * The row has always carried `scoring_method`. It was simply never read.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export function resolveGovernedThreshold(
+  policy: GovernedPolicy,
+  key: InstrumentKey,
+): number | null {
+  const instrument = INSTRUMENTS[key];
+  if (!instrument.hasThreshold) return null;
+  if (policy.scoringMethod !== instrument.scoringMethod) return instrument.defaultThreshold;
+
+  // Bounded on the instrument's OWN scale, not on GHQ-12's 1–12. The database
+  // enforces the same rule; this stays because "the constraint makes it
+  // unreachable" and "safe to assume" are not the same thing for a number that
+  // decides what a person is told about themselves.
+  const max = thresholdMaxFor(key);
+  if (max === null) return instrument.defaultThreshold;
+  const threshold = policy.screeningThreshold;
+  if (!Number.isInteger(threshold) || threshold < 1 || threshold > max) {
+    return instrument.defaultThreshold;
+  }
+  return threshold;
+}
+
+/** A stored result, reduced to the two score columns every instrument writes. */
+export interface StoredScores {
+  /** `wellbeing_results.total_score` — the instrument's RAW total. */
+  totalScore: number;
+  /** `wellbeing_results.index_score` — present only where one is normalised. */
+  indexScore: number | null;
+}
+
+/**
+ * The figure an instrument is REPORTED on, taken from its declared scale.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * WHY THIS REPLACED `primaryScoreMax === 100`.
+ *
+ * That test asked "does this instrument report on 0–100?" and used the answer
+ * to pick a COLUMN. It gets the right answer for all four instruments today,
+ * by coincidence: every instrument whose primary scale tops out at 100 happens
+ * to be one that normalises into `index_score`.
+ *
+ * The coincidence is not a rule. An instrument with a raw 0–100 count would
+ * satisfy the test and be read from the wrong column, and nothing would fail —
+ * it would report zero for everybody, because `index_score` is null there.
+ *
+ * `reportedOn` states the fact directly instead of inferring it.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export function reportedScoreFor(key: InstrumentKey, scores: StoredScores): number {
+  return INSTRUMENTS[key].reportedOn === "index" ? (scores.indexScore ?? 0) : scores.totalScore;
+}
+
+/**
+ * Whether a result sits at or above its instrument's cut-off.
+ *
+ * DIRECTION IS NOT DECIDED HERE, deliberately. This answers only "which side
+ * of the number is it on"; what that side MEANS is `scoreDirection`'s job, and
+ * conflating the two is the defect this whole audit exists to remove — on GHQ
+ * at-or-above is the concerning side, on WHO-5 it is the unremarkable one.
+ *
+ * Returns null for an instrument that carries no threshold, which must then
+ * store no flag either.
+ */
+export function atOrAboveThresholdFor(
+  key: InstrumentKey,
+  scores: StoredScores,
+  threshold: number | null,
+): boolean | null {
+  const instrument = INSTRUMENTS[key];
+  if (!instrument.hasThreshold || threshold === null) return null;
+  return reportedScoreFor(key, scores) >= threshold;
 }
 
 /**
@@ -489,42 +736,53 @@ export function canServeToParticipants(
   options: {
     isProduction: boolean;
     demoEnabled: boolean;
-    /**
-     * What the ORGANISATION about to run this campaign is licensed for.
-     *
-     * Omitted means unrestricted, which is correct for every instrument whose
-     * content DISC360 owns. It is only consulted for an instrument that
-     * carries a narrower classification of its own.
-     */
-    organizationUse?: UseClassification;
   },
 ): ServeDecision {
   const instrument = INSTRUMENTS[key];
 
-  // The non-commercial boundary, checked BEFORE status.
+  // `useClassification` is RECORDED, not enforced here.
   //
-  // An instrument licensed for internal non-commercial use may not be served
-  // by an organisation that is not itself classified that way — being "active"
-  // is a content fact and says nothing about rights. Checked first so that
-  // flipping a status can never, on its own, put licensed content in front of
-  // a commercial customer.
-  if (instrument.useClassification === "internal_noncommercial") {
-    const organizationUse = options.organizationUse ?? "unrestricted";
-    if (organizationUse !== "internal_noncommercial") {
-      return { allowed: false, reason: NON_COMMERCIAL_ONLY_MESSAGE };
-    }
-  }
+  // It was briefly a hard gate: an instrument marked `internal_noncommercial`
+  // was refused unless the caller passed a matching organisation
+  // classification. Nothing ever passed one, so the gate defaulted closed and
+  // WHO-5 could not be served by anybody — a dead end rather than a control.
+  //
+  // The product owner has since confirmed that no additional licence is
+  // required for this implementation's intended use, so the block is removed.
+  // The classification stays on the instrument because it remains TRUE and is
+  // rendered in the licensing surfaces: CC BY-NC-SA is a non-commercial
+  // licence, and anyone considering serving WHO-5 to a paying customer needs
+  // to see that before they do. Recording a constraint and enforcing it are
+  // different jobs, and only the first one is honest here.
+  //
+  // If enforcement is wanted later it needs somewhere to read the
+  // organisation's classification FROM — a column and a governance surface —
+  // not a parameter no caller supplies.
 
   if (instrument.status === "active") return { allowed: true, reason: null };
 
-  if (instrument.status === "demo_restricted") {
+  // `licensed` and `demo_restricted` share one serving rule.
+  //
+  // Both mean "the content exists and may be looked at, but this instrument is
+  // not switched on for participants". The only place that is legitimate is a
+  // NON-PRODUCTION deployment with the demo flag explicitly set — which is
+  // also the only way to exercise the participant journey before release.
+  //
+  // Without this, a held instrument could not be end-to-end tested anywhere,
+  // and the choice would be between shipping it unverified or flipping it to
+  // `active` to make a test pass. Both are worse than a rule that says plainly
+  // where a held instrument may run.
+  //
+  // Production is unaffected: `isProductionEnvironment()` returns true for the
+  // hosted deployment unconditionally, so this branch cannot open there.
+  if (instrument.status === "demo_restricted" || instrument.status === "licensed") {
     if (!options.isProduction && options.demoEnabled) {
       return { allowed: true, reason: null };
     }
     return { allowed: false, reason: NOT_ACTIVE_MESSAGE };
   }
 
-  // structure_only, licensed (not yet switched on) and retired never serve.
+  // structure_only and retired never serve, anywhere.
   return { allowed: false, reason: NOT_ACTIVE_MESSAGE };
 }
 

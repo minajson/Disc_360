@@ -347,12 +347,19 @@ begin
            values (%L, %L, 'ghq12', 2, 6, '{3,3,0}', '1.0.0', 1, %L, 4, false)$sql$,
            v_spare, v_bob, v_version));
 
+  -- A threshold must sit inside ITS OWN instrument's range.
+  --
+  -- This used to assert "outside 1-12", which was GHQ-12's range hard-coded
+  -- when GHQ-12 was the only instrument with a threshold. It rejected WHO-5's
+  -- documented cut-off of 50 at insert time, so a participant completed the
+  -- questionnaire and was told it could not be scored. The rule is now
+  -- per-instrument, and this checks the bound that actually applies.
   perform pg_temp.expect_rejected(
-    'a threshold outside 1-12 is refused',
+    'a GHQ-12 threshold above its own maximum is refused',
     format($sql$insert into public.wellbeing_results
              (session_id, profile_id, instrument_key, total_score, likert_score, item_positions,
               scoring_version, questionnaire_version, version_id, threshold_at_completion, at_or_above_threshold)
-           values (%L, %L, 'ghq12', 2, 6, '{3,3,0,0,0,0,0,0,0,0,0,0}', '1.0.0', 1, %L, 0, true)$sql$,
+           values (%L, %L, 'ghq12', 2, 6, '{3,3,0,0,0,0,0,0,0,0,0,0}', '1.0.0', 1, %L, 13, true)$sql$,
            v_spare, v_bob, v_version));
 
   /* ── §32 · unlicensed content cannot reach a participant ──────────── */

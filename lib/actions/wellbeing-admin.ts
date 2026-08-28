@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireOnboarded, requireSuperAdmin } from "@/lib/auth/guards";
+import { INSTRUMENTS, thresholdMaxFor } from "@/data/wellbeing-instruments";
 import { createSupabaseAdminClient } from "@/lib/db/admin";
 import {
   grantWellbeingRole,
@@ -72,9 +73,24 @@ export async function revokeWellbeingRoleAction(
   return result;
 }
 
+/**
+ * The instrument this governance surface configures.
+ *
+ * Stated once, and used for BOTH the validation bound and the stored
+ * `scoring_method`, so the row records which instrument it governs instead of
+ * inheriting it from a column default. `resolveInstrumentThreshold` reads that
+ * column; a policy that does not say what it governs cannot be applied safely.
+ *
+ * Per-instrument policy authoring is a catalogue-governance concern and is not
+ * built here. Until it is, this surface governs GHQ-12 and says so.
+ */
+const GOVERNED_INSTRUMENT = "ghq12" as const;
+/** GHQ-12's own scale — not a platform-wide 1–12. */
+const GOVERNED_THRESHOLD_MAX = thresholdMaxFor(GOVERNED_INSTRUMENT) ?? 1;
+
 const policySchema = z.object({
   organizationId: z.uuid(),
-  screeningThreshold: z.coerce.number().int().min(1).max(12),
+  screeningThreshold: z.coerce.number().int().min(1).max(GOVERNED_THRESHOLD_MAX),
   minCohortSize: z.coerce.number().int().min(5).max(100),
   rationale: z.string().trim().min(20).max(2000),
 });
@@ -99,7 +115,7 @@ export async function setWellbeingPolicyAction(
       ok: false,
       message:
         parsed.error.issues[0]?.message ??
-        "A threshold (1–12), a minimum group size (5 or more) and a rationale are required.",
+        `A threshold (1–${GOVERNED_THRESHOLD_MAX}), a minimum group size (5 or more) and a rationale are required.`,
     };
   }
 
@@ -120,6 +136,7 @@ export async function setWellbeingPolicyAction(
   const { error } = await access.supabase.from("wellbeing_policies").insert({
     organization_id: parsed.data.organizationId,
     screening_threshold: parsed.data.screeningThreshold,
+    scoring_method: INSTRUMENTS[GOVERNED_INSTRUMENT].scoringMethod,
     min_cohort_size: parsed.data.minCohortSize,
     rationale: parsed.data.rationale,
     created_by: access.user.id,

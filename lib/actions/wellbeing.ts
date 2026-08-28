@@ -10,7 +10,7 @@ import {
   WELLBEING_SCORING_METHOD,
   WELLBEING_SCORING_VERSION,
 } from "@/lib/scoring/wellbeing";
-import { getWellbeingPolicy } from "@/lib/wellbeing/policy";
+import { getWellbeingPolicy, resolveInstrumentThreshold } from "@/lib/wellbeing/policy";
 import { getActiveQuestionnaire, getTeamInstrument } from "@/lib/wellbeing/queries";
 import {
   computeDiscWellbeingResult,
@@ -28,7 +28,15 @@ import {
   WHO5_SCORING_VERSION,
 } from "@/lib/scoring/who5";
 import { WHO5_SUGGESTED_CUTOFF_PERCENTAGE } from "@/data/who5-items";
-import { INSTRUMENTS, isInstrumentKey, type InstrumentKey } from "@/data/wellbeing-instruments";
+import {
+  atOrAboveThresholdFor,
+  canServeToParticipants,
+  INSTRUMENTS,
+  INSTRUMENT_KEYS,
+  isInstrumentKey,
+  type InstrumentKey,
+} from "@/data/wellbeing-instruments";
+import { isProductionEnvironment, isWellbeingDemoEnabled } from "@/lib/wellbeing/environment";
 import { isOtherDepartment } from "@/data/wellbeing-taxonomy";
 import { normalizeOrgFreeText, ORG_FREE_TEXT_MAX } from "@/lib/wellbeing/free-text";
 import { buildWellbeingSnapshot } from "@/lib/wellbeing/snapshot";
@@ -62,8 +70,15 @@ const beginSchema = z.object({
    * Which instrument to run. Resolved from the team where one is configured;
    * a client-supplied value is only honoured for a solo attempt, and is
    * validated against the registry either way.
+   *
+   * Derived from INSTRUMENT_KEYS rather than written out. It used to list
+   * ["ghq12", "disc360_wellbeing_v1"] — two of the four — so a WHO-5 or GHQ-28
+   * attempt failed schema validation and was reported as "Taking part requires
+   * your agreement": a consent error for something that had nothing to do with
+   * consent. An enum that repeats the registry silently goes stale the moment
+   * an instrument is added.
    */
-  instrumentKey: z.enum(["ghq12", "disc360_wellbeing_v1"]).optional(),
+  instrumentKey: z.enum(INSTRUMENT_KEYS as unknown as [InstrumentKey, ...InstrumentKey[]]).optional(),
 });
 
 export interface BeginResult {
@@ -86,7 +101,17 @@ export async function beginWellbeingPulse(input: {
 }): Promise<BeginResult> {
   const parsed = beginSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, error: "Taking part requires your agreement." };
+    // Consent is the only failure a participant can act on, so it is named
+    // only when it is actually the problem. Reporting every schema rejection
+    // as a consent failure sent a real defect — an instrument missing from the
+    // enum — to whoever was debugging it, dressed as user error.
+    const consentFailed = parsed.error.issues.some((issue) => issue.path[0] === "consent");
+    return {
+      ok: false,
+      error: consentFailed
+        ? "Taking part requires your agreement."
+        : "This Wellbeing Pulse could not be started.",
+    };
   }
 
   const context = await requireOnboarded();
@@ -107,6 +132,43 @@ export async function beginWellbeingPulse(input: {
       error: teamId
         ? "This session has not been configured with a questionnaire yet."
         : "Choose which Wellbeing Pulse to take.",
+    };
+  }
+
+  /*
+   * THE SERVING GATE — APPLIED TO EVERY ATTEMPT, TEAM OR SOLO.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   * THE BYPASS THIS CLOSES.
+   *
+   * `canServeToParticipants` was consulted on the participant path in exactly
+   * one place: `checkCampaignReadiness`, called below inside `if (teamId)`.
+   *
+   * A SOLO attempt has no team, so it skipped the gate entirely — and a solo
+   * attempt is the one case where `instrumentKey` comes from the CLIENT. The
+   * only remaining barrier was `getActiveQuestionnaire`, which asks whether an
+   * active version exists. That is a question about CONTENT, not about
+   * licensing, and the two answers diverge the moment held content is loaded.
+   *
+   * Migration 00040 loads exactly that: it marks GHQ-12, GHQ-28 and WHO-5
+   * `licensed` and `is_active`. So on the deployment that ships 00040, any
+   * signed-in participant could invoke this action with `{ instrumentKey:
+   * "who5" }` and no team, and open a real attempt on a held instrument in
+   * production. Nothing else would have stopped them.
+   *
+   * The gate belongs HERE — before the resume lookup, so it covers an attempt
+   * already in flight as well as a new one. An instrument that may not be
+   * served may not be served on its second screen either.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  const serving = canServeToParticipants(instrumentKey, {
+    isProduction: isProductionEnvironment(),
+    demoEnabled: isWellbeingDemoEnabled(),
+  });
+  if (!serving.allowed) {
+    return {
+      ok: false,
+      error: serving.reason ?? "This Wellbeing Pulse is not available yet.",
     };
   }
 
@@ -335,11 +397,43 @@ export async function saveWellbeingContext(
 
 /* ── answering ──────────────────────────────────────────────────────── */
 
+/**
+ * The shape of an answer, bounded STRUCTURALLY.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * WHY THESE NUMBERS ARE NOT AN INSTRUMENT'S.
+ *
+ * They used to be. This schema read
+ *
+ *     position:  z.number().int().min(0).max(3),
+ *     itemIndex: z.number().int().min(0).max(11),
+ *
+ * which is GHQ-12 exactly: four response options and twelve items. Every other
+ * instrument on the platform exceeds one bound or the other, so the autosave
+ * rejected legitimate answers as "Invalid answer":
+ *
+ *   · WHO-5 offers six options (0–5), so its top two answers could not be
+ *     recorded at all — a participant reporting the BEST wellbeing was the one
+ *     who could not proceed.
+ *   · DISC360 Wellbeing Pulse V1 — the instrument that is ACTIVE and shipping —
+ *     offers five (0–4), so its top answer was rejected on every item.
+ *   · GHQ-28 has 28 items, so nothing past the twelfth could be answered.
+ *
+ * The bounds below are the DATABASE COLUMNS' own limits
+ * (wellbeing_responses.option_position is 0–9, wellbeing_items.position is
+ * 0–49). They exist to reject nonsense cheaply before touching the database,
+ * and they deliberately encode nothing about any instrument.
+ *
+ * The AUTHORITATIVE check happens below, against the item's own options and its
+ * version's own item count — because "which answers exist" is a fact about the
+ * item, not a number to be copied from a registry and kept in step by hand.
+ * ─────────────────────────────────────────────────────────────────────
+ */
 const answerSchema = z.object({
   sessionId: z.uuid(),
   itemId: z.uuid(),
-  position: z.number().int().min(0).max(3),
-  itemIndex: z.number().int().min(0).max(11),
+  position: z.number().int().min(0).max(9),
+  itemIndex: z.number().int().min(0).max(49),
 });
 
 export interface SaveAnswerResult {
@@ -369,14 +463,45 @@ export async function saveWellbeingResponse(
     return { ok: false, answeredCount: 0, error: "This pulse is already complete." };
   }
 
-  // The item must belong to the version this session is running.
+  // The item must belong to the version this session is running, and it is
+  // fetched WITH the two facts that decide whether this answer is valid at all:
+  // the options it actually offers, and how many items its version has.
   const { data: item } = await supabase
     .from("wellbeing_items")
-    .select("id, version_id")
+    .select("id, version_id, wellbeing_versions(item_count), wellbeing_item_options(position)")
     .eq("id", itemId)
     .maybeSingle();
   if (!item || item.version_id !== session.version_id) {
     return { ok: false, answeredCount: 0, error: "Question not found" };
+  }
+
+  /*
+   * The answer must be one THIS ITEM OFFERS.
+   *
+   * Checked against the item's own options rather than against a per-instrument
+   * range, so it is right for every instrument including ones not yet written,
+   * and cannot drift from the questionnaire the participant is actually being
+   * shown. A range would have to be maintained in step with the content; this
+   * cannot disagree with it.
+   */
+  const offered = (item.wellbeing_item_options ?? []) as { position: number }[];
+  if (!offered.some((option) => option.position === position)) {
+    return { ok: false, answeredCount: 0, error: "Invalid answer" };
+  }
+
+  // The resume position must be inside the questionnaire being taken. Read from
+  // the version rather than assumed — GHQ-12's twelve is not GHQ-28's 28.
+  // PostgREST returns a to-one embed as an object; the generated types model it
+  // as an array. Both are read, so neither shape silently yields 0 — which
+  // would reject every answer.
+  const versionEmbed = item.wellbeing_versions as
+    | { item_count: number }
+    | { item_count: number }[]
+    | null;
+  const itemCount =
+    (Array.isArray(versionEmbed) ? versionEmbed[0]?.item_count : versionEmbed?.item_count) ?? 0;
+  if (itemIndex >= itemCount) {
+    return { ok: false, answeredCount: 0, error: "Invalid answer" };
   }
 
   const { error } = await supabase
@@ -522,7 +647,10 @@ export async function completeWellbeingPulse(sessionId: string): Promise<Complet
       const scored = computeWellbeingResult({
         answers,
         itemOrder,
-        threshold: policy.screeningThreshold,
+        // The governed threshold FOR THIS INSTRUMENT. Reading
+        // `policy.screeningThreshold` directly is what handed GHQ-12's cut-off
+        // to GHQ-28 below.
+        threshold: resolveInstrumentThreshold(policy, "ghq12"),
       });
       scoredRow = {
         total_score: scored.totalScore,
@@ -538,7 +666,11 @@ export async function completeWellbeingPulse(sessionId: string): Promise<Complet
       const scored = computeGhq28Result({
         answers,
         itemOrder,
-        threshold: policy.screeningThreshold,
+        // GHQ-28's own 4/5 split unless a policy names GHQ-28's scoring
+        // method. It used to receive GHQ-12's 3/4 split, so results were
+        // classified one point early — while the analytics surface had already
+        // been patched to DISPLAY 5.
+        threshold: resolveInstrumentThreshold(policy, "ghq28"),
       });
       scoredRow = {
         total_score: scored.totalScore,
@@ -581,7 +713,11 @@ export async function completeWellbeingPulse(sessionId: string): Promise<Complet
         // WHO-5 counts UPWARD toward wellbeing, so at-or-above its cut-off is
         // the unremarkable side — the exact opposite of what this flag means
         // for GHQ. Nothing may read it without knowing the instrument.
-        at_or_above_threshold: scored.transformedScore >= WHO5_SUGGESTED_CUTOFF_PERCENTAGE,
+        at_or_above_threshold: atOrAboveThresholdFor(
+          "who5",
+          { totalScore: scored.rawScore, indexScore: scored.transformedScore },
+          WHO5_SUGGESTED_CUTOFF_PERCENTAGE,
+        ),
       };
     } else if (instrumentKey === "disc360_wellbeing_v1") {
       const scored = computeDiscWellbeingResult({ answers, itemOrder });
@@ -620,6 +756,34 @@ export async function completeWellbeingPulse(sessionId: string): Promise<Complet
   } catch {
     // Both engines reject incomplete or malformed sets rather than returning a
     // partial score. Surface that as a form problem, never as a silent zero.
+    return { ok: false, error: "We could not score this pulse. Please check your answers." };
+  }
+
+  /*
+   * The flag, re-derived from the registry and compared against what the
+   * engine produced.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   * WHY A CHECK HERE, WHEN THE DATABASE ALSO CHECKS.
+   *
+   * They are the SAME RULE written twice — once in SQL because a CHECK cannot
+   * read the registry, once here because the engines each compute their own
+   * flag. Two copies of a rule drift, and this particular rule drifting is how
+   * WHO-5's cut-off came to be compared against a scale it does not live on.
+   *
+   * So the copies are reconciled before the insert rather than after: if the
+   * engine's flag and the registry's disagree, nothing is stored. The
+   * alternative is a constraint violation surfacing as "could not save", which
+   * is exactly how this defect presented and exactly what made it look like an
+   * application fault rather than a scoring one.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  const expectedFlag = atOrAboveThresholdFor(
+    instrumentKey,
+    { totalScore: scoredRow.total_score, indexScore: scoredRow.index_score },
+    scoredRow.threshold_at_completion,
+  );
+  if (expectedFlag !== scoredRow.at_or_above_threshold) {
     return { ok: false, error: "We could not score this pulse. Please check your answers." };
   }
 
