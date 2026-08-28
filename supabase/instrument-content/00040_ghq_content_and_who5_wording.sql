@@ -1,3 +1,57 @@
+-- ─────────────────────────────────────────────────────────────────────
+-- HELD OUT OF THE MIGRATION SET. NOT APPLIED TO PRODUCTION.
+--
+-- This file was `supabase/migrations/00040_ghq_content_and_who5_wording.sql` and has been moved
+-- here unchanged apart from this header. It is no longer a migration, because
+-- `supabase db push` has no way to apply a SUBSET of pending migrations — it
+-- applies every one it finds. So the only reliable way to keep licensed
+-- questionnaire wording and instrument activation out of production is to keep
+-- them out of `supabase/migrations/`.
+--
+-- WHAT IT DOES: loads third-party questionnaire wording and marks the affected
+-- versions `licensed` + `is_active`. Content and activation, coupled.
+--
+-- WHY IT IS HELD: see supabase/instrument-content/README.md. In short —
+-- GHQ-12's required GL Assessment attribution wording is unconfirmed, GHQ-28's
+-- Section D support wording is unapproved by Occupational Health, and WHO-5 is
+-- not being switched on this release. None of that is a technical readiness
+-- question; the engines, scoring and tests are complete and certified.
+--
+-- HOW TO RUN IT LOCALLY (after `npx supabase db reset`):
+--
+--   PGPASSWORD=postgres psql -h 127.0.0.1 -p 54322 -U postgres -d postgres \
+--     -v ON_ERROR_STOP=1 -f supabase/instrument-content/00040_ghq_content_and_who5_wording.sql
+--
+-- TO PROMOTE IT when governance approves: move it back into
+-- `supabase/migrations/` with a NEW number (it must never reuse 00040, which
+-- history records as unapplied), and delete this header including the guard —
+-- a migration must be able to run against production, which is the whole point
+-- of promoting it.
+-- ─────────────────────────────────────────────────────────────────────
+
+-- Abort on the FIRST error. Without this the local-host guard below is
+-- decorative: `raise exception` inside a DO block ends that block, psql
+-- reports it and then carries straight on — so a file that "refuses to run"
+-- against the wrong database would load it anyway.
+\set ON_ERROR_STOP on
+
+do $guard$
+begin
+  -- Loopback, or a private (RFC1918 / Docker) address. A hosted Supabase
+  -- instance is on neither, so this refuses anything reachable from outside.
+  if inet_server_addr() is not null
+     and not (inet_server_addr() <<= inet '127.0.0.0/8'
+           or inet_server_addr() <<= inet '10.0.0.0/8'
+           or inet_server_addr() <<= inet '172.16.0.0/12'
+           or inet_server_addr() <<= inet '192.168.0.0/16') then
+    raise exception
+      'Refusing to load held instrument content into a non-local host %. '
+      'This content is governance-held; promote it to a migration instead.',
+      inet_server_addr();
+  end if;
+end;
+$guard$;
+
 -- GHQ-12 and GHQ-28 questionnaire content; WHO-5 wording aligned to the supplied guide.
 --
 -- ─────────────────────────────────────────────────────────────────────

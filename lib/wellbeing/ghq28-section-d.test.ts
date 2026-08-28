@@ -14,6 +14,7 @@ import {
   GHQ28_SUPPORT_NEXT_STEPS,
   GHQ28_SUPPORT_PRIVACY_NOTE,
 } from "../../data/ghq28-support-content.ts";
+import { canServeToParticipants, INSTRUMENTS } from "../../data/wellbeing-instruments.ts";
 
 /**
  * The GHQ-28 Section D safeguard.
@@ -193,6 +194,56 @@ test("the copy is flagged as awaiting clinical approval", () => {
     false,
     "GHQ28_SUPPORT_APPROVED is true — confirm an Occupational Health Physician signed off " +
       "the exact wording, then update this test with the approval reference",
+  );
+});
+
+/**
+ * The rule that keeps GHQ-28 closed, stated as a rule rather than as a pin.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * WHY BOTH HALVES ARE ASSERTED TOGETHER.
+ *
+ * GHQ-28's engine, scoring, subscales, reporting and analytics are finished and
+ * exercised locally. The ONE thing outstanding is the participant-facing
+ * Section D support wording, which must come from Occupational Health and has
+ * not been approved. Until it is, a participant must not be able to reach the
+ * questionnaire — because answering Section D positively and being shown
+ * nothing is the failure this safeguard exists to prevent.
+ *
+ * Elsewhere the two facts are pinned separately: one test says the flag is
+ * `false`, another says the status is `licensed`. Either could be changed on
+ * its own and the other would still pass, and the connection between them lives
+ * only in a comment. This asserts the CONNECTION: while the wording is
+ * unapproved, GHQ-28 is not active and cannot serve a participant in
+ * production, with or without the demo flag.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+test("GHQ-28 cannot reach a participant while the Section D wording is unapproved", () => {
+  if (GHQ28_SUPPORT_APPROVED) return; // Approved: the rule below no longer binds.
+
+  assert.notEqual(
+    INSTRUMENTS.ghq28.status,
+    "active",
+    "GHQ-28 must not be active while its Section D support wording is unapproved",
+  );
+
+  for (const environment of [
+    { isProduction: true, demoEnabled: false },
+    { isProduction: true, demoEnabled: true },
+  ]) {
+    assert.equal(
+      canServeToParticipants("ghq28", environment).allowed,
+      false,
+      `GHQ-28 must not serve in production (demoEnabled=${environment.demoEnabled})`,
+    );
+  }
+
+  // Local, flagged evaluation stays open — that is how the engine and the
+  // Section D detection are exercised at all, and it reaches no participant.
+  assert.equal(
+    canServeToParticipants("ghq28", { isProduction: false, demoEnabled: true }).allowed,
+    true,
+    "the engine must remain testable locally, or the safeguard cannot be verified",
   );
 });
 

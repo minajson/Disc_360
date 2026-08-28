@@ -15,7 +15,6 @@ import {
   WHO5_SOURCE_DOCUMENT,
   WHO5_STEM,
   WHO5_SUGGESTED_CUTOFF_PERCENTAGE,
-  WHO5_SUGGESTED_CUTOFF_RAW,
   WHO5_TRANSFORM_MULTIPLIER,
 } from "./who5-items.ts";
 import { INSTRUMENTS } from "./wellbeing-instruments.ts";
@@ -179,7 +178,7 @@ test("no WHO logo asset exists in the product", () => {
 test("the logo prohibition is written down where the content lives", () => {
   // So the next person to touch this file learns the rule from the file.
   assert.match(read("data/who5-items.ts"), /logo is not permitted/i);
-  assert.match(read("supabase/migrations/00038_who5_content.sql"), /No WHO logo/i);
+  assert.match(read("supabase/instrument-content/00038_who5_content.sql"), /No WHO logo/i);
 });
 
 /* ── 4 · the cut-off is documentation, not a verdict ─────────────────── */
@@ -213,7 +212,7 @@ test("WHO-5 never claims to diagnose", () => {
 // migration is a questionnaire that tests one way and administers another.
 
 test("the migration seeds exactly the authored items", () => {
-  const migration = read("supabase/migrations/00040_ghq_content_and_who5_wording.sql");
+  const migration = read("supabase/instrument-content/00040_ghq_content_and_who5_wording.sql");
   for (const item of WHO5_ITEM_STRUCTURE) {
     assert.ok(
       migration.includes(`'${item.externalId}'`),
@@ -229,7 +228,7 @@ test("the migration seeds exactly the authored items", () => {
 test("the migration seeds exactly the authored anchors and points", () => {
   // 00038 established the anchors AND their points; 00040 only re-labels them
   // to the supplied guide's wording. Points are asserted where they are set.
-  const migration = read("supabase/migrations/00038_who5_content.sql");
+  const migration = read("supabase/instrument-content/00038_who5_content.sql");
   for (const option of WHO5_RESPONSE_OPTIONS) {
     assert.match(
       migration,
@@ -239,7 +238,7 @@ test("the migration seeds exactly the authored anchors and points", () => {
   }
 
   // The wording in force comes from 00040, transcribed from the supplied guide.
-  const rewording = read("supabase/migrations/00040_ghq_content_and_who5_wording.sql");
+  const rewording = read("supabase/instrument-content/00040_ghq_content_and_who5_wording.sql");
   for (const option of WHO5_RESPONSE_OPTIONS) {
     assert.ok(
       rewording.includes(`'${option.label}'`),
@@ -249,7 +248,7 @@ test("the migration seeds exactly the authored anchors and points", () => {
 });
 
 test("the migration records the licence and checks its own arithmetic", () => {
-  const migration = read("supabase/migrations/00038_who5_content.sql");
+  const migration = read("supabase/instrument-content/00038_who5_content.sql");
   assert.match(migration, /CC BY-NC-SA 3\.0 IGO/);
   assert.match(migration, /World Health Organization/);
   assert.match(migration, /does not\s+-- endorse|does not '\s*\|\|\s*'endorse|not endorse/i);
@@ -261,7 +260,7 @@ test("the migration records the licence and checks its own arithmetic", () => {
 
 test("the WHO-5 content migration touches no other instrument", () => {
   // 00040 deliberately covers all three; 00038 is WHO-5's alone.
-  const migration = read("supabase/migrations/00038_who5_content.sql");
+  const migration = read("supabase/instrument-content/00038_who5_content.sql");
   for (const foreign of ["ghq12", "ghq28", "disc360_wellbeing_v1"]) {
     const writes = new RegExp(`(insert|update|delete)[\\s\\S]{0,200}${foreign}`, "i");
     assert.ok(!writes.test(migration), `migration must not write ${foreign} content`);

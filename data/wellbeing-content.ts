@@ -1,3 +1,7 @@
+import type { InstrumentKey } from "./wellbeing-instruments.ts";
+import { DISC_WELLBEING_DISCLAIMER_LONG } from "./disc360-wellbeing-content.ts";
+import { WHO5_DISCLAIMER_LONG } from "./who5-content.ts";
+
 import type { WellbeingMovement } from "../lib/scoring/wellbeing.ts";
 
 /**
@@ -56,6 +60,22 @@ export const SCREENING_DISCLAIMER =
   "GHQ-12 is a screening questionnaire and does not provide a diagnosis.";
 
 /** The longer form, for the report and the result page footer. */
+/**
+ * GHQ-28's own disclaimer.
+ *
+ * GHQ-28 used to inherit GHQ-12's, which names GHQ-12 in its first four words.
+ * A participant answering twenty-eight questions was told they had taken a
+ * twelve-item questionnaire — the instrument is half the meaning of the
+ * result, and misnaming it to the one person entitled to know is not a
+ * cosmetic error.
+ */
+export const GHQ28_DISCLAIMER_LONG =
+  "GHQ-28 is a screening questionnaire and does not provide a diagnosis. It describes " +
+  "how you have been feeling recently compared with usual, and nothing more. Its four " +
+  "sections are profile dimensions, not separate findings, and none of them names a " +
+  "condition. It is not a medical, clinical or employment-selection instrument, and your " +
+  "responses are never shared with your manager.";
+
 export const SCREENING_DISCLAIMER_LONG =
   "GHQ-12 is a screening questionnaire and does not provide a diagnosis. It describes " +
   "how you have been feeling recently compared with usual, and nothing more. It is not " +
@@ -218,3 +238,32 @@ export const ITEM_SIGNAL_NOTE =
   "Each column is one questionnaire item, reported as the share of responses indicating " +
   "more difficulty than usual. Items are shown individually and are never grouped into " +
   "named categories.";
+
+/**
+ * The long-form disclaimer for an instrument, chosen by the instrument.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * WHY A RESOLVER RATHER THAN A TERNARY AT EACH CALL SITE.
+ *
+ * Both the landing page and the result page used to branch two ways:
+ * DISC360 Wellbeing, or "everything else". Everything else meant GHQ-12's
+ * text, which opens with the words "GHQ-12 is a screening questionnaire" — so
+ * WHO-5 and GHQ-28 participants were told, in the one place that describes
+ * what they just answered, that they had taken a different questionnaire.
+ *
+ * A two-way branch cannot survive a fourth instrument. This is exhaustive, so
+ * adding one is a compile error rather than a silent mislabelling.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export function participantDisclaimerFor(instrumentKey: InstrumentKey): string {
+  switch (instrumentKey) {
+    case "ghq12":
+      return SCREENING_DISCLAIMER_LONG;
+    case "ghq28":
+      return GHQ28_DISCLAIMER_LONG;
+    case "who5":
+      return WHO5_DISCLAIMER_LONG;
+    case "disc360_wellbeing_v1":
+      return DISC_WELLBEING_DISCLAIMER_LONG;
+  }
+}

@@ -13,6 +13,7 @@ import {
   WHO5_DISCLAIMER_LONG,
   WHO5_SCORE_MEANING,
 } from "../../data/who5-content.ts";
+import { participantDisclaimerFor } from "../../data/wellbeing-content.ts";
 
 /**
  * WHO-5 must never be interpreted by GHQ code.
@@ -69,12 +70,12 @@ test("Who5Result shares no scale component with GHQ", () => {
 });
 
 test("the WHO-5 disclaimer is WHO-5's own", () => {
+  // Resolved per instrument rather than branched. The chain this replaced sent
+  // GHQ-28 to GHQ-12's text, which names GHQ-12 in its opening words.
   const page = read(RESULT_PAGE);
-  assert.match(
-    page,
-    /record\.instrumentKey === "who5"\s*\?\s*WHO5_DISCLAIMER_LONG/,
-    "WHO-5 must not inherit the GHQ screening disclaimer",
-  );
+  assert.match(page, /participantDisclaimerFor\(record\.instrumentKey\)/);
+  assert.match(participantDisclaimerFor("who5"), /WHO-5/);
+  assert.ok(!participantDisclaimerFor("who5").includes("GHQ"));
 });
 
 /* ── 2 · the scale reads in WHO-5's direction ────────────────────────── */
@@ -132,9 +133,28 @@ test("WHO-5 stores the published transform and its own cut-off", () => {
   assert.match(block, /index_score: scored\.transformedScore/, "the 0-100 percentage is the index");
   assert.match(block, /total_score: scored\.rawScore/, "the raw 0-25 is the total");
   assert.match(block, /threshold_at_completion: WHO5_SUGGESTED_CUTOFF_PERCENTAGE/);
+  /*
+   * The flag is computed on the TRANSFORMED score against WHO's cut-off.
+   *
+   * This used to pin the literal expression
+   * `scored.transformedScore >= WHO5_SUGGESTED_CUTOFF_PERCENTAGE`. The
+   * comparison now goes through `atOrAboveThresholdFor`, which reads the scale
+   * from the registry — so the database CHECK and this code cannot state the
+   * rule differently. What is asserted is therefore the SEMANTICS, which is
+   * what mattered all along: the cut-off meets the transformed score, and the
+   * raw 0–25 total is never what is compared against 50.
+   */
   assert.match(
     block,
-    /at_or_above_threshold: scored\.transformedScore >= WHO5_SUGGESTED_CUTOFF_PERCENTAGE/,
+    /at_or_above_threshold: atOrAboveThresholdFor\(/,
+    "the flag must come from the registry's rule, not a restatement of it",
+  );
+  assert.match(block, /indexScore: scored\.transformedScore/);
+  assert.match(block, /WHO5_SUGGESTED_CUTOFF_PERCENTAGE,\s*\)/);
+  assert.doesNotMatch(
+    block,
+    /at_or_above_threshold:[^,]*rawScore\s*>=/,
+    "50 is a number on the transformed scale; a 0-25 raw can never reach it",
   );
 });
 

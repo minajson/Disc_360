@@ -192,6 +192,45 @@ export async function getTeamInstrument(
   return key && isInstrumentKey(key) ? key : null;
 }
 
+/**
+ * The wellbeing campaign this participant belongs to, when there is exactly one.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * WHY THIS EXISTS.
+ *
+ * The landing page used to take the campaign from a `?team=` query parameter,
+ * and fall back to "the single live instrument" when there wasn't one. That
+ * worked only while exactly one instrument was live: the moment GHQ-12 and
+ * GHQ-28 were licensed and activated, three were, the fallback returned
+ * nothing, and a participant who genuinely belonged to a campaign was told the
+ * check-in was not open.
+ *
+ * Membership is the real answer, and it does not depend on how the participant
+ * arrived. A QR link carries the team; a bookmark, a browser restore or a
+ * "back to home" click does not — and the questionnaire somebody is asked
+ * should not change because of which of those they used.
+ *
+ * Returns null when there is no campaign or more than one, because choosing
+ * between two campaigns is a decision this product does not make on somebody's
+ * behalf. The caller then falls back as before.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export async function getMyWellbeingCampaignTeam(
+  context: AuthContext,
+): Promise<string | null> {
+  const { data } = await context.supabase
+    .from("team_members")
+    .select("team_id, teams!inner (id, wellbeing_instrument_key, archived_at)")
+    .eq("profile_id", context.user.id);
+
+  const campaigns = (data ?? [])
+    .map((row) => (row as unknown as { teams: { id: string; wellbeing_instrument_key: string | null; archived_at: string | null } }).teams)
+    .filter((team) => team && team.wellbeing_instrument_key !== null && team.archived_at === null);
+
+  const unique = [...new Set(campaigns.map((team) => team.id))];
+  return unique.length === 1 ? unique[0]! : null;
+}
+
 /* ── form taxonomy ──────────────────────────────────────────────────── */
 
 export interface WellbeingSubUnitOption {

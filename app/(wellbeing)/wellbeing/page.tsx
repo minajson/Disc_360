@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireOnboarded } from "@/lib/auth/guards";
 import {
   getInstrumentAvailability,
+  getMyWellbeingCampaignTeam,
   getMyWellbeingHistory,
   getTeamInstrument,
 } from "@/lib/wellbeing/queries";
@@ -13,11 +14,11 @@ import {
   consentIntro,
   CONSENT_DECLINE,
   CONSENT_HEADING,
+  participantDisclaimerFor,
   SCREENING_DISCLAIMER_LONG,
   WELLBEING_PRODUCT_DESCRIPTION,
   WELLBEING_PRODUCT_NAME,
 } from "@/data/wellbeing-content";
-import { DISC_WELLBEING_DISCLAIMER_LONG } from "@/data/disc360-wellbeing-content";
 
 export const metadata: Metadata = { title: "Your wellbeing check-in" };
 
@@ -56,8 +57,15 @@ export default async function WellbeingHomePage({
   // For a solo participant with no campaign, the rule is unchanged: the one
   // active instrument if there is exactly one, otherwise none. They are never
   // asked to choose between questionnaires either way.
+  // The team from the link if there is one, otherwise the participant's own
+  // campaign membership. Falling back to "the single live instrument" only
+  // works while exactly one is live, which stopped being true the moment
+  // GHQ-12 and GHQ-28 were licensed — see getMyWellbeingCampaignTeam.
   const live = availability.filter((entry) => entry.available);
-  const campaignInstrument = team ? await getTeamInstrument(context, team) : null;
+  const campaignTeam = team ?? (await getMyWellbeingCampaignTeam(context));
+  const campaignInstrument = campaignTeam
+    ? await getTeamInstrument(context, campaignTeam)
+    : null;
   const questionnaire = campaignInstrument
     ? (availability.find((entry) => entry.key === campaignInstrument) ?? null)
     : live.length === 1
@@ -191,9 +199,11 @@ export default async function WellbeingHomePage({
 
       <p className="mt-10 max-w-2xl text-xs leading-relaxed text-slate">
         {/* The disclaimer belongs to the instrument being offered, not to the
-            shell — four instruments run here and they do not share wording. */}
-        {questionnaire?.key === "disc360_wellbeing_v1"
-          ? DISC_WELLBEING_DISCLAIMER_LONG
+            shell — four instruments run here and they do not share wording.
+            A two-way branch here told WHO-5 and GHQ-28 participants they had
+            taken GHQ-12. */}
+        {questionnaire
+          ? participantDisclaimerFor(questionnaire.key)
           : SCREENING_DISCLAIMER_LONG}
       </p>
     </div>

@@ -30,6 +30,21 @@ export default defineConfig({
     timeout: 60_000,
     // Shared join links/QRs must point at the server under test. SITE_URL is
     // the runtime override — NEXT_PUBLIC_SITE_URL is frozen at build time.
-    env: { SITE_URL: `http://localhost:${PORT}`, NEXT_DIST_DIR: ".next-test" },
+    env: {
+      SITE_URL: `http://localhost:${PORT}`,
+      NEXT_DIST_DIR: ".next-test",
+      // This suite is a local test deployment, not production.
+      //
+      // `next start` sets NODE_ENV=production for any optimised build, so
+      // without this the server is indistinguishable from the hosted one and a
+      // held instrument (WHO-5) could not be exercised anywhere — leaving only
+      // the choice between shipping it unverified and flipping it to `active`
+      // to make a test pass.
+      //
+      // Neither variable can open hosted production: `isProductionEnvironment`
+      // returns true unconditionally on Vercel.
+      WELLBEING_LOCAL_TEST: "true",
+      WELLBEING_DEMO_MODE: "true",
+    },
   },
 });

@@ -194,7 +194,19 @@ test("only usable providers are offered on an invitation", () => {
 
 test("the landing page resolves the invited campaign's own instrument", () => {
   const page = code("app/(wellbeing)/wellbeing/page.tsx");
-  assert.match(page, /getTeamInstrument\(context, team\)/, "the campaign is asked");
+  assert.match(page, /getTeamInstrument\(\s*context,\s*campaignTeam\s*\)/, "the campaign is asked");
+  // The campaign is the one from the link OR the participant's own membership.
+  //
+  // It used to be the link alone, with "the single live instrument" as the
+  // fallback — which silently stopped working the moment more than one
+  // instrument was licensed, and told a participant who genuinely belonged to
+  // a campaign that the check-in was not open. Membership does not depend on
+  // how somebody arrived.
+  assert.match(
+    page,
+    /const campaignTeam = team \?\? \(await getMyWellbeingCampaignTeam\(context\)\)/,
+    "membership is consulted when the link carries no team",
+  );
   assert.match(
     page,
     /campaignInstrument\s*\?[\s\S]{0,160}availability\.find/,

@@ -8,6 +8,7 @@ import { ScoreScale } from "@/components/wellbeing/ScoreScale";
 import { Who5Scale } from "@/components/wellbeing/Who5Scale";
 import { hasPositiveSectionD } from "@/lib/wellbeing/ghq28-section-d";
 import {
+  GHQ28_SUPPORT_APPROVED,
   GHQ28_SUPPORT_BODY,
   GHQ28_SUPPORT_HEADING,
   GHQ28_SUPPORT_NEXT_STEPS,
@@ -17,7 +18,6 @@ import { WHO5_RAW_MAX, WHO5_SUGGESTED_CUTOFF_PERCENTAGE } from "@/data/who5-item
 import {
   who5CutoffCopy,
   WHO5_CUTOFF_SOURCE_NOTE,
-  WHO5_DISCLAIMER_LONG,
   WHO5_MOVEMENT_CAVEAT,
   WHO5_NEXT_STEPS_BODY,
   WHO5_NEXT_STEPS_HEADING,
@@ -40,7 +40,7 @@ import {
   RESULT_HEADING,
   SCORE_LABEL,
   SCORE_MEANING,
-  SCREENING_DISCLAIMER_LONG,
+  participantDisclaimerFor,
 } from "@/data/wellbeing-content";
 import {
   DISC_DIMENSION_HEADING,
@@ -53,7 +53,6 @@ import {
   DISC_PATTERN_NOTE,
   DISC_RESULT_HEADING,
   DISC_STRONGEST_HEADING,
-  DISC_WELLBEING_DISCLAIMER_LONG,
   indexMovementDetail,
   lowestLine,
   sinceFirstDetail,
@@ -119,11 +118,11 @@ export default async function WellbeingResultPage({
       <ResultContext record={record} instrument={instrument} />
 
       <p className="mt-8 text-xs leading-relaxed text-slate">
-        {record.instrumentKey === "disc360_wellbeing_v1"
-          ? DISC_WELLBEING_DISCLAIMER_LONG
-          : record.instrumentKey === "who5"
-            ? WHO5_DISCLAIMER_LONG
-            : SCREENING_DISCLAIMER_LONG}
+        {/* Resolved from the instrument, exhaustively. The chain this replaced
+            sent GHQ-28 to GHQ-12's text, which names GHQ-12 in its opening
+            words — so a participant was told which questionnaire they had
+            taken, incorrectly, on their own result. */}
+        {participantDisclaimerFor(record.instrumentKey)}
       </p>
 
       {instrument.attribution && (
@@ -364,8 +363,20 @@ function GhqResult({
   // product cannot notify anybody, because an individual result is private by
   // design. So the support information goes to the one person who can act on
   // it. Derived here and discarded — never stored, never sent, never counted.
+  //
+  // DISABLED until an Occupational Health Physician supplies the authorised
+  // wording. `GHQ28_SUPPORT_APPROVED` is the switch, and it is false: showing
+  // unapproved clinical-adjacent copy to somebody who has just answered a
+  // suicidality item is worse than showing nothing, because it would be this
+  // product speaking where it has no standing to.
+  //
+  // The detection, the copy draft and the tests are all in place, so enabling
+  // it is a one-line change once the wording arrives — see
+  // data/ghq28-support-content.ts.
   const showSectionDSupport =
-    record.instrumentKey === "ghq28" && hasPositiveSectionD(record.itemPositions);
+    GHQ28_SUPPORT_APPROVED &&
+    record.instrumentKey === "ghq28" &&
+    hasPositiveSectionD(record.itemPositions);
 
   return (
     <>
