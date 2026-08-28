@@ -113,6 +113,84 @@ function addResult(userId: string, teamId: string | null, scoreD: number, attemp
 
 const superAdmin = () => sql(`select id from profiles where is_super_admin limit 1`);
 
+/**
+ * Drives the confirmation contract for an irreversible reconciliation.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * WHAT THIS PROVES, AND WHY IT TOOK THREE ATTEMPTS TO GET RIGHT.
+ *
+ * The operator must be told, durably, that an irreversible merge succeeded.
+ * Two designs failed before this one, and each failed for a reason worth
+ * keeping written down:
+ *
+ *   1 · `setResult(outcome)` then `router.push(...)` in one transition. React
+ *       commits both together, so the panel unmounted before the message
+ *       painted.
+ *   2 · Removing the push was not enough. A Server Action re-renders the route
+ *       it was invoked from as part of its own response. After the merge the
+ *       preflight returns null, the page stops rendering `ReconcilePanel`, and
+ *       any state it held goes with it.
+ *
+ * So the confirmation is not client state. It is server-rendered from
+ * `identity_reconciliations` — the row the merge itself wrote — which is why
+ * it is present in the very render the Server Action returns, and why it
+ * survives a reload.
+ *
+ * Asserted in order:
+ *
+ *   1 · the outcome is rendered, naming both sides and the audit record
+ *   2 · the page has NOT navigated — the operator is still where they acted
+ *   3 * the confirm control is gone, so a permanent merge cannot be re-run
+ *   4 · it survives a full reload, which is what "durable" has to mean
+ *   5 · leaving is the operator's own act
+ *   6 · the destination carries the durable record
+ * ─────────────────────────────────────────────────────────────────────
+ */
+async function expectReconciled(page: Page, survivorEmail: string, retiredEmail: string): Promise<void> {
+  const outcome = page.getByRole("status", { name: "Reconciliation outcome" });
+
+  // 1 · the confirmation is rendered, and says which way round the merge went.
+  await expect(outcome).toBeVisible({ timeout: 20_000 });
+  await expect(outcome).toContainText("Identity reconciled");
+  await expect(outcome).toContainText(survivorEmail);
+  await expect(outcome).toContainText(retiredEmail);
+  await expect(outcome).toContainText("Audit record");
+
+  // 2 · nothing navigated. The operator is still on the page they acted on.
+  await expect(page).toHaveURL(/\/identity\?with=/);
+
+  // 3 · the merge is permanent, so it is no longer on offer.
+  await expect(
+    page.getByRole("button", { name: "Confirm identity reconciliation" }),
+  ).toHaveCount(0);
+
+  // 4 · DURABLE. A reload is the difference between a message and a record —
+  // an operator who lost their connection mid-merge must still be told.
+  await page.reload();
+  await expect(outcome).toBeVisible({ timeout: 20_000 });
+  await expect(outcome).toContainText("Identity reconciled");
+
+  // 5 · leaving is the operator's act, not the mutation's.
+  await page.getByRole("link", { name: "Continue to the surviving identity" }).click();
+  await expect(page).toHaveURL(/\/identity$/, { timeout: 20_000 });
+
+  // 6 · the durable record on the destination.
+  await expect(
+    page
+      .getByRole("region", { name: "Identity overview" })
+      .getByRole("listitem")
+      .filter({ hasText: retiredEmail }),
+  ).toBeVisible({ timeout: 20_000 });
+  // The entry's label and status are separate elements, so `textContent` runs
+  // them together as "Identity reconciliationcompleted". `\s*` accepts either.
+  await expect(page.getByRole("region", { name: "Identity history" })).toContainText(
+    /Identity reconciliation\s*completed/,
+    { timeout: 20_000 },
+  );
+}
+
+
+
 async function signIn(page: Page, email: string, password = PASSWORD) {
   await page.goto("/sign-in");
   await page.getByLabel("Email").fill(email);
@@ -419,7 +497,10 @@ test("reconciliation requires the surviving address to be typed", async ({ page 
   await expect(confirm).toBeEnabled();
   await confirm.click();
 
-  await expect(page.getByText(/Identity reconciled/)).toBeVisible({ timeout: 20000 });
+  // The survivor is uidA, which TAKES emailB as its login; emailA is the
+  // address that retires. Asserting the wrong side here would pass on a merge
+  // done backwards.
+  await expectReconciled(page, emailB, emailA);
   expect(sql(`select count(*) from assessment_results where profile_id='${uidA}'`)).toBe("1");
   expect(sql(`select deactivated_at is not null from profiles where id='${uidB}'`)).toBe("t");
   expect(sql(`select email from profiles where id='${uidA}'`)).toBe(emailB);
@@ -446,7 +527,7 @@ test("the participant signs in with the new address and keeps everything", async
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByPlaceholder(emailA).fill(emailA);
   await page.getByRole("button", { name: "Confirm identity reconciliation" }).click();
-  await expect(page.getByText(/Identity reconciled/)).toBeVisible({ timeout: 20000 });
+  await expectReconciled(page, emailB, emailA);
 
   // Sign in with the NEW address — same person, same history.
   await page.context().clearCookies();

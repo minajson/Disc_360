@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { reconcileIdentity } from "@/lib/actions/identity";
+import { reconcileIdentity, type IdentityActionResult } from "@/lib/actions/identity";
 import {
   BLOCKER_MESSAGES,
   buildReconciliationPlan,
@@ -32,13 +31,39 @@ export function ReconcilePanel({
   recommendation: CanonicalRecommendation;
   returnPath: string;
 }) {
-  const router = useRouter();
   const [canonicalId, setCanonicalId] = useState(recommendation.profileId);
   const [step, setStep] = useState<"choose" | "review" | "confirm">("choose");
   const [confirmation, setConfirmation] = useState("");
   const [note, setNote] = useState("");
-  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [result, setResult] = useState<IdentityActionResult | null>(null);
   const [pending, start] = useTransition();
+
+  /*
+   * The merge has landed and this panel is finished.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   * WHY THIS EXISTS INSTEAD OF NAVIGATING ON SUCCESS.
+   *
+   * `submit` used to call `setResult(outcome)` and then `router.push(...)` in
+   * the same transition. React commits the state update and the navigation
+   * together, so the panel is unmounted before the confirmation paints and the
+   * operator is moved on without ever being told what happened — after an
+   * IRREVERSIBLE, audited merge of two people's records.
+   *
+   * It also produced a test that went red while the reconciliation had
+   * SUCCEEDED, which is the worst kind of red: it points at the wrong thing.
+   *
+   * Waiting a moment before navigating would not fix it. There is no duration
+   * that means "the operator has seen this", and picking one would make the
+   * guarantee a race with a longer fuse.
+   *
+   * So navigation stops being automatic. Once the database half is done, this
+   * becomes a terminal confirmation the operator reads and dismisses, and the
+   * dismissal IS the navigation. The contract is satisfied by an act, not by
+   * elapsed time.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  const settled = result?.recordsMerged === true;
 
   const { canonical, retiring, blockers } = preflight;
   const blocked = blockers.length > 0;
@@ -57,6 +82,7 @@ export function ReconcilePanel({
   const conservative = projectionIsConservative(oriented);
 
   const submit = () => {
+    if (settled) return; // the merge is permanent; never offer it twice
     start(async () => {
       const outcome = await reconcileIdentity({
         canonicalId: survivor.profileId,
@@ -64,8 +90,8 @@ export function ReconcilePanel({
         confirmation,
         note: note || undefined,
       });
+      // The ONLY state change here. Navigation is the operator's, below.
       setResult(outcome);
-      if (outcome.ok) router.push(`/admin/users/${survivor.profileId}/identity`);
     });
   };
 
@@ -161,7 +187,7 @@ export function ReconcilePanel({
       ) : null}
 
       {/* ── step 3 · typed confirmation ── */}
-      {step === "confirm" ? (
+      {step === "confirm" && !settled ? (
         <div className="flex flex-col gap-3 rule-t pt-5">
           <h3 className="font-display text-base font-semibold">Confirm identity reconciliation</h3>
           <p className="text-sm leading-relaxed text-slate">
@@ -215,11 +241,18 @@ export function ReconcilePanel({
         </div>
       ) : null}
 
-      {result ? (
-        <p
-          role="status"
-          className={`text-sm leading-relaxed ${result.ok ? "text-botanical" : "text-disc-d"}`}
-        >
+      {/* ── outcome ──
+          A merged reconciliation is NOT confirmed here. The page renders
+          `ReconciliationConfirmation` from the record the merge wrote, because
+          a Server Action re-renders its own route and this panel stops being
+          rendered the moment the duplicate is gone. Showing a message here too
+          would only flash before the server's render replaces it.
+
+          What remains is the case where nothing was merged — a refusal or a
+          validation failure — where the panel is still on screen and the
+          operator can correct and retry. */}
+      {result && !settled ? (
+        <p role="status" aria-live="polite" className="text-sm leading-relaxed text-disc-d">
           {result.message}
         </p>
       ) : null}

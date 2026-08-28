@@ -27,6 +27,27 @@ export interface IdentityActionResult {
   message: string;
   /** Set when the operation opened a reconciliation record. */
   reconciliationId?: string;
+  /**
+   * The IRREVERSIBLE half is done: records have been merged in the database.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   * WHY THIS IS NOT DERIVABLE FROM `ok`.
+   *
+   * A reconciliation has two halves — the database merge, then the auth email
+   * swap — and the second can fail after the first has succeeded. That returns
+   * `ok: false` with a message explaining the records ARE merged and only the
+   * sign-in address needs retrying.
+   *
+   * A caller reading `ok` alone therefore cannot tell "nothing happened, try
+   * again" from "the merge is permanent, do not run it again". The only other
+   * way to tell them apart is matching the message text, which is a sentence
+   * written for a person and not a contract.
+   *
+   * So the fact is returned as a fact. `ReconcilePanel` uses it to refuse a
+   * second submission once the merge has landed.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  recordsMerged?: boolean;
 }
 
 const TOMBSTONE_DOMAIN = "identity.disc360.invalid";
@@ -277,6 +298,7 @@ export async function reconcileIdentity(
       message:
         "Records were merged successfully, but the duplicate login could not be retired. The participant can still sign in with their existing address — retry the authentication step.",
       reconciliationId,
+      recordsMerged: true,
     };
   }
 
@@ -296,6 +318,7 @@ export async function reconcileIdentity(
       message:
         "Records were merged successfully, but the new sign-in address could not be applied. The participant can still sign in with their previous address — retry the authentication step.",
       reconciliationId,
+      recordsMerged: true,
     };
   }
 
@@ -306,12 +329,34 @@ export async function reconcileIdentity(
     p_note: undefined,
   });
 
-  revalidatePath(`/admin/users/${canonicalId}/identity`);
+  /*
+   * The identity page is deliberately NOT revalidated here.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   * WHY REVALIDATING IT DESTROYS THE CONFIRMATION.
+   *
+   * `revalidatePath` on the route the operator is currently looking at makes
+   * Next re-render it as part of this action's response. After the merge, the
+   * retiring identity is deactivated, so `getReconciliationPreflight` returns
+   * null and the page no longer renders `ReconcilePanel` at all.
+   *
+   * The panel is where the confirmation lives. So revalidating here unmounts
+   * the operator's only evidence that an irreversible merge succeeded — the
+   * same failure as the `router.push` race it replaced, arriving by a
+   * different route. The confirmation would flash and vanish.
+   *
+   * Freshness is not lost, it moves: the operator's acknowledgement navigates
+   * AND refreshes, so the destination they land on is server-rendered after
+   * the merge. The user list is revalidated here because nobody is looking at
+   * it and it must not show a retired duplicate.
+   * ───────────────────────────────────────────────────────────────────
+   */
   revalidatePath("/admin/users");
   return {
     ok: true,
     message: `Identity reconciled. ${newEmail} now signs in to the canonical participant.`,
     reconciliationId,
+    recordsMerged: true,
   };
 }
 

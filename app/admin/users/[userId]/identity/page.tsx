@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/admin/table";
 import { ChangeEmailPanel } from "@/components/admin/identity/ChangeEmailPanel";
 import { LinkLoginPanel } from "@/components/admin/identity/LinkLoginPanel";
 import { ReconcilePanel } from "@/components/admin/identity/ReconcilePanel";
+import { ReconciliationConfirmation } from "@/components/admin/identity/ReconciliationConfirmation";
 import { IdentityHistoryList } from "@/components/admin/identity/IdentityHistoryList";
 
 export const metadata: Metadata = { title: "Manage identity · Admin" };
@@ -64,6 +65,33 @@ export default async function ManageIdentityPage({
       },
     };
   })();
+
+  /*
+   * The reconciliation that has ALREADY happened for this pair, if any.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   * WHY THE PAGE OWNS THE CONFIRMATION.
+   *
+   * When `?with=` names an identity that has just been merged away, the
+   * preflight above returns null and `ReconcilePanel` stops rendering. That is
+   * correct — there is nothing left to reconcile — but it is also the moment
+   * the operator most needs to be told what happened, and a client component
+   * that is no longer rendered cannot tell them.
+   *
+   * A Server Action re-renders the route it was invoked from, so this branch
+   * is reached IMMEDIATELY after the merge, in the same response. Reading the
+   * outcome from the record the merge wrote means the confirmation is present
+   * in that render rather than racing it.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  const settledReconciliation =
+    counterpartId && !context
+      ? (history.find(
+          (entry) =>
+            entry.retiredProfileId === counterpartId &&
+            (entry.status === "completed" || entry.status === "pending_auth"),
+        ) ?? null)
+      : null;
 
   return (
     <div className="flex flex-col gap-8">
@@ -168,6 +196,15 @@ export default async function ManageIdentityPage({
           preflight={context.preflight}
           recommendation={context.recommendation}
           returnPath={`/admin/users/${userId}/identity`}
+        />
+      ) : null}
+
+      {settledReconciliation ? (
+        <ReconciliationConfirmation
+          entry={settledReconciliation}
+          survivingEmail={identity.email}
+          retiredEmail={settledReconciliation.oldEmail}
+          continueHref={`/admin/users/${userId}/identity`}
         />
       ) : null}
 
