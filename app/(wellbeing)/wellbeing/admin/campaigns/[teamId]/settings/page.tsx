@@ -23,6 +23,7 @@ import { CampaignHeader, CampaignNav } from "@/components/wellbeing/campaign/Cam
 import { ReadinessPanel } from "@/components/wellbeing/campaign/ReadinessPanel";
 import { checkCampaignReadiness } from "@/lib/wellbeing/readiness";
 import { Section } from "@/components/wellbeing/campaign/Section";
+import { campaignJoinPath } from "@/lib/wellbeing/campaigns";
 
 export const metadata: Metadata = { title: "Campaign settings" };
 
@@ -86,7 +87,17 @@ export default async function CampaignSettingsPage({
     };
   });
 
-  const joinUrl = `${getPublicBaseUrl().url}/wellbeing/join/${identity.inviteToken}`;
+  // The campaign's own join token — never the team's invite token, which
+  // belongs to DISC's invitation system and resolves to the DISC journey.
+  const { createSupabaseAdminClient } = await import("@/lib/db/admin");
+  const { data: campaignRow } = await createSupabaseAdminClient()
+    .from("wellbeing_campaigns")
+    .select("join_token")
+    .eq("team_id", teamId)
+    .maybeSingle();
+  const joinUrl = campaignRow
+    ? `${getPublicBaseUrl().url}${campaignJoinPath(campaignRow.join_token as string)}`
+    : null;
 
   return (
     <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-12">
@@ -175,11 +186,14 @@ export default async function CampaignSettingsPage({
         </Section>
 
         {/* ── 03 · joining ─────────────────────────────────────────── */}
-        {identity.instrumentKey && (
+        {/* A campaign with no `wellbeing_campaigns` row has no join token, so
+            there is no link to show. Rendering the panel with a team invite
+            link instead would hand out a DISC credential. */}
+        {identity.instrumentKey && joinUrl && (
           <Section
             index={3}
             title="Join link and QR code"
-            lead="What participants scan or open. The link carries an opaque token, never an internal id, and it resolves to this campaign's instrument and to nothing else."
+            lead="What participants scan or open. The link carries the campaign's own opaque token, never an internal id or a team invitation, and it resolves to this campaign's pinned questionnaire version and to nothing else."
           >
             <PilotPanel
               campaignName={identity.name}

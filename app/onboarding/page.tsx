@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/guards";
 import { getJoinContext } from "@/lib/join/context";
+import { campaignJoinPath, resolveCampaignByToken } from "@/lib/wellbeing/campaigns";
 import { invitedJoinDestination } from "@/lib/join/destination";
 import { ASSESSMENT_LABELS, type AssessmentProduct } from "@/lib/teams/session";
 import { WELLBEING_PRODUCT_NAME } from "@/data/wellbeing-content";
@@ -19,10 +20,29 @@ export default async function OnboardingPage({
   const { profile } = await requireUser();
   const { intent, join } = await searchParams;
 
-  // Arrived through a validated invitation (QR / join link → auth): resolve
-  // the token again server-side and onboard into that exact team — the team
-  // code is never asked for on this path.
-  const joinContext = join ? await getJoinContext(join) : null;
+  /*
+   * Arrived through a validated invitation (QR / join link → auth): resolve
+   * the token again server-side and onboard into that exact campaign — the
+   * team code is never asked for on this path.
+   *
+   * ─────────────────────────────────────────────────────────────────────
+   * TWO CREDENTIAL SPACES, TRIED IN ORDER.
+   *
+   * A wellbeing campaign token is not a DISC team invite token, and this page
+   * consulted only the DISC resolver. A participant who scanned a wellbeing QR
+   * and signed up with Google therefore reached onboarding with a token that
+   * resolved to nothing: no campaign name, no product label, and — worse — the
+   * "already onboarded" branch below fell through to `/app`, delivering them
+   * into DISC360.
+   *
+   * The campaign is resolved first. Only a token that is not a campaign token
+   * is offered to DISC, so DISC invitations behave exactly as they did and a
+   * wellbeing token never crosses into them.
+   * ─────────────────────────────────────────────────────────────────────
+   */
+  const campaignResolution = join ? await resolveCampaignByToken(join) : null;
+  const campaign = campaignResolution?.campaign ?? null;
+  const joinContext = join && !campaign ? await getJoinContext(join) : null;
 
   // Somebody already onboarded has nothing to do on this page. Sending them to
   // /app is right for a DISC invitation and wrong for a wellbeing one — it
@@ -30,6 +50,7 @@ export default async function OnboardingPage({
   // invitation's own type decides, and the wellbeing path returns to the token,
   // which is what grants membership.
   if (profile.onboarded_at) {
+    if (join && campaign) redirect(campaignJoinPath(join));
     redirect(
       join && joinContext && !joinContext.blocked
         ? invitedJoinDestination(joinContext.assessmentType, join)
@@ -37,8 +58,19 @@ export default async function OnboardingPage({
     );
   }
 
-  const invitation =
-    joinContext && !joinContext.blocked && joinContext.teamId
+  const invitation = campaign
+    ? {
+        token: join!,
+        teamName: campaign.organizationName ?? campaign.campaignName,
+        presenterName: null,
+        presenterTitle: null,
+        // Named from the wellbeing product content — ASSESSMENT_LABELS covers
+        // DISC and Focus only, so a wellbeing campaign indexed into it
+        // produced `undefined`.
+        sessionLabel: WELLBEING_PRODUCT_NAME,
+        isWellbeing: true,
+      }
+    : joinContext && !joinContext.blocked && joinContext.teamId
       ? {
           token: join!,
           teamName: joinContext.teamName,

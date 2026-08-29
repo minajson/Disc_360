@@ -289,11 +289,13 @@ export async function createWellbeingCampaignAction(
 ): Promise<AdminActionResult> {
   const { z } = await import("zod");
   const { requireOnboarded } = await import("@/lib/auth/guards");
-  const { isInstrumentKey, INSTRUMENTS } = await import("@/data/wellbeing-instruments");
-  const { canServeToParticipants } = await import("@/data/wellbeing-instruments");
+  const { isInstrumentKey, INSTRUMENTS, canServeToParticipants } = await import(
+    "@/data/wellbeing-instruments"
+  );
   const { isProductionEnvironment, isWellbeingDemoEnabled } = await import(
     "@/lib/wellbeing/environment"
   );
+  const { generateJoinToken } = await import("@/lib/wellbeing/campaigns");
 
   const name = String(formData.get("name") ?? "").trim();
   const instrumentKey = String(formData.get("instrument_key") ?? "");
@@ -338,29 +340,94 @@ export async function createWellbeingCampaignAction(
   }
   const { profile } = await requireOnboarded();
 
-  const stem = name.replace(/[^a-zA-Z]/g, "").slice(0, 5).toUpperCase() || "WELL";
   const { createSupabaseAdminClient } = await import("@/lib/db/admin");
   const admin = createSupabaseAdminClient();
 
-  const { data: team, error } = await admin
+  /*
+   * THE VERSION IS PINNED HERE, AND ONLY HERE.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   * This is the one moment "the currently active version" is the right
+   * question to ask. From this insert onward the campaign's `version_id` is
+   * the answer, permanently: the participant journey reads the pin, never the
+   * active flag, and 00044's trigger refuses to change it once anybody has
+   * answered.
+   *
+   * The lookup requires `content_status = 'licensed'` as well as `is_active`.
+   * The database's own `wellbeing_versions_active_requires_licence` check makes
+   * that redundant today — and stating it here means a campaign cannot be
+   * created against unworded content even if that constraint is ever relaxed.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  const { data: version } = await admin
+    .from("wellbeing_versions")
+    .select("id, version")
+    .eq("instrument_key", instrumentKey)
+    .eq("is_active", true)
+    .eq("content_status", "licensed")
+    .maybeSingle();
+
+  if (!version) {
+    return {
+      ok: false,
+      message: `${INSTRUMENTS[instrumentKey].name} has no licensed, active questionnaire version to pin.`,
+    };
+  }
+
+  /*
+   * The roster, created alongside the campaign.
+   *
+   * `team_members` is what every aggregate, cohort and suppression floor
+   * counts participation against — see 00047. The campaign owns identity, the
+   * token, the instrument, the pinned version, capacity and lifecycle; this
+   * row owns membership and nothing else.
+   *
+   * It carries NO join token of its own worth using: `join_enabled` is false,
+   * so `resolve_join_token` refuses it and the only way into this campaign is
+   * the campaign's own token. That is what stops a wellbeing campaign being
+   * reachable through the DISC invitation route.
+   */
+  const stem = name.replace(/[^a-zA-Z]/g, "").slice(0, 5).toUpperCase() || "WELL";
+  const { data: team, error: teamError } = await admin
     .from("teams")
     .insert({
       organization_id: organizationId,
       name,
       description: "",
-      // Both, explicitly. 00032 would derive the type from the instrument
-      // anyway; saying it here keeps the boundary readable at the call site.
       assessment_type: "wellbeing",
       wellbeing_instrument_key: instrumentKey,
       wellbeing_pilot_capacity: capacity,
       team_code: `${stem}-${Math.floor(1000 + Math.random() * 9000)}`,
       created_by: access.user.id,
-      join_enabled: true,
+      join_enabled: false,
     })
     .select("id")
     .single();
 
-  if (error || !team) {
+  if (teamError || !team) {
+    return { ok: false, message: "Could not create the campaign." };
+  }
+
+  const { data: campaign, error } = await admin
+    .from("wellbeing_campaigns")
+    .insert({
+      organization_id: organizationId,
+      instrument_key: instrumentKey,
+      version_id: version.id,
+      created_by: access.user.id,
+      name,
+      status: "active",
+      participant_capacity: capacity,
+      join_token: generateJoinToken(),
+      team_id: team.id,
+    })
+    .select("id, join_token")
+    .single();
+
+  if (error || !campaign) {
+    // The roster is useless without its campaign, and leaving it behind would
+    // show a facilitator an empty wellbeing team they cannot run.
+    await admin.from("teams").delete().eq("id", team.id);
     return { ok: false, message: "Could not create the campaign." };
   }
 
@@ -375,14 +442,21 @@ export async function createWellbeingCampaignAction(
   await admin.from("audit_logs").insert({
     actor_id: access.user.id,
     action: "wellbeing.campaign_created",
-    entity_type: "team",
-    entity_id: team.id,
-    metadata: { instrument: INSTRUMENTS[instrumentKey].name, capacity },
+    entity_type: "wellbeing_campaign",
+    entity_id: campaign.id,
+    // No join token in the audit trail: it is the campaign's credential, and
+    // an audit row is read by more people than may join.
+    metadata: {
+      instrument: INSTRUMENTS[instrumentKey].name,
+      capacity,
+      pinned_version: version.version,
+      team_id: team.id,
+    },
   });
 
   return {
     ok: true,
-    message: `${name} created for ${INSTRUMENTS[instrumentKey].name}.`,
+    message: `${name} created for ${INSTRUMENTS[instrumentKey].name}, pinned to version ${version.version}.`,
     redirectTo: `/wellbeing/admin/campaigns/${team.id}`,
   };
 }

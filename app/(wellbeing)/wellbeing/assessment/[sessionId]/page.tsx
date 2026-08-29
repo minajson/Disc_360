@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { requireOnboarded } from "@/lib/auth/guards";
-import { getActiveQuestionnaire, getWellbeingFormOptions } from "@/lib/wellbeing/queries";
+import { getQuestionnaireByVersion, getWellbeingFormOptions } from "@/lib/wellbeing/queries";
 import { PulseFlow } from "@/components/wellbeing/PulseFlow";
 import type { WorkLocation } from "@/data/wellbeing-taxonomy";
 import { isInstrumentKey } from "@/data/wellbeing-instruments";
@@ -54,10 +54,30 @@ export default async function WellbeingAssessmentPage({
   if (!isInstrumentKey(instrumentKey)) redirect("/wellbeing");
 
   const [questionnaire, options, { data: responses }] = await Promise.all([
-    // The questionnaire is the one THIS session was started with — never a
-    // freshly resolved "active" one, which could differ if a facilitator
-    // changed the campaign mid-flight.
-    getActiveQuestionnaire(context, instrumentKey),
+    /*
+     * The questionnaire is the one THIS session was started with.
+     *
+     * ─────────────────────────────────────────────────────────────────
+     * THE COMMENT THAT WAS TRUE AND THE CALL THAT WAS NOT.
+     *
+     * This block already carried a note saying "never a freshly resolved
+     * active one, which could differ if a facilitator changed the campaign
+     * mid-flight" — and then called `getActiveQuestionnaire(context,
+     * instrumentKey)`, which resolves by `is_active` and never looks at
+     * `session.version_id` at all.
+     *
+     * So the stated invariant was not implemented. Activate a new version
+     * while somebody is part-way through and their remaining items would come
+     * from the new wording, silently, while their answers were scored as one
+     * set. It went unnoticed because exactly one version per instrument may be
+     * active, which made "the active one" accidentally equal to "theirs".
+     *
+     * It now reads the session's own version id — the one the campaign pinned,
+     * copied onto the session at creation and refused by the database if it
+     * ever disagreed with the campaign.
+     * ─────────────────────────────────────────────────────────────────
+     */
+    getQuestionnaireByVersion(context, session.version_id as string),
     getWellbeingFormOptions(context, (session.organization_id as string | null) ?? null),
     supabase
       .from("wellbeing_responses")

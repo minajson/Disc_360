@@ -2125,6 +2125,7 @@ export type Database = {
           organization_id: string
           participant_capacity: number | null
           status: Database["public"]["Enums"]["wellbeing_campaign_status"]
+          team_id: string | null
           updated_at: string
           version_id: string
         }
@@ -2140,6 +2141,7 @@ export type Database = {
           organization_id: string
           participant_capacity?: number | null
           status?: Database["public"]["Enums"]["wellbeing_campaign_status"]
+          team_id?: string | null
           updated_at?: string
           version_id: string
         }
@@ -2155,6 +2157,7 @@ export type Database = {
           organization_id?: string
           participant_capacity?: number | null
           status?: Database["public"]["Enums"]["wellbeing_campaign_status"]
+          team_id?: string | null
           updated_at?: string
           version_id?: string
         }
@@ -2178,6 +2181,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_campaigns_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: true
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
           {
@@ -3342,6 +3352,7 @@ export type Database = {
         Returns: {
           campaign_id: string
           campaign_name: string
+          capacity_reached: boolean
           instrument_key: string
           is_open: boolean
           organization_name: string

@@ -87,14 +87,41 @@ test("selecting an instrument re-checks the licensing gate on the server", () =>
 
 /* ── the participant never chooses ──────────────────────────────────── */
 
-test("a team campaign's instrument overrides anything the client sends", () => {
+test("a campaign's instrument and version override anything the client sends", () => {
   const begin = ACTIONS.slice(
     ACTIONS.indexOf("export async function beginWellbeingPulse"),
     ACTIONS.indexOf("/* ── context step"),
   );
-  // Team first, client value only for a solo attempt.
-  assert.match(begin, /teamInstrument \?\? \(teamId \? null : \(parsed\.data\.instrumentKey \?\? null\)\)/);
-  assert.match(begin, /getTeamInstrument\(context, teamId\)/);
+  // ─────────────────────────────────────────────────────────────────
+  // This asserted `teamInstrument ?? (teamId ? ...)`, because the instrument
+  // used to come from the TEAM and the version from whatever was active. Both
+  // now come from the CAMPAIGN, which is the whole point: a team knows its
+  // instrument but not which questionnaire version its participants were
+  // pinned to, so a team-derived answer had to be completed by a clock-derived
+  // one.
+  // ─────────────────────────────────────────────────────────────────
+  assert.match(
+    begin,
+    /campaign\?\.instrumentKey \?\? \(campaignId \? null : \(parsed\.data\.instrumentKey \?\? null\)\)/,
+    "a campaign's instrument wins; a client value is honoured only for a solo attempt",
+  );
+  assert.match(
+    begin,
+    /loadAuthorisedCampaignById\(campaignId\)/,
+    "the campaign is loaded server-side from its id",
+  );
+  // The version is the campaign's pin, never a re-resolved active one.
+  assert.match(begin, /getQuestionnaireByVersion\(context, campaign\.versionId\)/);
+  assert.ok(
+    !/getActiveQuestionnaire\(context, instrumentKey\)[^]*campaign/.test(begin) ||
+      /campaign\s*\?\s*await getQuestionnaireByVersion/.test(begin),
+    "the active-version lookup must be the SOLO branch only",
+  );
+  // And nothing consequential is read from the form.
+  assert.ok(
+    !/formData\.get\("instrument_key"\)/.test(begin),
+    "the instrument must not be read from the client inside the campaign path",
+  );
 });
 
 test("a campaign with no instrument refuses to start rather than guessing", () => {
@@ -106,10 +133,31 @@ test("a campaign with no instrument refuses to start rather than guessing", () =
   );
 });
 
-test("the runner serves the session's own instrument, never a re-resolved one", () => {
+test("the runner serves the session's own PINNED version, never a re-resolved one", () => {
   const page = code("app/(wellbeing)/wellbeing/assessment/[sessionId]/page.tsx");
   assert.match(page, /session\.instrument_key/);
-  assert.match(page, /getActiveQuestionnaire\(context, instrumentKey\)/);
+  // ─────────────────────────────────────────────────────────────────
+  // THE DEFECT THIS TEST USED TO CERTIFY.
+  //
+  // It asserted `getActiveQuestionnaire(context, instrumentKey)` while the
+  // page's own comment said the questionnaire was "the one THIS session was
+  // started with — never a freshly resolved active one". The test agreed with
+  // the code and both disagreed with the comment: `getActiveQuestionnaire`
+  // resolves by `is_active` and never reads `session.version_id`.
+  //
+  // So a participant part-way through a campaign would have had their
+  // remaining items swapped under them the moment a new version was activated.
+  // The test is now the one that would catch it.
+  // ─────────────────────────────────────────────────────────────────
+  assert.match(
+    page,
+    /getQuestionnaireByVersion\(context, session\.version_id as string\)/,
+    "the runner must read the session's pinned version id",
+  );
+  assert.ok(
+    !/getActiveQuestionnaire\(/.test(page),
+    "the runner must never resolve a questionnaire by its active flag",
+  );
 });
 
 test("starting a pulse validates any client-supplied instrument against the registry", () => {

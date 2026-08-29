@@ -92,14 +92,57 @@ test("completeInvitedOnboarding routes by the campaign type it already has", () 
     action.indexOf("const joinSchema"),
   );
   assert.ok(invited.length > 0, "the invited action must exist");
+
+  // ─────────────────────────────────────────────────────────────────
+  // TWO CREDENTIAL SPACES, RESOLVED IN ORDER AND NEVER CROSSED.
+  //
+  // A wellbeing campaign token is tried FIRST. If it resolves, the participant
+  // is a wellbeing participant and DISC's resolver is never consulted — a
+  // campaign that refuses (closed, expired, full) must not then be offered to
+  // `resolve_join_token`, because that could land somebody in the DISC
+  // assessment on the strength of a wellbeing link.
+  //
+  // A token that is not a campaign token at all still goes to DISC, unchanged.
+  // ─────────────────────────────────────────────────────────────────
+  assert.match(invited, /resolveCampaignByToken\(token\)/, "wellbeing is resolved first");
+  assert.ok(
+    invited.indexOf("resolveCampaignByToken(token)") < invited.indexOf("getJoinContext(token)"),
+    "the campaign resolver must run before the DISC one",
+  );
   assert.match(
     invited,
-    /redirect\(invitedJoinDestination\(context\.assessmentType, parsedToken\.data\.join_token\)\)/,
-    "the destination comes from the resolved campaign and the validated token",
+    /if \(campaign\) \{[\s\S]{0,1200}redirect\(campaignJoinPath\(token\)\)/,
+    "a wellbeing participant returns to their own campaign invitation",
+  );
+  assert.match(
+    invited,
+    /redirect\(invitedJoinDestination\(context\.assessmentType, token\)\)/,
+    "and a DISC destination still comes from the resolved campaign type",
   );
   assert.ok(
     !/redirect\("\/app"\);/.test(invited),
     "the unconditional DISC redirect must be gone from the invited path",
+  );
+});
+
+/**
+ * A campaign token is not a UUID, and the schema must not pretend it is.
+ *
+ * `invitedSchema` was `z.uuid()`. A wellbeing campaign's `join_token` is 43
+ * base64url characters, so every participant who signed up through a campaign
+ * link was rejected with "this invitation is no longer valid" — at the exact
+ * moment they had already given their name.
+ */
+test("the invited token schema accepts both credential shapes", () => {
+  const action = code("lib/actions/onboarding.ts");
+  assert.match(
+    action,
+    /join_token: z\.string\(\)\.regex\(\/\^\[A-Za-z0-9_-\]\{24,64\}\$\/\)/,
+    "the schema must admit a campaign token as well as a DISC UUID",
+  );
+  assert.ok(
+    !/const invitedSchema = z\.object\(\{ join_token: z\.uuid\(\) \}\)/.test(action),
+    "a UUID-only schema silently rejects every wellbeing campaign participant",
   );
 });
 
@@ -126,8 +169,16 @@ test("membership is still resolved server-side from the token", () => {
   // Unchanged by the routing fix, and worth pinning: the redirect moved, the
   // authorization did not.
   assert.match(invited, /invitedSchema\.safeParse/, "the token is validated");
-  assert.match(invited, /getJoinContext\(parsedToken\.data\.join_token\)/, "and resolved server-side");
-  assert.match(invited, /attachMembership\(\s*context\.teamId/, "membership comes from that context");
+  // Both products resolve their own credential server-side from the token —
+  // wellbeing through the campaign lookup, DISC through the join context.
+  assert.match(invited, /loadAuthorisedCampaignByToken\(token\)/, "wellbeing resolves server-side");
+  assert.match(invited, /getJoinContext\(token\)/, "and DISC still does too");
+  assert.match(invited, /attachMembership\(\s*context\.teamId/, "DISC membership comes from that context");
+  assert.match(
+    invited,
+    /joinCampaignRoster\(authorised, user,/,
+    "and wellbeing membership comes from the resolved campaign, never an id",
+  );
   assert.ok(
     !/formData\.get\("team_id"\)/.test(invited),
     "a client-supplied team id must never grant membership",

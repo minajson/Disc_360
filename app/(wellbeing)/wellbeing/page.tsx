@@ -3,9 +3,9 @@ import Link from "next/link";
 import { requireOnboarded } from "@/lib/auth/guards";
 import {
   getInstrumentAvailability,
-  getMyWellbeingCampaignTeam,
+  getMyWellbeingCampaigns,
+  resolveParticipantCampaign,
   getMyWellbeingHistory,
-  getTeamInstrument,
 } from "@/lib/wellbeing/queries";
 import { startWellbeingPulseAction } from "@/lib/actions/wellbeing";
 import {
@@ -37,9 +37,9 @@ export const metadata: Metadata = { title: "Your wellbeing check-in" };
 export default async function WellbeingHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ team?: string; unavailable?: string }>;
+  searchParams: Promise<{ campaign?: string; unavailable?: string }>;
 }) {
-  const { team } = await searchParams;
+  const { campaign: campaignParam } = await searchParams;
   const context = await requireOnboarded();
   const [availability, { history }] = await Promise.all([
     getInstrumentAvailability(context),
@@ -57,17 +57,20 @@ export default async function WellbeingHomePage({
   // For a solo participant with no campaign, the rule is unchanged: the one
   // active instrument if there is exactly one, otherwise none. They are never
   // asked to choose between questionnaires either way.
-  // The team from the link if there is one, otherwise the participant's own
-  // campaign membership. Falling back to "the single live instrument" only
-  // works while exactly one is live, which stopped being true the moment
-  // GHQ-12 and GHQ-28 were licensed — see getMyWellbeingCampaignTeam.
+  // The campaign from the link if there is one, otherwise the participant's
+  // own campaign membership. Falling back to "the single live instrument" only
+  // works while exactly one is live, which stopped being true the moment every
+  // instrument was activated — see getMyWellbeingCampaigns.
+  //
+  // A campaign id from the URL is not trusted on its own: it is resolved
+  // server-side and only accepted if this participant actually belongs to the
+  // campaign's roster. Otherwise anyone could describe another organisation's
+  // campaign to themselves by editing a query string.
   const live = availability.filter((entry) => entry.available);
-  const campaignTeam = team ?? (await getMyWellbeingCampaignTeam(context));
-  const campaignInstrument = campaignTeam
-    ? await getTeamInstrument(context, campaignTeam)
-    : null;
-  const questionnaire = campaignInstrument
-    ? (availability.find((entry) => entry.key === campaignInstrument) ?? null)
+  const myCampaigns = await getMyWellbeingCampaigns(context);
+  const campaign = resolveParticipantCampaign(myCampaigns, campaignParam);
+  const questionnaire = campaign
+    ? (availability.find((entry) => entry.key === campaign.instrumentKey) ?? null)
     : live.length === 1
       ? live[0]!
       : null;
@@ -145,7 +148,9 @@ export default async function WellbeingHomePage({
           </div>
 
           <form action={startWellbeingPulseAction} className="flex flex-col gap-5">
-            {team && <input type="hidden" name="team_id" value={team} />}
+            {campaign && (
+              <input type="hidden" name="campaign_id" value={campaign.campaignId} />
+            )}
             <input type="hidden" name="instrument_key" value={questionnaire.key} />
 
             <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[rgba(31,78,95,0.2)] bg-pulse-mist/60 p-4 transition-colors hover:border-pulse">

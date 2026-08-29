@@ -55,7 +55,8 @@ const INSTRUMENT = "disc360_wellbeing_v1";
 test.describe.configure({ timeout: 240_000 });
 
 let teamId = "";
-let inviteToken = "";
+let campaignId = "";
+let joinToken = "";
 /** The highest option position this instrument offers, read from the database. */
 let topPosition = -1;
 let itemCount = -1;
@@ -69,6 +70,7 @@ function removeFixtureCampaign(): void {
          (select id from wellbeing_results where team_id='${existing}')`);
   sql(`delete from wellbeing_results where team_id='${existing}'`);
   sql(`delete from wellbeing_sessions where team_id='${existing}'`);
+  sql(`delete from wellbeing_campaigns where team_id='${existing}'`);
   sql(`delete from team_members where team_id='${existing}'`);
   sql(`delete from teams where id='${existing}'`);
 }
@@ -83,7 +85,17 @@ test.beforeAll(() => {
    * has to run against a database carrying only the migrations PRODUCTION will
    * have — no demo seed, no held instrument content.
    */
-  const orgId = sql(`select organization_id from teams where organization_id is not null limit 1`);
+  //
+  // Deterministic, because `limit 1` with no `order by` is not. Which
+  // organisation came back depended on physical row order, so this fixture
+  // built its campaign in a different organisation from one run to the next —
+  // and that difference is precisely what exposed the RLS defect fixed in
+  // 00048. A fixture whose subject changes between runs reports a real bug as
+  // a flake.
+  const orgId = sql(
+    `select organization_id from teams where organization_id is not null
+      order by organization_id limit 1`,
+  );
   const creator = sql(
     `select created_by from teams where organization_id='${orgId}' and created_by is not null limit 1`,
   );
@@ -91,10 +103,22 @@ test.beforeAll(() => {
     `insert into teams (organization_id, name, team_code, created_by, assessment_type,
                         wellbeing_instrument_key, join_enabled)
      values ('${orgId}','Wellbeing V1 Top Option','WBV1-TOP','${creator}','wellbeing',
-             '${INSTRUMENT}',true)
+             '${INSTRUMENT}',false)
      returning id`,
   );
-  inviteToken = sql(`select invite_token from teams where id='${teamId}'`);
+  // The campaign, pinning the instrument's active version — the participant
+  // journey resolves through this and not through the team's invite token.
+  const versionId = sql(
+    `select id from wellbeing_versions where instrument_key='${INSTRUMENT}' and is_active`,
+  );
+  joinToken = "wb-bounds-e2e-token-00000000000001";
+  campaignId = sql(
+    `insert into wellbeing_campaigns
+       (organization_id, instrument_key, version_id, created_by, name, status, join_token, team_id)
+     values ('${orgId}','${INSTRUMENT}','${versionId}','${creator}','Wellbeing V1 Top Option',
+             'active','${joinToken}','${teamId}')
+     returning id`,
+  );
 
   // Read the shape from the database rather than hard-coding it — the point of
   // this suite is that a bound must come from the instrument, not from a
@@ -119,6 +143,7 @@ test.afterAll(() => {
          (select id from wellbeing_results where team_id='${teamId}')`);
   sql(`delete from wellbeing_results where team_id='${teamId}'`);
   sql(`delete from wellbeing_sessions where team_id='${teamId}'`);
+  sql(`delete from wellbeing_campaigns where team_id='${teamId}'`);
   sql(`delete from team_members where team_id='${teamId}'`);
   sql(`delete from teams where id='${teamId}'`);
 });
@@ -154,12 +179,24 @@ test("every item can be answered at the highest option, and it is what gets stor
   await submitSignIn(page);
   await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"));
 
-  await page.goto(`/join/${inviteToken}`);
+  await page.goto(`/wellbeing/join/${joinToken}`);
   await page.waitForLoadState("networkidle");
-  await page.goto(`/wellbeing?team=${teamId}`);
+  await page.goto(`/wellbeing?campaign=${campaignId}`);
   const consent = page.getByRole("checkbox").first();
   if (await consent.count()) await consent.check();
-  await page.getByRole("button", { name: /Start my Wellbeing Pulse/i }).click();
+
+  // Short wait, then say what the page showed. Clicking a control that never
+  // appears blocks for the whole test timeout and reports only "waiting for
+  // getByRole(...)", which says nothing about WHY the campaign was not
+  // resolved — the page itself is the evidence.
+  const start = page.getByRole("button", { name: /Start my Wellbeing Pulse/i });
+  try {
+    await start.waitFor({ state: "visible", timeout: 15_000 });
+  } catch {
+    const text = (await page.locator("main").innerText()).replace(/\s+/g, " ").slice(0, 500);
+    throw new Error(`no start control on ${page.url()} — page said: ${text}`);
+  }
+  await start.click();
   await page.waitForURL("**/wellbeing/assessment/**", { timeout: 20_000 });
 
   const department = page.locator("#wb-department");

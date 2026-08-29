@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import { expect, test, type Page } from "@playwright/test";
 import { DEMO_PASSWORD, submitSignIn } from "./helpers";
 
@@ -22,6 +23,46 @@ import { DEMO_PASSWORD, submitSignIn } from "./helpers";
  * leaking, so the journey is what is asserted here.
  * ─────────────────────────────────────────────────────────────────────
  */
+
+const DB = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+const sql = (query: string) =>
+  execSync(`psql "${DB}" -t -A -c ${JSON.stringify(query.replace(/\s+/g, " ").trim())}`, {
+    encoding: "utf8",
+  }).trim();
+
+/**
+ * Take the accounts this suite joined back off the wellbeing roster.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * WHY THIS IS NOT OPTIONAL TIDINESS.
+ *
+ * These tests deliberately JOIN a campaign — that is the behaviour under test
+ * — and a roster membership outlives the run. `solo@disc360.dev` is otherwise
+ * an ordinary DISC-side account with no facilitated team, and
+ * `authorizeAssessment` binds a participant to the facilitated team running
+ * the product they asked for. Leave them on a wellbeing roster and they now
+ * have exactly one facilitated team, running the WRONG product, so
+ * `/focus/assessment` is denied with `wrong_assessment` and redirects to
+ * `/app?notice=...`.
+ *
+ * The failure lands in `e2e/visualisations.spec.ts`, which never mentions
+ * wellbeing, and only on the SECOND run — the first leaves the residue, the
+ * next one trips over it. That is the most expensive shape a test defect can
+ * have: it looks like a regression in an unrelated feature, and it does not
+ * reproduce on a fresh database.
+ *
+ * So the join is undone. The new signup accounts this suite creates are left
+ * alone: they exist only for this suite and belong to no other test.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+function leaveWellbeingRosters(): void {
+  sql(`delete from team_members m using profiles p, teams t
+        where p.id = m.profile_id and t.id = m.team_id
+          and p.email = 'solo@disc360.dev'
+          and t.assessment_type = 'wellbeing'`);
+}
+
+test.afterAll(leaveWellbeingRosters);
 
 /** Wording that must never appear anywhere on a wellbeing participant's path. */
 const DISC_WORDING = [
@@ -89,9 +130,13 @@ test("a first-time participant scans the code and never sees DISC", async ({ pag
   const token = await wellbeingToken(page);
   test.skip(!token, "no seeded wellbeing campaign — run scripts/seed-wellbeing-demo.sql");
 
-  /* 1 · the printed code, which is a /join/ link, reaches the right product */
-  await page.goto(`/join/${token}`);
-  await page.waitForURL(`**/wellbeing/join/${token}`);
+  /* 1 · the printed code IS the wellbeing campaign route, not a DISC link */
+  //
+  // The QR used to encode `/join/<team invite token>` and rely on DISC's
+  // resolver noticing `assessment_type = 'wellbeing'` and redirecting. The
+  // campaign now owns its own token and its own route, so the code goes
+  // straight there and no DISC surface is involved at any point.
+  await page.goto(`/wellbeing/join/${token}`);
   await expect(page.getByRole("heading", { name: "Wellbeing Pulse" })).toBeVisible();
   await expectNoDiscWording(page);
 

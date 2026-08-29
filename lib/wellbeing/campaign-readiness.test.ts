@@ -222,9 +222,12 @@ test("a participant is never shown the organisation's configuration state", () =
 test("readiness is enforced before the invitation and before a session starts", () => {
   const invitation = code("app/(wellbeing-public)/wellbeing/join/[token]/page.tsx");
   assert.match(invitation, /await checkCampaignReadiness\(/);
+  // Membership is granted by `joinCampaignRoster` now, not `acceptTeamLink` —
+  // the roster join moved onto the campaign with everything else. The ORDER
+  // is what this asserts, and it is the same requirement either way.
   assert.ok(
     invitation.indexOf("await checkCampaignReadiness(") <
-      invitation.indexOf("acceptTeamLink(token)"),
+      invitation.indexOf("joinCampaignRoster("),
     "an unready campaign must be refused before membership is granted",
   );
   const action = code("lib/actions/wellbeing.ts");
@@ -232,9 +235,9 @@ test("readiness is enforced before the invitation and before a session starts", 
     action.indexOf("export async function beginWellbeingPulse"),
     action.indexOf("export async function saveWellbeingContext"),
   );
-  assert.match(begin, /checkCampaignReadiness\(teamId, instrumentKey\)/);
+  assert.match(begin, /checkCampaignReadiness\(campaign\.teamId, instrumentKey\)/);
   assert.ok(
-    begin.indexOf("checkCampaignReadiness(teamId") < begin.indexOf(".insert({"),
+    begin.indexOf("checkCampaignReadiness(campaign.teamId") < begin.indexOf(".insert({"),
     "readiness must be checked before a session row is written",
   );
 });

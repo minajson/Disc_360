@@ -77,7 +77,6 @@ export interface CampaignIdentity {
   organizationName: string;
   instrumentKey: InstrumentKey | null;
   instrument: InstrumentMetadata | null;
-  inviteToken: string;
   teamCode: string;
   capacity: number | null;
   status: CampaignStatus;
@@ -117,7 +116,7 @@ export async function loadCampaignIdentity(teamId: string): Promise<{
   const { data: team } = await admin
     .from("teams")
     .select(
-      "id, name, session_name, assessment_type, wellbeing_instrument_key, wellbeing_pilot_capacity, invite_token, team_code, organization_id, archived_at, join_enabled, created_at, organizations (name)",
+      "id, name, session_name, assessment_type, wellbeing_instrument_key, wellbeing_pilot_capacity, team_code, organization_id, archived_at, join_enabled, created_at, organizations (name)",
     )
     .eq("id", teamId)
     .maybeSingle();
@@ -162,7 +161,6 @@ export async function loadCampaignIdentity(teamId: string): Promise<{
       organizationName: (organization as { name: string } | null)?.name ?? "Organisation",
       instrumentKey,
       instrument: instrumentKey ? INSTRUMENTS[instrumentKey] : null,
-      inviteToken: team.invite_token as string,
       teamCode: team.team_code as string,
       capacity: (team.wellbeing_pilot_capacity as number | null) ?? null,
       status: deriveStatus(

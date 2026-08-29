@@ -74,6 +74,67 @@ export async function getActiveQuestionnaire(
     .eq("instrument_key", instrumentKey)
     .maybeSingle();
   if (!version) return null;
+  return loadQuestionnaire(context, version, instrumentKey);
+}
+
+/**
+ * The questionnaire for an EXACT version id. The participant-path loader.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * WHY THIS EXISTS, AND WHY IT IS NOT `getActiveQuestionnaire`.
+ *
+ * A campaign pins `version_id` at creation. Everything downstream of that pin
+ * must read the pin — not "the active version", which is a fact about the
+ * clock rather than about the campaign somebody joined.
+ *
+ * The assessment runner already CLAIMED to do this. Its comment read "the
+ * questionnaire is the one THIS session was started with — never a freshly
+ * resolved active one, which could differ if a facilitator changed the
+ * campaign mid-flight", and directly beneath it the code called
+ * `getActiveQuestionnaire(context, instrumentKey)`. The comment described the
+ * intended behaviour; the call resolved by `is_active` and ignored
+ * `session.version_id` entirely. Activate a second version while somebody is
+ * part-way through and their remaining items come from the new wording, silently.
+ *
+ * So the pinned read is a function of its own, and it takes the version id
+ * rather than an instrument key — there is no argument in which to pass "the
+ * active one" by accident.
+ *
+ * The instrument is verified against the version rather than trusted from the
+ * caller: a session's `instrument_key` and `version_id` must agree, and if
+ * they do not this returns null rather than rendering one instrument's items
+ * under another's scoring.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export async function getQuestionnaireByVersion(
+  context: AuthContext,
+  versionId: string,
+): Promise<WellbeingQuestionnaire | null> {
+  const { data: version } = await context.supabase
+    .from("wellbeing_versions")
+    .select("id, name, version, content_status, is_active, instrument_key")
+    .eq("id", versionId)
+    .maybeSingle();
+  if (!version) return null;
+
+  const instrumentKey = version.instrument_key as string;
+  if (!isInstrumentKey(instrumentKey)) return null;
+
+  // A version that is not licensed carries no wording that may be served.
+  // `is_active` is deliberately NOT required: a campaign's pinned version must
+  // keep serving its own participants after a newer version is activated,
+  // which is the entire point of pinning it.
+  if (version.content_status !== "licensed") return null;
+
+  return loadQuestionnaire(context, version, instrumentKey);
+}
+
+/** Shared body: the items, options and completeness check for one version. */
+async function loadQuestionnaire(
+  context: AuthContext,
+  version: { id: string; name: string; version: number },
+  instrumentKey: InstrumentKey,
+): Promise<WellbeingQuestionnaire | null> {
 
   const { data: items } = await context.supabase
     .from("wellbeing_items")
@@ -192,43 +253,79 @@ export async function getTeamInstrument(
   return key && isInstrumentKey(key) ? key : null;
 }
 
+
+/** A campaign a participant belongs to, reduced to what the pulse page needs. */
+export interface ParticipantCampaign {
+  campaignId: string;
+  instrumentKey: InstrumentKey;
+  versionId: string;
+}
+
 /**
- * The wellbeing campaign this participant belongs to, when there is exactly one.
+ * Every ACTIVE wellbeing campaign this participant is on the roster of.
  *
  * ─────────────────────────────────────────────────────────────────────
- * WHY THIS EXISTS.
+ * WHY THIS RETURNS A LIST, AND WHY THE LIST IS THE PARTICIPANT'S OWN.
  *
- * The landing page used to take the campaign from a `?team=` query parameter,
- * and fall back to "the single live instrument" when there wasn't one. That
- * worked only while exactly one instrument was live: the moment GHQ-12 and
- * GHQ-28 were licensed and activated, three were, the fallback returned
- * nothing, and a participant who genuinely belonged to a campaign was told the
- * check-in was not open.
+ * The predecessor answered "which wellbeing TEAM am I on", returned null for
+ * anyone on more than one, and left the caller to ask that team for its
+ * instrument — which the team knew, while the VERSION had to be filled in by
+ * `getActiveQuestionnaire()`. That is the clock-derived resolution this whole
+ * refactor exists to remove.
  *
- * Membership is the real answer, and it does not depend on how the participant
- * arrived. A QR link carries the team; a bookmark, a browser restore or a
- * "back to home" click does not — and the questionnaire somebody is asked
- * should not change because of which of those they used.
+ * Returning a list rather than an optional single campaign matters as much.
+ * Collapsing to null the moment somebody belonged to two campaigns meant a
+ * real participant — anyone in a pilot and a follow-up, or anyone in the demo
+ * organisation — was told the check-in was not open, with no way to say which
+ * one they meant. The campaign id in the link is how they say it; this list is
+ * what that id is checked AGAINST.
  *
- * Returns null when there is no campaign or more than one, because choosing
- * between two campaigns is a decision this product does not make on somebody's
- * behalf. The caller then falls back as before.
+ * The membership is read through the participant's OWN client, so the list can
+ * only ever contain campaigns they are genuinely on. A campaign id from a URL
+ * can therefore narrow this list but never extend it.
  * ─────────────────────────────────────────────────────────────────────
  */
-export async function getMyWellbeingCampaignTeam(
+export async function getMyWellbeingCampaigns(
   context: AuthContext,
-): Promise<string | null> {
-  const { data } = await context.supabase
+): Promise<ParticipantCampaign[]> {
+  const { data: memberships } = await context.supabase
     .from("team_members")
-    .select("team_id, teams!inner (id, wellbeing_instrument_key, archived_at)")
+    .select("team_id")
     .eq("profile_id", context.user.id);
 
-  const campaigns = (data ?? [])
-    .map((row) => (row as unknown as { teams: { id: string; wellbeing_instrument_key: string | null; archived_at: string | null } }).teams)
-    .filter((team) => team && team.wellbeing_instrument_key !== null && team.archived_at === null);
+  const teamIds = [...new Set((memberships ?? []).map((row) => row.team_id as string))];
+  if (teamIds.length === 0) return [];
 
-  const unique = [...new Set(campaigns.map((team) => team.id))];
-  return unique.length === 1 ? unique[0]! : null;
+  const { data } = await context.supabase
+    .from("wellbeing_campaigns")
+    .select("id, instrument_key, version_id, status")
+    .in("team_id", teamIds)
+    .eq("status", "active");
+
+  return (data ?? [])
+    .filter((row) => isInstrumentKey(row.instrument_key as string))
+    .map((row) => ({
+      campaignId: row.id as string,
+      instrumentKey: row.instrument_key as InstrumentKey,
+      versionId: row.version_id as string,
+    }));
+}
+
+/**
+ * Which campaign this participant is about to answer.
+ *
+ * The id from the link when it names one of THEIR campaigns; otherwise the
+ * single campaign they belong to; otherwise null. Never a guess between two —
+ * somebody offered the wrong questionnaire cannot tell that it was a guess.
+ */
+export function resolveParticipantCampaign(
+  campaigns: ParticipantCampaign[],
+  requestedId: string | undefined,
+): ParticipantCampaign | null {
+  if (requestedId) {
+    return campaigns.find((campaign) => campaign.campaignId === requestedId) ?? null;
+  }
+  return campaigns.length === 1 ? campaigns[0]! : null;
 }
 
 /* ── form taxonomy ──────────────────────────────────────────────────── */

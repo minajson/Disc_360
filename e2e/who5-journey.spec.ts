@@ -68,7 +68,8 @@ test.describe.configure({ timeout: 240_000 });
 const uniformScore = (position: number) => position * 5 * 4;
 
 let teamId = "";
-let inviteToken = "";
+let campaignId = "";
+let joinToken = "";
 
 /**
  * Removes a campaign left behind by an earlier interrupted run.
@@ -87,6 +88,7 @@ function removeFixtureCampaign(): void {
          (select id from wellbeing_results where team_id='${existing}')`);
   sql(`delete from wellbeing_results where team_id='${existing}'`);
   sql(`delete from wellbeing_sessions where team_id='${existing}'`);
+  sql(`delete from wellbeing_campaigns where team_id='${existing}'`);
   sql(`delete from team_members where team_id='${existing}'`);
   sql(`delete from teams where id='${existing}'`);
 }
@@ -99,13 +101,27 @@ test.beforeAll(() => {
     `select organization_id from teams where wellbeing_instrument_key is not null limit 1`,
   );
   const creator = sql(`select created_by from teams where organization_id='${orgId}' limit 1`);
+  // The ROSTER. `join_enabled` is false: a wellbeing campaign is not reachable
+  // through the DISC invitation route, and this fixture must not pretend it is.
   teamId = sql(
     `insert into teams (organization_id, name, team_code, created_by, assessment_type,
                         wellbeing_instrument_key, join_enabled)
-     values ('${orgId}','WHO-5 Journey','WHO5-E2E','${creator}','wellbeing','who5',true)
+     values ('${orgId}','WHO-5 Journey','WHO5-E2E','${creator}','wellbeing','who5',false)
      returning id`,
   );
-  inviteToken = sql(`select invite_token from teams where id='${teamId}'`);
+  // The CAMPAIGN, pinning WHO-5's active version. This is what the participant
+  // journey resolves through — see lib/wellbeing/campaigns.ts.
+  const versionId = sql(
+    `select id from wellbeing_versions where instrument_key='who5' and is_active`,
+  );
+  joinToken = "who5-e2e-journey-token-0000000000001";
+  campaignId = sql(
+    `insert into wellbeing_campaigns
+       (organization_id, instrument_key, version_id, created_by, name, status, join_token, team_id)
+     values ('${orgId}','who5','${versionId}','${creator}','WHO-5 Journey','active',
+             '${joinToken}','${teamId}')
+     returning id`,
+  );
 });
 
 test.afterAll(() => {
@@ -116,6 +132,7 @@ test.afterAll(() => {
          (select id from wellbeing_results where team_id='${teamId}')`);
   sql(`delete from wellbeing_results where team_id='${teamId}'`);
   sql(`delete from wellbeing_sessions where team_id='${teamId}'`);
+  sql(`delete from wellbeing_campaigns where team_id='${teamId}'`);
   sql(`delete from team_members where team_id='${teamId}'`);
   sql(`delete from teams where id='${teamId}'`);
 });
@@ -141,9 +158,12 @@ async function signIn(page: Page): Promise<void> {
 
 /** Join link → consent → context → the questionnaire. Returns the session URL. */
 async function startPulse(page: Page): Promise<void> {
-  await page.goto(`/join/${inviteToken}`);
+  // The campaign's OWN token, through the wellbeing join route. Not
+  // `/join/<team invite token>`, which is DISC's invitation and no longer
+  // resolves a wellbeing campaign at all.
+  await page.goto(`/wellbeing/join/${joinToken}`);
   await page.waitForLoadState("networkidle");
-  await page.goto(`/wellbeing?team=${teamId}`);
+  await page.goto(`/wellbeing?campaign=${campaignId}`);
   const consent = page.getByRole("checkbox").first();
   if (await consent.count()) await consent.check();
   await page.getByRole("button", { name: /Start my Wellbeing Pulse/i }).click();
@@ -315,7 +335,7 @@ test("an interrupted WHO-5 pulse resumes where it was left", async ({ page }) =>
   }
 
   // Return to the campaign: the open attempt is resumed, not restarted.
-  await page.goto(`/wellbeing?team=${teamId}`);
+  await page.goto(`/wellbeing?campaign=${campaignId}`);
   const consent = page.getByRole("checkbox").first();
   if (await consent.count()) await consent.check();
   await page.getByRole("button", { name: /Start my Wellbeing Pulse|Resume/i }).click();

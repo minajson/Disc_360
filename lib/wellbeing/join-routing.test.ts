@@ -160,9 +160,12 @@ test("no wellbeing surface collects an employee or reference id", () => {
 
 test("the invitation carries itself through sign-in, not the dashboard", () => {
   const page = code("app/(wellbeing-public)/wellbeing/join/[token]/page.tsx");
+  // Built by `campaignJoinPath` rather than interpolated here, so the auth
+  // `next`, the onboarding return and the QR code cannot drift into three
+  // different shapes of the same URL.
   assert.match(
     page,
-    /const next = `\/wellbeing\/join\/\$\{token\}`/,
+    /const next = campaignJoinPath\(token\)/,
     "returning to the invitation is what lets the token grant membership",
   );
   assert.ok(!/next = "\/app"/.test(page), "never the DISC dashboard");
@@ -172,12 +175,48 @@ test("the invitation carries itself through sign-in, not the dashboard", () => {
 
 test("a signed-in visitor joins from the token and goes to their campaign", () => {
   const page = code("app/(wellbeing-public)/wellbeing/join/[token]/page.tsx");
-  assert.match(page, /acceptTeamLink\(token\)/, "membership comes from the TOKEN");
-  assert.ok(
-    !/acceptTeamLink\(context\.teamId\)/.test(page),
-    "never from a team id — that would let a signed-in user join any campaign",
+  // Membership now comes from the CAMPAIGN the token resolved to, not from a
+  // DISC team-link acceptance. The rule is the same one, applied to the right
+  // credential: the token is the authorization, and a signed-in participant
+  // must never be able to join by supplying an id.
+  assert.match(
+    page,
+    /const authorised = await loadAuthorisedCampaignByToken\(token\)/,
+    "the campaign is resolved from the TOKEN",
   );
-  assert.match(page, /redirect\(`\/wellbeing\?team=\$\{encodeURIComponent\(context\.teamId\)\}`\)/);
+  assert.match(page, /joinCampaignRoster\(authorised, user,/, "and the roster join uses it");
+  assert.ok(
+    !/acceptTeamLink\(/.test(page),
+    "the wellbeing invitation must not accept a DISC team link",
+  );
+  assert.match(
+    page,
+    /redirect\(`\/wellbeing\?campaign=\$\{encodeURIComponent\(campaign\.campaignId\)\}`\)/,
+  );
+});
+
+/**
+ * The rule that makes the two credential spaces disjoint.
+ *
+ * A wellbeing token that does not resolve must NOT be retried against DISC's
+ * resolver. Falling back would let a mistyped, revoked or expired wellbeing
+ * link land somebody in the DISC assessment — a different product, a different
+ * consent, measuring a different thing.
+ */
+test("an unresolvable wellbeing token never falls back to the DISC resolver", () => {
+  const page = code("app/(wellbeing-public)/wellbeing/join/[token]/page.tsx");
+  assert.match(page, /resolveCampaignByToken\(token\)/, "one resolver");
+  assert.ok(
+    !/getJoinContext\(/.test(page),
+    "the wellbeing invitation must not consult DISC's join resolver at all",
+  );
+  assert.ok(
+    !/resolve_join_token/.test(page),
+    "nor its RPC",
+  );
+  // And a refusal offers the wellbeing front door, never /app.
+  assert.match(page, /href="\/wellbeing"/);
+  assert.ok(!/href="\/app"/.test(page), "a refused participant is never sent into DISC360");
 });
 
 test("only usable providers are offered on an invitation", () => {
@@ -194,7 +233,7 @@ test("only usable providers are offered on an invitation", () => {
 
 test("the landing page resolves the invited campaign's own instrument", () => {
   const page = code("app/(wellbeing)/wellbeing/page.tsx");
-  assert.match(page, /getTeamInstrument\(\s*context,\s*campaignTeam\s*\)/, "the campaign is asked");
+  assert.match(page, /getMyWellbeingCampaigns\(context\)/, "the campaign is asked");
   // The campaign is the one from the link OR the participant's own membership.
   //
   // It used to be the link alone, with "the single live instrument" as the
@@ -204,19 +243,37 @@ test("the landing page resolves the invited campaign's own instrument", () => {
   // how somebody arrived.
   assert.match(
     page,
-    /const campaignTeam = team \?\? \(await getMyWellbeingCampaignTeam\(context\)\)/,
-    "membership is consulted when the link carries no team",
+    /const myCampaigns = await getMyWellbeingCampaigns\(context\)/,
+    "membership is consulted rather than trusting the link alone",
+  );
+  // A campaign id in the URL SELECTS from the participant's own campaigns, so
+  // it can narrow the list but never extend it.
+  //
+  // Returning a LIST rather than an optional single campaign is the fix that
+  // matters here: collapsing to null the moment somebody belonged to two
+  // campaigns told a real participant the check-in was not open, and gave them
+  // no way to say which one they meant.
+  assert.match(
+    page,
+    /resolveParticipantCampaign\(myCampaigns, campaignParam\)/,
+    "the requested campaign is resolved against membership",
+  );
+  const queries = code("lib/wellbeing/queries.ts");
+  assert.match(
+    queries,
+    /return campaigns\.find\(\(campaign\) => campaign\.campaignId === requestedId\) \?\? null/,
+    "an id that is not one of theirs resolves to nothing",
   );
   assert.match(
     page,
-    /campaignInstrument\s*\?[\s\S]{0,160}availability\.find/,
+    /campaign\s*\?[\s\S]{0,160}availability\.find/,
     "and its instrument wins",
   );
   // The "one active instrument" fallback must remain reachable ONLY with no
   // campaign — that fallback is what told a GHQ-12 participant they were
   // taking a workplace wellbeing reflection.
   assert.ok(
-    page.indexOf("campaignInstrument") < page.indexOf("live.length === 1"),
+    page.indexOf("myCampaigns") < page.indexOf("live.length === 1"),
     "the solo fallback must come after the campaign, never before it",
   );
 });

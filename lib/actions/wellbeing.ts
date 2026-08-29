@@ -5,13 +5,22 @@ import { z } from "zod";
 import { requireOnboarded } from "@/lib/auth/guards";
 import { createSupabaseAdminClient } from "@/lib/db/admin";
 import { isPilotCapacityError, PILOT_CAPACITY_MESSAGE } from "@/lib/wellbeing/pilot";
+import { logRouteDiagnostic } from "@/lib/observability/diagnostics";
+import { campaignAdmissionRefusal } from "@/lib/wellbeing/admission";
 import {
   computeWellbeingResult,
   WELLBEING_SCORING_METHOD,
   WELLBEING_SCORING_VERSION,
 } from "@/lib/scoring/wellbeing";
 import { getWellbeingPolicy, resolveInstrumentThreshold } from "@/lib/wellbeing/policy";
-import { getActiveQuestionnaire, getTeamInstrument } from "@/lib/wellbeing/queries";
+import {
+  getActiveQuestionnaire,
+  getQuestionnaireByVersion,
+} from "@/lib/wellbeing/queries";
+import {
+  loadAuthorisedCampaignById,
+  type AuthorisedCampaign,
+} from "@/lib/wellbeing/campaigns";
 import {
   computeDiscWellbeingResult,
   DISC_WELLBEING_SCORING_METHOD,
@@ -63,7 +72,15 @@ import { buildWellbeingSnapshot } from "@/lib/wellbeing/snapshot";
 /* ── starting ───────────────────────────────────────────────────────── */
 
 const beginSchema = z.object({
-  teamId: z.uuid().nullable().optional(),
+  /**
+   * The campaign this attempt belongs to.
+   *
+   * Replaces `teamId`. A team knows its instrument; only a CAMPAIGN knows
+   * which questionnaire version was pinned, and the version is what a result
+   * has to be able to name for ever. Null means a solo attempt, which belongs
+   * to no campaign — see the branch below.
+   */
+  campaignId: z.uuid().nullable().optional(),
   /** Must be explicitly true. A missing checkbox is not consent. */
   consent: z.literal(true),
   /**
@@ -95,7 +112,7 @@ export interface BeginResult {
  * started, and the original timestamp is preserved rather than refreshed.
  */
 export async function beginWellbeingPulse(input: {
-  teamId?: string | null;
+  campaignId?: string | null;
   consent: boolean;
   instrumentKey?: InstrumentKey;
 }): Promise<BeginResult> {
@@ -116,45 +133,74 @@ export async function beginWellbeingPulse(input: {
 
   const context = await requireOnboarded();
   const { supabase, user } = context;
-  const teamId = parsed.data.teamId ?? null;
+  const campaignId = parsed.data.campaignId ?? null;
 
-  // The team decides which instrument its session runs. A client-supplied key
-  // is honoured only for a solo attempt — otherwise a participant could opt
-  // themselves into a different questionnaire than the one their facilitator
-  // configured, and their result would land in the wrong analytics.
-  const teamInstrument = teamId ? await getTeamInstrument(context, teamId) : null;
+  /*
+   * ─────────────────────────────────────────────────────────────────────
+   * THE CAMPAIGN DECIDES EVERYTHING. THIS IS THE POINT OF THE REFACTOR.
+   *
+   * This function used to take a `teamId`, ask the team for its instrument,
+   * and then call `getActiveQuestionnaire()` to decide the VERSION. That last
+   * step resolved by `is_active` — "whichever version is switched on right
+   * now" — so which wording a participant answered was a fact about the clock,
+   * not about the campaign they joined. Activate a new version mid-campaign
+   * and two people in it answer different content while their results are
+   * pooled as though they had not.
+   *
+   * A campaign pins `version_id` at creation and 00044's trigger freezes it
+   * the moment anybody answers. So the campaign is loaded here, server-side,
+   * from an id that was itself obtained by resolving a join token — and the
+   * instrument, the version and the organisation are all DERIVED from it.
+   * None of the three is taken from the client, and none is re-resolved.
+   *
+   * The database enforces the same rule underneath: 00047's admission trigger
+   * refuses a session whose instrument or version disagrees with its campaign,
+   * so this cannot drift even if a future caller forgets.
+   * ─────────────────────────────────────────────────────────────────────
+   */
+  let campaign: AuthorisedCampaign | null = null;
+  if (campaignId) {
+    campaign = await loadAuthorisedCampaignById(campaignId);
+    if (!campaign) return { ok: false, error: "This campaign could not be found." };
+    if (!campaign.isOpen) {
+      return { ok: false, error: "This campaign is no longer accepting responses." };
+    }
+  }
+
+  /*
+   * A SOLO attempt belongs to no campaign, and keeps its own rule.
+   *
+   * It is the one case where the instrument key comes from the CLIENT, which
+   * is exactly why the serving gate below runs before anything else. A solo
+   * attempt has no pinned version — there is no campaign to have pinned one —
+   * so it uses the active version, which is the correct answer for an attempt
+   * that belongs to no cohort and will be compared with nobody.
+   */
   const instrumentKey: InstrumentKey | null =
-    teamInstrument ?? (teamId ? null : (parsed.data.instrumentKey ?? null));
+    campaign?.instrumentKey ?? (campaignId ? null : (parsed.data.instrumentKey ?? null));
 
   if (!instrumentKey) {
     return {
       ok: false,
-      error: teamId
-        ? "This session has not been configured with a questionnaire yet."
+      error: campaignId
+        ? "This campaign has not been configured with a questionnaire yet."
         : "Choose which Wellbeing Pulse to take.",
     };
   }
 
   /*
-   * THE SERVING GATE — APPLIED TO EVERY ATTEMPT, TEAM OR SOLO.
+   * THE SERVING GATE — APPLIED TO EVERY ATTEMPT, CAMPAIGN OR SOLO.
    *
    * ───────────────────────────────────────────────────────────────────
    * THE BYPASS THIS CLOSES.
    *
-   * `canServeToParticipants` was consulted on the participant path in exactly
-   * one place: `checkCampaignReadiness`, called below inside `if (teamId)`.
-   *
+   * `canServeToParticipants` was once consulted on the participant path in
+   * exactly one place: `checkCampaignReadiness`, called inside `if (teamId)`.
    * A SOLO attempt has no team, so it skipped the gate entirely — and a solo
    * attempt is the one case where `instrumentKey` comes from the CLIENT. The
-   * only remaining barrier was `getActiveQuestionnaire`, which asks whether an
-   * active version exists. That is a question about CONTENT, not about
-   * licensing, and the two answers diverge the moment held content is loaded.
-   *
-   * Migration 00040 loads exactly that: it marks GHQ-12, GHQ-28 and WHO-5
-   * `licensed` and `is_active`. So on the deployment that ships 00040, any
-   * signed-in participant could invoke this action with `{ instrumentKey:
-   * "who5" }` and no team, and open a real attempt on a held instrument in
-   * production. Nothing else would have stopped them.
+   * only remaining barrier was the questionnaire lookup, which asks whether
+   * content EXISTS, not whether it may be SERVED. Those two answers diverge the
+   * moment held content is loaded, which 00045/00046 do.
    *
    * The gate belongs HERE — before the resume lookup, so it covers an attempt
    * already in flight as well as a new one. An instrument that may not be
@@ -172,14 +218,16 @@ export async function beginWellbeingPulse(input: {
     };
   }
 
-  // Resume, scoped to the same context AND the same instrument.
+  // Resume, scoped to the same campaign AND the same instrument.
   let resume = supabase
     .from("wellbeing_sessions")
     .select("id")
     .eq("profile_id", user.id)
     .eq("status", "in_progress")
     .eq("instrument_key", instrumentKey);
-  resume = teamId ? resume.eq("team_id", teamId) : resume.is("team_id", null);
+  resume = campaign
+    ? resume.eq("campaign_id", campaign.campaignId)
+    : resume.is("campaign_id", null);
   const { data: existing } = await resume
     .order("started_at", { ascending: false })
     .limit(1)
@@ -192,17 +240,27 @@ export async function beginWellbeingPulse(input: {
   // participant who is already signed in can reach the start action by a
   // link, and a session begun against an unready campaign produces a form
   // with no options and an abandoned attempt in the facilitator's counts.
-  if (teamId) {
+  if (campaign?.teamId) {
     const { checkCampaignReadiness, CAMPAIGN_NOT_READY_PARTICIPANT_MESSAGE } = await import(
       "@/lib/wellbeing/readiness"
     );
-    const readiness = await checkCampaignReadiness(teamId, instrumentKey);
+    const readiness = await checkCampaignReadiness(campaign.teamId, instrumentKey);
     if (!readiness.ready) {
       return { ok: false, error: CAMPAIGN_NOT_READY_PARTICIPANT_MESSAGE };
     }
   }
 
-  const questionnaire = await getActiveQuestionnaire(context, instrumentKey);
+  /*
+   * THE VERSION. Pinned for a campaign; active for a solo attempt.
+   *
+   * `getQuestionnaireByVersion` takes a version id and has no argument in
+   * which "the active one" could be passed by accident — which is the whole
+   * reason it exists as a separate function from `getActiveQuestionnaire`.
+   */
+  const questionnaire = campaign
+    ? await getQuestionnaireByVersion(context, campaign.versionId)
+    : await getActiveQuestionnaire(context, instrumentKey);
+
   if (!questionnaire) {
     return {
       ok: false,
@@ -213,22 +271,24 @@ export async function beginWellbeingPulse(input: {
     };
   }
 
-  // The organisation is resolved server-side, never from the client.
-  //
-  // With a team, it is that team's organisation. Without one, it is the
-  // organisation the participant already belongs to through a team membership
-  // — otherwise a solo attempt would carry no organisation, which both empties
-  // the Department / Function list and leaves the result out of every
-  // aggregate its organisation is entitled to count.
-  let organizationId: string | null = null;
-  if (teamId) {
-    const { data: team } = await supabase
-      .from("teams")
-      .select("organization_id")
-      .eq("id", teamId)
-      .maybeSingle();
-    organizationId = (team?.organization_id as string | null) ?? null;
-  } else {
+  // A pinned version that belongs to another instrument is a configuration
+  // fault, and scoring it would apply one instrument's engine to another's
+  // items. Refused rather than reconciled.
+  if (questionnaire.instrumentKey !== instrumentKey) {
+    return { ok: false, error: "This Wellbeing Pulse is not available yet." };
+  }
+
+  /*
+   * The organisation, resolved server-side and never from the client.
+   *
+   * For a campaign it is the campaign's own organisation — one lookup, and
+   * authoritative. For a solo attempt it is the organisation the participant
+   * already belongs to through a team membership; without it a solo result
+   * carries no organisation, which both empties the Department / Function list
+   * and leaves the result out of every aggregate its organisation may count.
+   */
+  let organizationId: string | null = campaign?.organizationId ?? null;
+  if (!campaign) {
     const { data: membership } = await supabase
       .from("team_members")
       .select("teams (organization_id)")
@@ -243,9 +303,14 @@ export async function beginWellbeingPulse(input: {
     .from("wellbeing_sessions")
     .insert({
       profile_id: user.id,
+      // Straight from the campaign's pin. The database re-checks that these
+      // two agree with the campaign — see 00047.
       version_id: questionnaire.versionId,
       instrument_key: instrumentKey,
-      team_id: teamId,
+      campaign_id: campaign?.campaignId ?? null,
+      // The roster the campaign counts participation against, so every
+      // aggregate, cohort and wave keeps working unchanged.
+      team_id: campaign?.teamId ?? null,
       organization_id: organizationId,
       consent_given: true,
       consent_at: new Date().toISOString(),
@@ -253,12 +318,15 @@ export async function beginWellbeingPulse(input: {
     .select("id")
     .single();
 
-  // The pilot capacity control refuses a NEW participant once the campaign is
-  // full. It is not a fault, so it does not read like one — and it is reached
-  // only after the resume lookup above, so anyone who already holds a place
-  // continues their own attempt rather than meeting this message.
-  if (error && isPilotCapacityError(error)) {
-    return { ok: false, error: PILOT_CAPACITY_MESSAGE };
+  // Capacity and lifecycle are refused by the DATABASE, not by this action —
+  // two participants racing for the last place both pass any check made out
+  // here. 00047's trigger locks the campaign row before counting, so the final
+  // place is taken exactly once. What is left here is turning that refusal
+  // into something a participant can read.
+  if (error) {
+    const refusal = campaignAdmissionRefusal(error);
+    if (refusal) return { ok: false, error: refusal };
+    if (isPilotCapacityError(error)) return { ok: false, error: PILOT_CAPACITY_MESSAGE };
   }
 
   if (error || !session) return { ok: false, error: "Could not start your Wellbeing Pulse." };
@@ -553,7 +621,7 @@ export async function completeWellbeingPulse(sessionId: string): Promise<Complet
   const { data: session } = await supabase
     .from("wellbeing_sessions")
     .select(
-      "id, profile_id, status, version_id, instrument_key, team_id, organization_id, consent_given, consent_at, department_name, sub_unit_name, work_location, office_location_name, job_title",
+      "id, profile_id, status, version_id, instrument_key, campaign_id, team_id, organization_id, consent_given, consent_at, department_name, sub_unit_name, work_location, office_location_name, job_title",
     )
     .eq("id", sessionId)
     .maybeSingle();
@@ -805,6 +873,25 @@ export async function completeWellbeingPulse(sessionId: string): Promise<Complet
       instrument_key: instrumentKey,
       questionnaire_version: (version?.version as number | null) ?? 1,
       version_id: session.version_id,
+      /*
+       * THE CAMPAIGN TRAVELS WITH THE RESULT.
+       *
+       * ───────────────────────────────────────────────────────────────
+       * Copied from the SESSION, never re-derived. A result must be able to
+       * name for ever which campaign it was collected in, on which
+       * instrument, against which questionnaire version — and all three have
+       * to be the ones the participant actually answered, not the ones that
+       * happen to be current when the row is written.
+       *
+       * Omitting this is not a cosmetic gap. 00047's provenance trigger
+       * refuses a result whose campaign disagrees with its session's, so a
+       * missing `campaign_id` made every campaign-backed completion fail at
+       * the last click with "Could not save your Wellbeing Pulse" — which is
+       * how this omission was found, by the trigger written to catch exactly
+       * it.
+       * ───────────────────────────────────────────────────────────────
+       */
+      campaign_id: (session.campaign_id as string | null) ?? null,
       completed_at: new Date().toISOString(),
       ...scoredRow,
       ...snapshot,
@@ -838,16 +925,43 @@ export async function completeWellbeingPulse(sessionId: string): Promise<Complet
 
 /** Navigates to the questionnaire, creating or resuming the session. */
 export async function startWellbeingPulseAction(formData: FormData): Promise<void> {
-  const teamId = (formData.get("team_id") as string | null) || null;
+  // The CAMPAIGN, not a team. A team id from a form could name any team the
+  // participant is on; a campaign id is checked against a campaign that must
+  // be open, and every consequential fact — instrument, version, organisation
+  // — is then read from the campaign rather than from this form.
+  const campaignId = (formData.get("campaign_id") as string | null) || null;
   const consent = formData.get("consent") === "on" || formData.get("consent") === "true";
   if (!consent) redirect("/wellbeing/declined");
 
+  // Honoured only for a SOLO attempt — `beginWellbeingPulse` ignores it
+  // entirely once a campaign is named.
   const requested = formData.get("instrument_key");
   const instrumentKey =
     typeof requested === "string" && isInstrumentKey(requested) ? requested : undefined;
 
-  const outcome = await beginWellbeingPulse({ teamId, consent: true, instrumentKey });
+  const outcome = await beginWellbeingPulse({ campaignId, consent: true, instrumentKey });
   if (!outcome.ok || !outcome.sessionId) {
+    /*
+     * The participant sees a generic page; the SERVER records why.
+     *
+     * `beginWellbeingPulse` distinguishes a dozen refusals — an unknown
+     * campaign, a closed one, a full one, an unservable instrument, missing
+     * content, a version that disagrees with its campaign — and every one of
+     * them arrived here as the same `?unavailable=1`. That is right for the
+     * participant, who can act on none of them, and useless for anybody
+     * diagnosing a campaign that will not open: the reason was computed and
+     * then discarded.
+     *
+     * So it is logged, server-side, where the campaign id is already known and
+     * no participant can read it. Nothing about the questionnaire or the
+     * person is recorded — only which rule refused.
+     */
+    logRouteDiagnostic({
+      route: "wellbeing:start",
+      step: "beginWellbeingPulse",
+      message: outcome.error ?? "unknown refusal",
+      teamId: campaignId ?? undefined,
+    });
     redirect("/wellbeing?unavailable=1");
   }
   redirect(`/wellbeing/assessment/${outcome.sessionId}`);

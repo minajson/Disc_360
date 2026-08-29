@@ -173,7 +173,22 @@ async function attachMembership(
   return null;
 }
 
-const invitedSchema = z.object({ join_token: z.uuid() });
+/**
+ * The token an invited participant carries through onboarding.
+ *
+ * NOT `z.uuid()` any more. A wellbeing campaign's `join_token` is 43
+ * base64url characters (see lib/wellbeing/campaigns.ts), so a UUID schema
+ * rejected every wellbeing participant who signed up through a campaign link
+ * with "this invitation is no longer valid" — a dead end at the exact moment
+ * they had already given their name.
+ *
+ * The shape accepted here is the union of both credentials: DISC's UUID team
+ * invite token and a wellbeing campaign token. WHICH of the two it is is not
+ * decided by this pattern — it is decided by which resolver finds it, below.
+ */
+const invitedSchema = z.object({
+  join_token: z.string().regex(/^[A-Za-z0-9_-]{24,64}$/),
+});
 
 /**
  * Onboarding for a participant who arrived through a validated invitation
@@ -190,8 +205,55 @@ export async function completeInvitedOnboarding(
     return { status: "error", message: "This invitation is no longer valid — ask for a fresh link." };
   }
 
+  const token = parsedToken.data.join_token;
+
+  /*
+   * ─────────────────────────────────────────────────────────────────────
+   * WELLBEING FIRST, AND WITHOUT FALLING BACK INTO DISC.
+   *
+   * A token is resolved as a CAMPAIGN token first. If that succeeds the
+   * participant is a wellbeing participant and the DISC resolver is never
+   * consulted — the two credential spaces are disjoint, and trying the other
+   * one after a wellbeing campaign refuses (closed, expired, full) would land
+   * somebody in the DISC assessment on the strength of a wellbeing link.
+   *
+   * Only a token that is not a campaign token at all is offered to DISC's
+   * `resolve_join_token`, which is what keeps DISC invitations working exactly
+   * as they did.
+   * ─────────────────────────────────────────────────────────────────────
+   */
+  const { resolveCampaignByToken, loadAuthorisedCampaignByToken, joinCampaignRoster, campaignJoinPath, CAMPAIGN_STATE_MESSAGES } =
+    await import("@/lib/wellbeing/campaigns");
+  const { campaign, blocked } = await resolveCampaignByToken(token);
+
+  if (campaign) {
+    if (blocked) {
+      return {
+        status: "error",
+        message: CAMPAIGN_STATE_MESSAGES[blocked] ?? CAMPAIGN_STATE_MESSAGES.not_found!,
+      };
+    }
+
+    const profileResult = await completeProfile(formData, "join_team");
+    if (profileResult.error) return { status: "error", message: profileResult.error };
+
+    const { user, profile } = await requireUser();
+    const authorised = await loadAuthorisedCampaignByToken(token);
+    if (authorised) {
+      const roster = await joinCampaignRoster(authorised, user, {
+        email: profile.email,
+        full_name: profile.full_name,
+      });
+      if (!roster.ok) return { status: "error", message: roster.error! };
+    }
+
+    // Back to the campaign's own invitation, never to /app. That page is
+    // where the token grants membership and where readiness is checked.
+    redirect(campaignJoinPath(token));
+  }
+
   const { getJoinContext } = await import("@/lib/join/context");
-  const context = await getJoinContext(parsedToken.data.join_token);
+  const context = await getJoinContext(token);
   if (!context || context.blocked || !context.teamId) {
     return {
       status: "error",
@@ -219,10 +281,7 @@ export async function completeInvitedOnboarding(
   if (attachError) return { status: "error", message: attachError };
 
   // The invitation decides the product, not this function and not the URL.
-  // A wellbeing participant returns to their invitation — where the token
-  // grants membership and readiness is checked — and never to /app, which is
-  // a different product's dashboard.
-  redirect(invitedJoinDestination(context.assessmentType, parsedToken.data.join_token));
+  redirect(invitedJoinDestination(context.assessmentType, token));
 }
 
 const joinSchema = z.object({

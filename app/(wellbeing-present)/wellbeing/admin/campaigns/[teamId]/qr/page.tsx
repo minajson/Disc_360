@@ -8,6 +8,7 @@ import { getPublicBaseUrl } from "@/lib/utils/site-url";
 import { INSTRUMENTS, isInstrumentKey } from "@/data/wellbeing-instruments";
 import { readPilotStatus } from "@/lib/wellbeing/pilot";
 import { PresentationQr } from "@/components/wellbeing/PresentationQr";
+import { campaignJoinPath } from "@/lib/wellbeing/campaigns";
 
 export const metadata: Metadata = { title: "Campaign QR" };
 
@@ -34,16 +35,42 @@ export default async function WellbeingCampaignQrPage({
   const admin = createSupabaseAdminClient();
   const { data: team } = await admin
     .from("teams")
-    .select("id, name, session_name, wellbeing_instrument_key, invite_token")
+    .select("id, name, session_name")
     .eq("id", teamId)
     .maybeSingle();
   if (!team) notFound();
 
-  const key = team.wellbeing_instrument_key;
-  const instrument = key && isInstrumentKey(key) ? INSTRUMENTS[key].name : null;
-  const joinUrl = `${getPublicBaseUrl().url}/wellbeing/join/${team.invite_token}`;
+  /*
+   * ─────────────────────────────────────────────────────────────────────
+   * THE QR ENCODES THE CAMPAIGN'S OWN TOKEN, NOT THE TEAM'S INVITE TOKEN.
+   *
+   * This page used to build `${base}/wellbeing/join/${team.invite_token}` —
+   * DISC's reusable team-invite token, resolved by DISC's `resolve_join_token`.
+   * A wellbeing participant therefore held a TEAM credential, and the
+   * questionnaire they eventually answered was whichever version happened to be
+   * active when they got there rather than the one their campaign pinned.
+   *
+   * The campaign owns its join token. It is the only credential that resolves
+   * to a campaign, it carries the pinned version with it, and it cannot be
+   * accepted by the DISC join route. A campaign with no row here has no QR to
+   * print — which is a configuration fault worth surfacing as a 404 rather
+   * than papering over with a team link that would send people to the wrong
+   * product.
+   * ─────────────────────────────────────────────────────────────────────
+   */
+  const { data: campaign } = await admin
+    .from("wellbeing_campaigns")
+    .select("id, name, instrument_key, join_token, status")
+    .eq("team_id", teamId)
+    .maybeSingle();
+  if (!campaign) notFound();
+
+  const key = campaign.instrument_key as string;
+  const instrument = isInstrumentKey(key) ? INSTRUMENTS[key].name : null;
+  const joinUrl = `${getPublicBaseUrl().url}${campaignJoinPath(campaign.join_token as string)}`;
   const status = await readPilotStatus(teamId);
-  const campaignName = (team.session_name as string) || (team.name as string);
+  const campaignName =
+    (campaign.name as string) || (team.session_name as string) || (team.name as string);
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-[3vmin] bg-white px-6 py-10 text-center print:min-h-0">

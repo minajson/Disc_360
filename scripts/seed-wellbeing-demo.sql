@@ -56,6 +56,7 @@ do $$
 declare
   v_org uuid;
   v_team uuid;
+  v_campaign uuid;
   v_version uuid := '00000000-0000-4000-8000-0000000000d1';
   v_profile uuid; v_session uuid; v_result uuid;
   v_dept text; v_loc text; v_office text;
@@ -106,12 +107,39 @@ begin
   values ('30000000-0000-4000-8000-0000000009d1', v_org,
           'Wellbeing Pulse — Management Demo', '',
           'wellbeing', 'disc360_wellbeing_v1',
-          'WELLB-9001', '9d100000-0000-4000-8000-0000000009d1'::uuid, true,
+          -- join_enabled FALSE: a wellbeing campaign is reached through its own
+          -- token, never through DISC's team-invitation route. The campaign
+          -- below carries the join token.
+          'WELLB-9001', '9d100000-0000-4000-8000-0000000009d1'::uuid, false,
           (select id from public.profiles where email = 'demo@disc360.dev'))
   on conflict (id) do update
     set wellbeing_instrument_key = excluded.wellbeing_instrument_key,
-        assessment_type = excluded.assessment_type
+        assessment_type = excluded.assessment_type,
+        join_enabled = excluded.join_enabled
   returning id into v_team;
+
+  -- ── the campaign itself ───────────────────────────────────────────
+  --
+  -- The team above is the ROSTER. `wellbeing_campaigns` is the campaign: it
+  -- owns the join token, the instrument, the PINNED questionnaire version,
+  -- capacity and lifecycle, and the participant journey resolves through it.
+  --
+  -- The fixture creates it explicitly rather than relying on 00047's
+  -- conversion, because that conversion runs during migration and this seed
+  -- runs after. A demo campaign that existed only as a team would exercise a
+  -- path the product no longer has.
+  insert into public.wellbeing_campaigns
+    (id, organization_id, instrument_key, version_id, created_by, name, status,
+     participant_capacity, join_token, team_id)
+  values ('30000000-0000-4000-8000-00000000c9d1', v_org, 'disc360_wellbeing_v1',
+          v_version, (select id from public.profiles where email = 'demo@disc360.dev'),
+          'Wellbeing Pulse — Management Demo', 'active',
+          null, '9d100000-0000-4000-8000-0000000009d1', v_team)
+  on conflict (id) do update
+    set version_id = excluded.version_id,
+        status = excluded.status,
+        team_id = excluded.team_id
+  returning id into v_campaign;
 
   -- The waves exist before any response does, so every result below is
   -- attached to the wave it was actually completed in rather than to whatever
@@ -174,10 +202,10 @@ begin
 
         insert into public.wellbeing_sessions
           (profile_id, version_id, instrument_key, team_id, organization_id, status,
-           wave_id, consent_given, consent_at, department_name, work_location,
+           campaign_id, wave_id, consent_given, consent_at, department_name, work_location,
            office_location_name, completed_at, started_at)
         values (v_profile, v_version, 'disc360_wellbeing_v1', v_team, v_org, 'completed',
-                v_wave_id, true, v_wave_dates[v_wave + 1],
+                v_campaign, v_wave_id, true, v_wave_dates[v_wave + 1],
                 v_dept, v_loc::public.wellbeing_work_location, v_office,
                 v_wave_dates[v_wave + 1], v_wave_dates[v_wave + 1])
         returning id into v_session;
@@ -185,12 +213,12 @@ begin
         insert into public.wellbeing_results
           (session_id, profile_id, instrument_key, total_score, index_score, item_positions,
            scoring_method, scoring_version, questionnaire_version, version_id, organization_id,
-           team_id, wave_id, department_at_completion, work_location_at_completion,
+           team_id, campaign_id, wave_id, department_at_completion, work_location_at_completion,
            office_location_at_completion, attempt_number, completed_at, created_at)
         values (v_session, v_profile, 'disc360_wellbeing_v1', v_raw, v_idx,
                 (select array_agg(least(4, greatest(0, (v_raw / 12) + ((g + i) % 3) - 1)) order by g)
                  from generate_series(1, 12) g)::smallint[],
-                'disc360_wellbeing_sum_0_48', '1.0.0', 1, v_version, v_org, v_team, v_wave_id,
+                'disc360_wellbeing_sum_0_48', '1.0.0', 1, v_version, v_org, v_team, v_campaign, v_wave_id,
                 v_dept, v_loc::public.wellbeing_work_location, v_office, v_wave + 1,
                 v_wave_dates[v_wave + 1], v_wave_dates[v_wave + 1])
         returning id into v_result;
