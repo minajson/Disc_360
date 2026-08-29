@@ -22,13 +22,18 @@ import { DEMO_PASSWORD, submitSignIn } from "./helpers";
  * So this suite drives a real browser from the join link to the stored result,
  * and asserts the DIRECTION at every surface that shows a figure.
  *
- * HOW IT RUNS WITHOUT OPENING PRODUCTION.
+ * WHAT AUTHORISES IT TO RUN — WHICH CHANGED ON 2026-08-29.
  *
- * WHO-5's status is `licensed` — held, not active. A held instrument serves
- * only in a non-production deployment with the demo flag explicitly set, which
- * is what playwright.config.ts configures. `isProductionEnvironment()` returns
- * true unconditionally on Vercel, so nothing here can open the hosted product.
- * The instrument is NOT flipped to `active` to make these pass.
+ * This suite used to run because WHO-5 was `licensed` (held) and
+ * playwright.config.ts marks the server a non-production deployment with the
+ * demo flag. That is no longer why: WHO-5 is now `active`, authorised for
+ * INTERNAL USER TESTING, and 00045 loads its wording into the migration set.
+ *
+ * What has NOT changed is the boundary. Activation for internal testing is not
+ * external or commercial release — WHO-5 is published under CC BY-NC-SA 3.0
+ * IGO, a non-commercial licence — and `releaseScope` carries that separately
+ * from `status`. The final test in this file asserts the distinction against
+ * the live database rather than repeating a claim about it.
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -372,17 +377,50 @@ test("the WHO-5 report is WHO-5's, and downloads as a PDF", async ({ page }) => 
 
 /* ── 5 · the gate itself ─────────────────────────────────────────────── */
 
-test("WHO-5 is served here only because this is a flagged test deployment", async ({ page }) => {
-  // The instrument is HELD (`licensed`). It runs in this suite because
-  // playwright.config.ts marks the server as a local test deployment with the
-  // demo flag — not because anybody flipped it to active.
-  await signIn(page);
-  await page.goto("/wellbeing/admin/instruments");
-  const text = (await page.locator("body").innerText()).replace(/\s+/g, " ");
-  // Whatever the surface says, the registry must still record it as held.
-  const status = sql(
-    `select content_status from wellbeing_versions where instrument_key='who5' and is_active`,
+test("WHO-5 serves from a licensed, worded, active version — not from a fallback", async () => {
+  // ─────────────────────────────────────────────────────────────────
+  // WHAT THIS REPLACED, AND WHY IT WAS WORTH REPLACING.
+  //
+  // This test read `content_status` and asserted it equalled "licensed",
+  // under a comment saying "the registry must still record it as held". Those
+  // are two unrelated facts. `content_status` is the DB's CONTENT enum
+  // (structure_only | licensed | retired) — it says whether wording exists,
+  // never whether the instrument may be served. The registry's serving status
+  // lives in data/wellbeing-instruments.ts and is now `active`.
+  //
+  // So the assertion passed while its stated reason was false, which is worse
+  // than failing: a reader would have concluded WHO-5 was still withheld.
+  //
+  // What is actually worth proving here is provenance — that the content a
+  // participant answered came from the authorised migration payload and not
+  // from some reconstructed fallback — so that is what this asserts.
+  // ─────────────────────────────────────────────────────────────────
+  const version = sql(
+    `select content_status || '|' || is_active || '|' || item_count ||
+            '|' || (length(licence_note) > 0)
+     from wellbeing_versions where instrument_key='who5' and is_active`,
   );
-  expect(status).toBe("licensed");
-  expect(text.length).toBeGreaterThan(0);
+  expect(version).toBe("licensed|true|5|true");
+
+  // Five worded items, none blank, thirty labelled anchors — 00045's counts.
+  // A reconstructed or partially-seeded version cannot satisfy all three.
+  const content = sql(
+    `select count(distinct i.id) || '|' ||
+            count(*) filter (where coalesce(btrim(i.prompt),'') = '') || '|' ||
+            (select count(*) from wellbeing_item_options o
+             where o.item_id in (select id from wellbeing_items
+                                 where version_id = v.id))
+     from wellbeing_versions v
+     join wellbeing_items i on i.version_id = v.id
+     where v.instrument_key='who5' and v.is_active
+     group by v.id`,
+  );
+  expect(content).toBe("5|0|30");
+
+  // The licence the wording is served under is recorded WITH it, so an
+  // internal-test activation can never read as unrestricted commercial use.
+  const licence = sql(
+    `select licence_note from wellbeing_versions where instrument_key='who5' and is_active`,
+  );
+  expect(licence).toMatch(/CC BY-NC-SA 3\.0 IGO/);
 });

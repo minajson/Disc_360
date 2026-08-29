@@ -7,6 +7,7 @@ import {
   INSTRUMENTS,
   type InstrumentKey,
   type InstrumentStatus,
+  type ReleaseScope,
 } from "@/data/wellbeing-instruments";
 
 /**
@@ -29,8 +30,21 @@ export interface InstrumentOption {
   selectable: boolean;
   /** Facilitator-facing status line. */
   statusLabel: string;
-  /** True when the instrument's own wording is loaded. */
+  /** True when the instrument's own wording is committed, not only its slots. */
   contentLoaded: boolean;
+  /**
+   * How far the authorisation behind this instrument reaches.
+   *
+   * `selectable` above answers whether it may be launched HERE. This answers
+   * whether launching it is a release — and the two stopped being the same
+   * question when the third-party instruments were activated for authorised
+   * internal user testing. A facilitator reading "Available" with nothing
+   * beside it would reasonably conclude the instrument is cleared for their
+   * customers, which for three of the four it is not.
+   */
+  releaseScope: ReleaseScope;
+  /** The outstanding condition, in words a facilitator can act on. */
+  releaseScopeNote: string;
 }
 
 export function InstrumentPicker({
@@ -145,7 +159,17 @@ export function InstrumentPicker({
                         Demo structure only
                       </span>
                     )}
+                    {option.releaseScope === "internal_test" && (
+                      <span className="rounded-full border border-[rgba(138,106,47,0.4)] px-2.5 py-0.5 font-mono text-[10px] tracking-wide text-pulse-attention uppercase">
+                        Internal testing only
+                      </span>
+                    )}
                   </span>
+                  {option.releaseScope === "internal_test" && (
+                    <span className="mt-1 text-xs leading-relaxed text-slate">
+                      {option.releaseScopeNote}
+                    </span>
+                  )}
                 </span>
               </label>
             </li>

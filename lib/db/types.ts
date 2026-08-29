@@ -2000,6 +2000,7 @@ export type Database = {
           team_series_id: string | null
           timezone: string | null
           updated_at: string
+          wellbeing_conversion_blocked_reason: string | null
           wellbeing_instrument_key: string | null
           wellbeing_pilot_capacity: number | null
         }
@@ -2034,6 +2035,7 @@ export type Database = {
           team_series_id?: string | null
           timezone?: string | null
           updated_at?: string
+          wellbeing_conversion_blocked_reason?: string | null
           wellbeing_instrument_key?: string | null
           wellbeing_pilot_capacity?: number | null
         }
@@ -2068,6 +2070,7 @@ export type Database = {
           team_series_id?: string | null
           timezone?: string | null
           updated_at?: string
+          wellbeing_conversion_blocked_reason?: string | null
           wellbeing_instrument_key?: string | null
           wellbeing_pilot_capacity?: number | null
         }
@@ -2106,6 +2109,90 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "wellbeing_instruments"
             referencedColumns: ["key"]
+          },
+        ]
+      }
+      wellbeing_campaigns: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          instrument_key: string
+          join_token: string
+          name: string
+          organization_id: string
+          participant_capacity: number | null
+          status: Database["public"]["Enums"]["wellbeing_campaign_status"]
+          updated_at: string
+          version_id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          instrument_key: string
+          join_token: string
+          name: string
+          organization_id: string
+          participant_capacity?: number | null
+          status?: Database["public"]["Enums"]["wellbeing_campaign_status"]
+          updated_at?: string
+          version_id: string
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          instrument_key?: string
+          join_token?: string
+          name?: string
+          organization_id?: string
+          participant_capacity?: number | null
+          status?: Database["public"]["Enums"]["wellbeing_campaign_status"]
+          updated_at?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wellbeing_campaigns_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_campaigns_instrument_key_fkey"
+            columns: ["instrument_key"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_instruments"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "wellbeing_campaigns_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_campaigns_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wellbeing_campaigns_version_matches_instrument"
+            columns: ["instrument_key", "version_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_versions"
+            referencedColumns: ["questionnaire_code", "id"]
           },
         ]
       }
@@ -2575,6 +2662,7 @@ export type Database = {
         Row: {
           at_or_above_threshold: boolean | null
           attempt_number: number | null
+          campaign_id: string | null
           completed_at: string
           created_at: string
           department_at_completion: string | null
@@ -2607,6 +2695,7 @@ export type Database = {
         Insert: {
           at_or_above_threshold?: boolean | null
           attempt_number?: number | null
+          campaign_id?: string | null
           completed_at?: string
           created_at?: string
           department_at_completion?: string | null
@@ -2639,6 +2728,7 @@ export type Database = {
         Update: {
           at_or_above_threshold?: boolean | null
           attempt_number?: number | null
+          campaign_id?: string | null
           completed_at?: string
           created_at?: string
           department_at_completion?: string | null
@@ -2669,6 +2759,13 @@ export type Database = {
             | null
         }
         Relationships: [
+          {
+            foreignKeyName: "wellbeing_results_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_campaigns"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "wellbeing_results_instrument_key_fkey"
             columns: ["instrument_key"]
@@ -2797,6 +2894,7 @@ export type Database = {
       }
       wellbeing_sessions: {
         Row: {
+          campaign_id: string | null
           completed_at: string | null
           consent_at: string | null
           consent_given: boolean
@@ -2827,6 +2925,7 @@ export type Database = {
             | null
         }
         Insert: {
+          campaign_id?: string | null
           completed_at?: string | null
           consent_at?: string | null
           consent_given?: boolean
@@ -2857,6 +2956,7 @@ export type Database = {
             | null
         }
         Update: {
+          campaign_id?: string | null
           completed_at?: string | null
           consent_at?: string | null
           consent_given?: boolean
@@ -2887,6 +2987,13 @@ export type Database = {
             | null
         }
         Relationships: [
+          {
+            foreignKeyName: "wellbeing_sessions_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "wellbeing_campaigns"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "wellbeing_sessions_department_id_fkey"
             columns: ["department_id"]
@@ -3214,11 +3321,32 @@ export type Database = {
           team_name: string
         }[]
       }
+      team_holds_assessment_work: {
+        Args: { p_team_id: string }
+        Returns: boolean
+      }
       wellbeing_active_policy: {
         Args: { org: string }
         Returns: {
           min_cohort_size: number
+          scoring_method: string
           screening_threshold: number
+        }[]
+      }
+      wellbeing_campaign_admits: {
+        Args: { campaign: string; participant: string }
+        Returns: boolean
+      }
+      wellbeing_campaign_by_token: {
+        Args: { token: string }
+        Returns: {
+          campaign_id: string
+          campaign_name: string
+          instrument_key: string
+          is_open: boolean
+          organization_name: string
+          status: Database["public"]["Enums"]["wellbeing_campaign_status"]
+          version_id: string
         }[]
       }
       wellbeing_join_context: {
@@ -3311,6 +3439,7 @@ export type Database = {
       session_status: "in_progress" | "completed" | "abandoned"
       team_member_role: "member" | "team_admin"
       wellbeing_access_role: "wellbeing_governance" | "wellbeing_analyst"
+      wellbeing_campaign_status: "draft" | "active" | "closed" | "archived"
       wellbeing_content_status: "structure_only" | "licensed" | "retired"
       wellbeing_delivery_status:
         | "requested"
@@ -3512,6 +3641,7 @@ export const Constants = {
       session_status: ["in_progress", "completed", "abandoned"],
       team_member_role: ["member", "team_admin"],
       wellbeing_access_role: ["wellbeing_governance", "wellbeing_analyst"],
+      wellbeing_campaign_status: ["draft", "active", "closed", "archived"],
       wellbeing_content_status: ["structure_only", "licensed", "retired"],
       wellbeing_delivery_status: [
         "requested",

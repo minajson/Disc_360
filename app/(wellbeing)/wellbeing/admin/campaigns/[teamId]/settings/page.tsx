@@ -74,7 +74,15 @@ export default async function CampaignSettingsPage({
       status: INSTRUMENTS[key].status,
       selectable: decision.allowed,
       statusLabel: STATUS_LABEL[INSTRUMENTS[key].status] ?? unavailableReason(key),
-      contentLoaded: key === "disc360_wellbeing_v1",
+      // Derived, not listed. This was `key === "disc360_wellbeing_v1"`, written
+      // when DISC360's was the only wording in the repository — so once 00038,
+      // 00040 and 00045/00046 loaded the rest, the picker went on telling a
+      // facilitator that three fully worded instruments were "demo structure
+      // only". `structure_only` is the registry's own word for wording that is
+      // not committed, so the badge reads it instead of a hard-coded name.
+      contentLoaded: INSTRUMENTS[key].status !== "structure_only",
+      releaseScope: INSTRUMENTS[key].releaseScope,
+      releaseScopeNote: INSTRUMENTS[key].releaseScopeNote,
     };
   });
 

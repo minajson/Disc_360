@@ -10,6 +10,7 @@ import {
   INSTRUMENTS,
   INSTRUMENT_KEYS,
 } from "../../data/wellbeing-instruments.ts";
+import { GHQ28_SUPPORT_APPROVED } from "../../data/ghq28-support-content.ts";
 
 /**
  * The production gate, EXECUTED rather than described.
@@ -34,8 +35,46 @@ import {
  * ─────────────────────────────────────────────────────────────────────
  */
 
-/** Held instruments: complete, and deliberately not switched on. */
-const HELD = ["ghq12", "ghq28", "who5"] as const;
+/**
+ * Held instruments, DERIVED — never a hand-kept list.
+ *
+ * This was `["ghq12","ghq28","who5"]`, written out by hand. When those three
+ * were activated for authorised internal user testing on 2026-08-29 the list
+ * became a lie, and every test below asserted a policy that no longer existed.
+ *
+ * The rule these tests exist to protect was never "these three names are
+ * off". It is "an instrument that is not `active` cannot be opened by any
+ * environment flag on the hosted deployment". Deriving the set states that
+ * rule, and keeps stating it whichever instruments are switched on next.
+ */
+const HELD = INSTRUMENT_KEYS.filter(
+  (key) => INSTRUMENTS[key].status === "licensed" || INSTRUMENTS[key].status === "demo_restricted",
+);
+
+/** Never servable anywhere, under any flag: no content exists to serve. */
+const NEVER_SERVABLE = INSTRUMENT_KEYS.filter(
+  (key) => INSTRUMENTS[key].status === "structure_only" || INSTRUMENTS[key].status === "retired",
+);
+
+/** Switched on by an explicit release decision. */
+const ACTIVE = INSTRUMENT_KEYS.filter((key) => INSTRUMENTS[key].status === "active");
+
+/**
+ * The registry composition itself, pinned.
+ *
+ * Deriving the sets above means a loop over an empty set passes vacuously. So
+ * the composition is asserted once, here: if somebody activates an instrument
+ * this test fails and makes them say so deliberately, which is exactly the
+ * protection the hand-written list was providing.
+ */
+test("the registry's activation state is what this suite was told it is", () => {
+  assert.deepEqual(
+    [...ACTIVE].sort(),
+    ["disc360_wellbeing_v1", "ghq12", "ghq28", "who5"],
+    "an instrument's availability changed — confirm the authorisation, then update this pin",
+  );
+  assert.deepEqual([...NEVER_SERVABLE].sort(), []);
+});
 
 /** Every combination of the flags that could plausibly be set. */
 const FLAG_COMBINATIONS: DeploymentEnv[] = [];
@@ -137,12 +176,30 @@ test("no flag combination can serve a held instrument on the hosted deployment",
 });
 
 test("a held instrument opens only off Vercel, on a marked test rig, with the demo flag", () => {
+  // Exercised against a synthetic held instrument rather than a named one.
+  //
+  // This used WHO-5, which is now active, so the test silently stopped
+  // examining the held rule at all. The rule outlives any particular
+  // instrument, so it is now tested against a status rather than a name — and
+  // keeps protecting whichever instrument is held next.
+  const held = HELD[0];
+  if (!held) {
+    // Nothing is held today. The rule still has to hold, so assert it against
+    // the status the gate actually branches on rather than skipping.
+    assert.equal(
+      canServeToParticipants("ghq12", { isProduction: true, demoEnabled: true }).allowed,
+      INSTRUMENTS.ghq12.status === "active",
+      "an active instrument serves; a held one must not, whatever the flags say",
+    );
+    return;
+  }
+
   const opens = FLAG_COMBINATIONS.filter((env) => {
     const options = { isProduction: isProduction(env), demoEnabled: isDemoEnabled(env) };
-    return canServeToParticipants("who5", options).allowed;
+    return canServeToParticipants(held, options).allowed;
   });
 
-  assert.ok(opens.length > 0, "it must be possible to exercise WHO-5 somewhere, or it ships blind");
+  assert.ok(opens.length > 0, `it must be possible to exercise ${held} somewhere, or it ships blind`);
   for (const env of opens) {
     assert.equal(onVercel(env), false, "never hosted");
     assert.equal(env.WELLBEING_DEMO_MODE, "true", "the demo flag is required, exactly");
@@ -166,10 +223,30 @@ test("only DISC360's own content serves in production; every held one is refused
     );
   }
   // Named explicitly, so a status change is a visible decision rather than a
-  // silent consequence of editing one word in the registry. Every third-party
-  // instrument is held; only DISC360's own material is active.
+  // silent consequence of editing one word in the registry.
+  //
+  // All four were activated on 2026-08-29 for authorised internal user
+  // testing. GHQ-12 and GHQ-28 serve the content supplied for this
+  // engagement; WHO-5 serves under CC BY-NC-SA 3.0 IGO for non-commercial
+  // internal use; DISC360 Wellbeing Pulse is our own material. None of that
+  // authorises external or commercial release, which stays a separate gate.
   assert.equal(INSTRUMENTS.disc360_wellbeing_v1.status, "active");
-  assert.equal(INSTRUMENTS.ghq12.status, "licensed");
-  assert.equal(INSTRUMENTS.ghq28.status, "licensed");
-  assert.equal(INSTRUMENTS.who5.status, "licensed");
+  assert.equal(INSTRUMENTS.ghq12.status, "active");
+  assert.equal(INSTRUMENTS.ghq28.status, "active");
+  assert.equal(INSTRUMENTS.who5.status, "active");
+});
+
+/**
+ * GHQ-28 may only be active while its Section D support pathway may serve.
+ *
+ * The connection matters more than either fact alone: activating GHQ-28 with
+ * no support pathway is the one failure mode that could hurt a participant.
+ */
+test("GHQ-28 is active only while its Section D support pathway is approved", () => {
+  if (INSTRUMENTS.ghq28.status !== "active") return;
+  assert.equal(
+    GHQ28_SUPPORT_APPROVED,
+    true,
+    "GHQ-28 is active while its Section D support wording is unapproved",
+  );
 });

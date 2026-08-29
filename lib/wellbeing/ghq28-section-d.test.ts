@@ -8,13 +8,22 @@ import {
 } from "./ghq28-section-d.ts";
 import { GHQ28_SECTION_D_ITEM_IDS } from "../../data/ghq28-content.ts";
 import {
+  ghq28SupportClinicallyApproved,
+  ghq28SupportPathwayApproved,
+  GHQ28_SUPPORT_APPROVAL_NOTE,
+  GHQ28_SUPPORT_APPROVAL_STATE,
   GHQ28_SUPPORT_APPROVED,
   GHQ28_SUPPORT_BODY,
   GHQ28_SUPPORT_HEADING,
   GHQ28_SUPPORT_NEXT_STEPS,
   GHQ28_SUPPORT_PRIVACY_NOTE,
 } from "../../data/ghq28-support-content.ts";
-import { canServeToParticipants, INSTRUMENTS } from "../../data/wellbeing-instruments.ts";
+import {
+  canReleaseExternally,
+  canServeToParticipants,
+  INSTRUMENTS,
+  SUPPORT_PATHWAY_REQUIRED_MESSAGE,
+} from "../../data/wellbeing-instruments.ts";
 
 /**
  * The GHQ-28 Section D safeguard.
@@ -185,65 +194,152 @@ test("the support copy makes no clinical claim", () => {
   }
 });
 
-test("the copy is flagged as awaiting clinical approval", () => {
-  // If this ever reads `true`, a clinician must actually have approved it.
-  // Failing here is the point: the flag cannot be flipped without a reviewer
-  // noticing the test that says what flipping it means.
+test("the approval is recorded as interim, not as clinical sign-off", () => {
+  // The flag was flipped on 2026-08-29 under an INTERIM approval from the
+  // engagement's Occupational Health facilitator, for internal user testing
+  // only. That is a real authorisation to serve the safeguard — and it is NOT
+  // clinical governance sign-off.
+  //
+  // A lone boolean cannot hold that difference, so the state is asserted too.
+  // If someone later takes GHQ-28 to a customer, this is the test that says
+  // out loud which approval they are relying on.
+  assert.equal(GHQ28_SUPPORT_APPROVED, true);
   assert.equal(
-    GHQ28_SUPPORT_APPROVED,
-    false,
-    "GHQ28_SUPPORT_APPROVED is true — confirm an Occupational Health Physician signed off " +
-      "the exact wording, then update this test with the approval reference",
+    GHQ28_SUPPORT_APPROVAL_STATE,
+    "interim_internal_test",
+    "GHQ-28 support wording still carries only interim internal-test approval; " +
+      "final clinical-governance sign-off is required before external rollout",
   );
+  assert.match(GHQ28_SUPPORT_APPROVAL_NOTE, /clinical-governance sign-off is still required/i);
+});
+
+test("the participant wording names a route to urgent help without diagnosing", () => {
+  const copy = `${GHQ28_SUPPORT_BODY} ${GHQ28_SUPPORT_NEXT_STEPS}`;
+
+  // The approved wording must actually carry the safety route.
+  assert.match(copy, /emergency/i, "no route to urgent help is offered");
+  assert.match(copy, /Occupational Health/i, "the organisation's own support route is unnamed");
+  assert.match(copy, /not a diagnosis/i, "the disclaimer is missing");
+
+  // And must still refuse to label the person.
+  for (const forbidden of [/suicid/i, /high[- ]risk/i, /at risk/i, /diagnos(ed|is of)/i, /disorder/i]) {
+    assert.ok(!forbidden.test(copy), `support copy uses alarming or diagnostic language: ${forbidden}`);
+  }
 });
 
 /**
- * The rule that keeps GHQ-28 closed, stated as a rule rather than as a pin.
+ * THE CONNECTION BETWEEN THE SAFEGUARD AND THE QUESTIONNAIRE.
  *
  * ─────────────────────────────────────────────────────────────────────
- * WHY BOTH HALVES ARE ASSERTED TOGETHER.
+ * WHY BOTH HALVES ARE ASSERTED TOGETHER, AND WHY THIS TEST CHANGED SHAPE.
  *
- * GHQ-28's engine, scoring, subscales, reporting and analytics are finished and
- * exercised locally. The ONE thing outstanding is the participant-facing
- * Section D support wording, which must come from Occupational Health and has
- * not been approved. Until it is, a participant must not be able to reach the
- * questionnaire — because answering Section D positively and being shown
- * nothing is the failure this safeguard exists to prevent.
+ * GHQ-28's Section D asks directly about not wanting to live. The one response
+ * this product can make is the support information on the participant's own
+ * result — it cannot notify anybody, because an individual result is private
+ * by design. So answering Section D positively and being shown nothing is the
+ * exact failure the safeguard exists to prevent.
  *
- * Elsewhere the two facts are pinned separately: one test says the flag is
- * `false`, another says the status is `licensed`. Either could be changed on
- * its own and the other would still pass, and the connection between them lives
- * only in a comment. This asserts the CONNECTION: while the wording is
- * unapproved, GHQ-28 is not active and cannot serve a participant in
- * production, with or without the demo flag.
+ * This test used to say: while the wording is unapproved, GHQ-28 must not be
+ * active. It opened with `if (GHQ28_SUPPORT_APPROVED) return;`, so when the
+ * interim approval was recorded on 2026-08-29 the test began returning on its
+ * first line and asserting nothing at all. It went green by evaporating, which
+ * is worse than going red.
+ *
+ * And underneath it, the connection it described was never actually enforced.
+ * `GHQ28_SUPPORT_APPROVED` was documented as gating "whether GHQ-28 may be
+ * served to a participant at all", but its only reader was the result page,
+ * which decides whether to RENDER the panel — after the participant has
+ * already answered. The two switches were independent.
+ *
+ * `canServeToParticipants` now reads the pathway itself, so the rule is stated
+ * as a BICONDITIONAL that holds in either direction: GHQ-28 serves if and only
+ * if its support pathway may serve. Withdraw the approval, blank the copy, or
+ * set an unrecognised approval state, and the questionnaire closes.
  * ─────────────────────────────────────────────────────────────────────
  */
-test("GHQ-28 cannot reach a participant while the Section D wording is unapproved", () => {
-  if (GHQ28_SUPPORT_APPROVED) return; // Approved: the rule below no longer binds.
-
-  assert.notEqual(
-    INSTRUMENTS.ghq28.status,
-    "active",
-    "GHQ-28 must not be active while its Section D support wording is unapproved",
-  );
+test("GHQ-28 serves if and only if its Section D support pathway may serve", () => {
+  const pathway = ghq28SupportPathwayApproved();
 
   for (const environment of [
     { isProduction: true, demoEnabled: false },
     { isProduction: true, demoEnabled: true },
+    { isProduction: false, demoEnabled: false },
+    { isProduction: false, demoEnabled: true },
   ]) {
-    assert.equal(
-      canServeToParticipants("ghq28", environment).allowed,
-      false,
-      `GHQ-28 must not serve in production (demoEnabled=${environment.demoEnabled})`,
-    );
+    const decision = canServeToParticipants("ghq28", environment);
+
+    if (!pathway) {
+      assert.equal(
+        decision.allowed,
+        false,
+        `GHQ-28 must not serve with an unapproved support pathway (${JSON.stringify(environment)})`,
+      );
+      continue;
+    }
+
+    // The pathway being approved does not open anything by itself — the
+    // ordinary status and environment rules still decide. What it must never
+    // do is be the reason a refusal happens while it is approved.
+    if (!decision.allowed) {
+      assert.notEqual(
+        decision.reason,
+        SUPPORT_PATHWAY_REQUIRED_MESSAGE,
+        "the support pathway is approved, so it must not be the cause of a refusal",
+      );
+    }
   }
 
-  // Local, flagged evaluation stays open — that is how the engine and the
-  // Section D detection are exercised at all, and it reaches no participant.
-  assert.equal(
-    canServeToParticipants("ghq28", { isProduction: false, demoEnabled: true }).allowed,
-    true,
-    "the engine must remain testable locally, or the safeguard cannot be verified",
+  // The other direction, stated as the thing a reviewer must never see true:
+  // an instrument switched on while the safeguard behind it cannot serve.
+  if (INSTRUMENTS.ghq28.status === "active") {
+    assert.equal(
+      pathway,
+      true,
+      "GHQ-28 is active while its Section D support wording cannot serve",
+    );
+  }
+});
+
+/**
+ * The approval is a complete condition, not a lone boolean.
+ *
+ * Each part is asserted because each part is a different way the safeguard
+ * could be hollowed out without anybody flipping the flag: an unrecognised
+ * approval state, or approved copy that is empty.
+ */
+test("the support pathway requires approval, a known state, and copy that exists", () => {
+  assert.equal(GHQ28_SUPPORT_APPROVED, true);
+  assert.ok(
+    GHQ28_SUPPORT_APPROVAL_STATE === "interim_internal_test" ||
+      GHQ28_SUPPORT_APPROVAL_STATE === "clinical_governance",
+    "an unrecognised approval state must never count as an approval",
+  );
+  for (const copy of [
+    GHQ28_SUPPORT_HEADING,
+    GHQ28_SUPPORT_BODY,
+    GHQ28_SUPPORT_PRIVACY_NOTE,
+    GHQ28_SUPPORT_NEXT_STEPS,
+  ]) {
+    assert.ok(copy.trim().length > 0, "approved support copy must not be empty");
+  }
+  assert.equal(ghq28SupportPathwayApproved(), true);
+});
+
+/**
+ * Interim approval opens the internal test and NOTHING beyond it.
+ *
+ * The distinction a boolean cannot hold: the engagement's Occupational Health
+ * facilitator accepted this wording so internal user testing could proceed. A
+ * clinician has not signed it off for general use, and until one does GHQ-28
+ * is not releasable however green the suite is.
+ */
+test("interim approval does not clear GHQ-28 for external release", () => {
+  assert.equal(ghq28SupportClinicallyApproved(), false);
+  const release = canReleaseExternally("ghq28");
+  assert.equal(release.allowed, false);
+  assert.ok(
+    release.blockers.some((blocker) => /clinical-governance sign-off/i.test(blocker)),
+    "the outstanding clinical sign-off must be named where release is decided",
   );
 });
 

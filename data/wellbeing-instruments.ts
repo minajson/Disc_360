@@ -24,6 +24,12 @@
  * ─────────────────────────────────────────────────────────────────────
  */
 
+import {
+  GHQ28_SUPPORT_APPROVAL_NOTE,
+  ghq28SupportClinicallyApproved,
+  ghq28SupportPathwayApproved,
+} from "./ghq28-support-content.ts";
+
 export type InstrumentKey = "ghq12" | "ghq28" | "who5" | "disc360_wellbeing_v1";
 
 export const INSTRUMENT_KEYS: readonly InstrumentKey[] = [
@@ -72,6 +78,41 @@ export type ScoreDirection =
  * to read an organisation's classification from first.
  */
 export type UseClassification = "unrestricted" | "internal_noncommercial";
+
+/**
+ * HOW FAR AN INSTRUMENT'S AUTHORISATION REACHES.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * WHY THIS IS NOT PART OF `status`.
+ *
+ * `status` answers one question: may this instrument be put in front of a
+ * participant at all. On 2026-08-29 the answer became yes for all four, for
+ * AUTHORISED INTERNAL USER TESTING. Written into `status` alone, that decision
+ * is indistinguishable from "cleared to sell", because the word `active` is
+ * the same word in both cases.
+ *
+ * That difference is the one a reader is most likely to get wrong and the one
+ * with the largest consequence: three of the four instruments carry an
+ * outstanding condition — GL Assessment's attribution wording is unconfirmed
+ * for both GHQs, WHO-5's licence is non-commercial, and GHQ-28's Section D
+ * support wording has interim approval only. None of those blocks an internal
+ * test. Every one of them blocks external release.
+ *
+ * So the two authorisations are two fields. Overloading one boolean would lose
+ * the distinction exactly where it costs most.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export type ReleaseScope =
+  /**
+   * Participant-servable, under an authorisation LIMITED to internal user
+   * testing by the engagement running it. Not a release.
+   */
+  | "internal_test"
+  /**
+   * Cleared for external and commercial release with no outstanding rights,
+   * attribution or governance condition.
+   */
+  | "general_release";
 
 export type LicensingBasis =
   /** Third-party content; digital-use rights required and being pursued. */
@@ -213,6 +254,21 @@ export interface InstrumentMetadata {
   /** Required attribution, rendered wherever the instrument's results appear. */
   attribution: string | null;
   status: InstrumentStatus;
+  /**
+   * How far the authorisation behind `status` actually reaches.
+   *
+   * `status: "active"` says an instrument MAY be served. This says to whom it
+   * may be released. They are set by different people on different evidence
+   * and they are never the same decision — see `ReleaseScope`.
+   */
+  releaseScope: ReleaseScope;
+  /**
+   * Why the scope is what it is, in a sentence a facilitator can act on.
+   *
+   * For an `internal_test` instrument this is the outstanding condition; for a
+   * `general_release` one it is the basis on which nothing is outstanding.
+   */
+  releaseScopeNote: string;
 
   /** Typical completion time, for the management comparison. */
   minutesToComplete: string;
@@ -298,7 +354,21 @@ export const GHQ12: InstrumentMetadata = {
    * before.
    * ───────────────────────────────────────────────────────────────────
    */
-  status: "licensed",
+  // Activated 2026-08-29 for authorised INTERNAL USER TESTING. The DB version
+  // is licensed, active and fully worded; this is the release switch that
+  // says the instrument may be offered at all. External/commercial release
+  // remains a separate compliance gate.
+  status: "active",
+  // Internal test only. The instrument's own licence is confirmed for digital
+  // use, but `attribution` above is null — the exact wording GL Assessment
+  // requires has never been supplied, and 00040's licence_note says it "must
+  // be confirmed with GL Assessment before external production release".
+  // Serving it to our own testers is a decision this engagement can make;
+  // publishing it to a customer is not.
+  releaseScope: "internal_test",
+  releaseScopeNote:
+    "Authorised for internal user testing. External or commercial release requires the " +
+    "required attribution wording to be confirmed with GL Assessment.",
   minutesToComplete: "2–3 minutes",
   notClaims: ["not a diagnosis", "not a severity scale", "not a measure of fitness for work"],
 };
@@ -394,7 +464,20 @@ export const GHQ28: InstrumentMetadata = {
   // engine, scoring, subscales, reporting, analytics and tests are complete and
   // exercised locally; only the participant-facing route is closed. See
   // GHQ28_SUPPORT_APPROVED in data/ghq28-support-content.ts.
-  status: "licensed",
+  // Activated 2026-08-29 for authorised INTERNAL USER TESTING. The DB version
+  // is licensed, active and fully worded; this is the release switch that
+  // says the instrument may be offered at all. External/commercial release
+  // remains a separate compliance gate.
+  status: "active",
+  // Internal test only, for TWO independent reasons — either alone would be
+  // enough. The GL Assessment attribution gap is the same one GHQ-12 carries,
+  // and the Section D support wording holds only the engagement facilitator's
+  // interim approval, not clinical-governance sign-off.
+  releaseScope: "internal_test",
+  releaseScopeNote:
+    "Authorised for internal user testing. External or commercial release requires the " +
+    "required attribution wording to be confirmed with GL Assessment, and final " +
+    "clinical-governance sign-off of the Section D support wording.",
   minutesToComplete: "5–7 minutes",
   notClaims: [
     "not a diagnosis",
@@ -463,7 +546,20 @@ export const WHO5: InstrumentMetadata = {
   // What remains is proving the participant journey end to end rather than
   // asserting it. Flipping this word is the whole act of opening WHO-5, so it
   // waits for that evidence.
-  status: "licensed",
+  // Activated 2026-08-29 for authorised INTERNAL USER TESTING. The DB version
+  // is licensed, active and fully worded; this is the release switch that
+  // says the instrument may be offered at all. External/commercial release
+  // remains a separate compliance gate.
+  status: "active",
+  // Internal test only, and for this instrument the boundary is the licence
+  // itself rather than a missing document. CC BY-NC-SA 3.0 IGO is a
+  // NON-COMMERCIAL licence; internal, non-commercial use is exactly what it
+  // covers, and a commercial deployment is exactly what it does not.
+  releaseScope: "internal_test",
+  releaseScopeNote:
+    "Authorised for internal, non-commercial user testing under CC BY-NC-SA 3.0 IGO. " +
+    "Commercial or external release requires a separate licence from the World Health " +
+    "Organization.",
   minutesToComplete: "1–2 minutes",
   notClaims: [
     "not a diagnosis",
@@ -505,6 +601,13 @@ export const DISC360_WELLBEING_V1: InstrumentMetadata = {
   licensingDescription: "Original DISC360 product content",
   attribution: null,
   status: "active",
+  // The only instrument with nothing outstanding: DISC360's own material, no
+  // third-party rights, no attribution to confirm, no clinical safeguard to
+  // sign off. This is what `general_release` is reserved for.
+  releaseScope: "general_release",
+  releaseScopeNote:
+    "Original DISC360 content. No third-party rights, attribution or governance approval " +
+    "is outstanding.",
   minutesToComplete: "2–3 minutes",
   notClaims: [
     "not a diagnosis",
@@ -716,6 +819,17 @@ export const NOT_ACTIVE_MESSAGE = "This instrument is not active for participant
  * person reading it needs to know that using the instrument here requires a
  * different licence, not a later release.
  */
+/**
+ * Refusal for an instrument whose participant SAFEGUARD is not approved.
+ *
+ * Distinct from `NOT_ACTIVE_MESSAGE` because it is a different fact and lifts
+ * for a different reason — and because a facilitator seeing "not active" for an
+ * instrument the registry plainly marks active would reasonably conclude the
+ * product is broken. It names the pathway, never the questionnaire.
+ */
+export const SUPPORT_PATHWAY_REQUIRED_MESSAGE =
+  "This instrument is unavailable: its participant support pathway is not approved.";
+
 export const NON_COMMERCIAL_ONLY_MESSAGE =
   "This instrument is licensed for internal, non-commercial use only, and this organisation " +
   "is not recorded as such. Using it here requires a separate licence from its publisher.";
@@ -759,6 +873,34 @@ export function canServeToParticipants(
   // organisation's classification FROM — a column and a governance surface —
   // not a parameter no caller supplies.
 
+  /*
+   * SAFEGUARD PRECONDITION — checked BEFORE `active` opens anything.
+   *
+   * ───────────────────────────────────────────────────────────────────
+   * THE GAP THIS CLOSES.
+   *
+   * GHQ-28's Section D asks directly about not wanting to live, and the
+   * supplied guide requires professional evaluation after a positive answer.
+   * This product cannot notify anybody, so the whole safeguard is the support
+   * information shown to the participant on their own result.
+   *
+   * `GHQ28_SUPPORT_APPROVED` was documented as gating "whether GHQ-28 may be
+   * served to a participant at all". It did not gate that. Its only reader was
+   * the result page, which decides whether to RENDER the panel — a decision
+   * taken after the participant has already answered. So availability and
+   * safeguard were independent switches, and the one combination that could
+   * actually hurt somebody (GHQ-28 servable, support wording withdrawn or
+   * blanked) was reachable by editing a single line in another file.
+   *
+   * Now the questionnaire cannot open unless the safeguard can. Ordered before
+   * the `active` branch on purpose: an instrument being switched on must not be
+   * able to skip past it.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  if (key === "ghq28" && !ghq28SupportPathwayApproved()) {
+    return { allowed: false, reason: SUPPORT_PATHWAY_REQUIRED_MESSAGE };
+  }
+
   if (instrument.status === "active") return { allowed: true, reason: null };
 
   // `licensed` and `demo_restricted` share one serving rule.
@@ -784,6 +926,68 @@ export function canServeToParticipants(
 
   // structure_only and retired never serve, anywhere.
   return { allowed: false, reason: NOT_ACTIVE_MESSAGE };
+}
+
+/* ── the external / commercial release gate ─────────────────────────── */
+
+export interface ReleaseDecision {
+  /** True only when NOTHING is outstanding for external, commercial release. */
+  allowed: boolean;
+  /** Every outstanding condition, in the words a facilitator can act on. */
+  blockers: readonly string[];
+}
+
+/**
+ * May this instrument be released externally or commercially?
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * A SECOND GATE, ASKED OF THE SAME REGISTRY.
+ *
+ * `canServeToParticipants` answers "may a participant in this engagement's
+ * authorised internal test open this?". This answers "may this go to a
+ * customer?". They were one question while nothing was switched on, and
+ * activating the three third-party instruments split them.
+ *
+ * The blockers are DERIVED from the metadata that records each fact, not
+ * listed by hand: an attribution that is null on rights-required content, a
+ * non-commercial licence, an interim-only safeguard approval. A second
+ * hand-kept table of the same facts would drift from the first one, and the
+ * copy of it that was wrong would be the one somebody read.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export function canReleaseExternally(key: InstrumentKey): ReleaseDecision {
+  const instrument = INSTRUMENTS[key];
+  const blockers: string[] = [];
+
+  if (instrument.status !== "active") {
+    blockers.push(unavailableReason(key) || NOT_ACTIVE_MESSAGE);
+  }
+
+  if (instrument.releaseScope !== "general_release") {
+    blockers.push(instrument.releaseScopeNote);
+  }
+
+  // Third-party content whose required attribution has never been supplied.
+  // Serving it internally is a decision this engagement can take; publishing
+  // it without the wording its licensor requires is not.
+  if (instrument.licensing === "external_rights_required" && instrument.attribution === null) {
+    blockers.push(
+      `${instrument.name}: the attribution wording required by ${instrument.publisher} is not confirmed.`,
+    );
+  }
+
+  // A non-commercial licence and a commercial release cannot both be true.
+  if (instrument.useClassification === "internal_noncommercial") {
+    blockers.push(NON_COMMERCIAL_ONLY_MESSAGE);
+  }
+
+  // GHQ-28's safeguard: interim approval opens the internal test and nothing
+  // beyond it. Read from the approval state itself rather than restated here.
+  if (key === "ghq28" && !ghq28SupportClinicallyApproved()) {
+    blockers.push(GHQ28_SUPPORT_APPROVAL_NOTE);
+  }
+
+  return { allowed: blockers.length === 0, blockers };
 }
 
 /** Why a facilitator cannot pick this instrument, for the campaign picker. */

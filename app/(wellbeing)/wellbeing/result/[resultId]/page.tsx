@@ -364,15 +364,16 @@ function GhqResult({
   // design. So the support information goes to the one person who can act on
   // it. Derived here and discarded — never stored, never sent, never counted.
   //
-  // DISABLED until an Occupational Health Physician supplies the authorised
-  // wording. `GHQ28_SUPPORT_APPROVED` is the switch, and it is false: showing
-  // unapproved clinical-adjacent copy to somebody who has just answered a
-  // suicidality item is worse than showing nothing, because it would be this
-  // product speaking where it has no standing to.
+  // ENABLED under the interim approval recorded on 2026-08-29 by the
+  // engagement's Occupational Health facilitator, for internal user testing.
+  // `GHQ28_SUPPORT_APPROVED` is the switch; the approval it stands for is
+  // NOT clinical-governance sign-off, and `GHQ28_SUPPORT_APPROVAL_STATE`
+  // carries that distinction — see data/ghq28-support-content.ts.
   //
-  // The detection, the copy draft and the tests are all in place, so enabling
-  // it is a one-line change once the wording arrives — see
-  // data/ghq28-support-content.ts.
+  // The same flag is now a precondition of serving GHQ-28 at all: if the
+  // wording were withdrawn, `canServeToParticipants` would refuse the
+  // questionnaire rather than let a participant answer Section D and reach a
+  // result page with nothing to show them.
   const showSectionDSupport =
     GHQ28_SUPPORT_APPROVED &&
     record.instrumentKey === "ghq28" &&
