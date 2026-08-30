@@ -239,3 +239,34 @@ test("the rendered cut-off is the registry's, which is the publication's", () =>
   assert.equal(INSTRUMENTS.who5.scoreDirection, "higher_is_stronger_wellbeing");
   assert.equal(INSTRUMENTS.who5.primaryScoreMax, 100);
 });
+
+/* ── the cut-off's source is never folded away ──────────────────────── */
+
+test("the WHO-5 cut-off source note is visible, not inside the disclosure", () => {
+  /*
+   * The result page moved its longer explanation behind "Understand my
+   * result", which is a closed <details> by default. The cut-off itself —
+   * "Suggested threshold 50" — is printed on the scale, so folding away WHOSE
+   * cut-off it is leaves a number on screen that the product appears to have
+   * decided for itself. The rule is that the cut-off never appears without its
+   * source, and a closed disclosure is not "appearing".
+   *
+   * The end-to-end suite caught this; this test is what stops it recurring
+   * without a browser in the loop.
+   */
+  const page = readFileSync(
+    new URL("../../app/(wellbeing)/wellbeing/result/[resultId]/page.tsx", import.meta.url),
+    "utf8",
+  );
+
+  const who5 = page.slice(page.indexOf("function Who5Result"), page.indexOf("function who5MovementDetail"));
+  const noteAt = who5.indexOf("WHO5_CUTOFF_SOURCE_NOTE");
+  assert.ok(noteAt > -1, "the WHO-5 branch must render its cut-off source note");
+
+  const disclosureAt = who5.indexOf("<Disclosure");
+  assert.ok(disclosureAt > -1, "the WHO-5 branch has a disclosure to be outside of");
+  assert.ok(
+    noteAt < disclosureAt,
+    "the cut-off source note must be rendered BEFORE the disclosure, where it is always visible",
+  );
+});

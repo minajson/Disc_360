@@ -99,7 +99,7 @@ async function wellbeingToken(page: Page): Promise<string | null> {
   await page.getByLabel("Password", { exact: true }).fill(DEMO_PASSWORD);
   await submitSignIn(page);
 
-  await page.goto("/wellbeing/admin/pilot");
+  await page.goto("/wellbeing/admin/campaigns");
   const hrefs = await page
     .locator('a[href^="/wellbeing/admin/campaigns/"]')
     .evaluateAll((links) => links.map((link) => link.getAttribute("href") ?? ""));
@@ -113,9 +113,14 @@ async function wellbeingToken(page: Page): Promise<string | null> {
 
   await page.goto(`/wellbeing/admin/campaigns/${campaign}/qr`);
   const text = await page.locator("body").innerText();
-  const match = text.match(
-    /\/wellbeing\/join\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i,
-  );
+  /*
+   * BOTH TOKEN SHAPES. A campaign created since 00044 carries a 43-character
+   * base64url token; one converted from the pre-campaign era keeps its
+   * original UUID (00047). This regex used to accept only the UUID form, so
+   * the moment a new campaign sorted first the helper failed and reported the
+   * fixture as broken.
+   */
+  const match = text.match(/\/wellbeing\/join\/([A-Za-z0-9_-]{24,64})/);
   expect(
     match,
     `campaign ${campaign} exists but its QR page shows no join URL — this helper is broken, not the fixture`,

@@ -93,7 +93,7 @@ test("a wellbeing campaign is absent from the DISC teams list", async ({ page })
 
 /* ── the campaign workspace ─────────────────────────────────────────── */
 
-test("the campaign header names the instrument, the wave and the status", async ({ page }) => {
+test("the campaign header names the questionnaire, the wave and the status", async ({ page }) => {
   await signInTo(page, FACILITATOR, "/app");
   const campaign = await findCampaign(page);
   test.skip(campaign === null, "no wellbeing campaign seeded");
@@ -101,7 +101,34 @@ test("the campaign header names the instrument, the wave and the status", async 
   await page.goto(`/wellbeing/admin/campaigns/${campaign}`);
   await expect(page.getByText("Wellbeing Pulse campaign")).toBeVisible();
   await expect(page.getByText(/Wave \d+ · \w+ \d{4}/)).toBeVisible();
-  await expect(page.getByText(/Active|Draft|Closed|At capacity|Archived/).first()).toBeVisible();
+  // The lifecycle vocabulary a facilitator actually operates. "At capacity"
+  // is deliberately absent: capacity is a fact reported BESIDE the state, not
+  // a state with no action attached to it.
+  await expect(page.getByText(/^(Open|Paused|Draft|Closed|Archived)$/).first()).toBeVisible();
+});
+
+test("the campaign says whether people can join, and offers the control", async ({ page }) => {
+  await signInTo(page, FACILITATOR, "/app");
+  const campaign = await findCampaign(page);
+  test.skip(campaign === null, "no wellbeing campaign seeded");
+
+  await page.goto(`/wellbeing/admin/campaigns/${campaign}`);
+  const status = page.getByRole("region", { name: "Campaign status" });
+  await expect(status).toBeVisible();
+
+  // Whatever state it is in, exactly one of these sentences is true and shown.
+  await expect(
+    status.getByText(
+      /Participants can join using the QR code or link\.|New participants cannot currently join\.|This campaign has ended\.|Not yet open\.|Archived and no longer running\./,
+    ),
+  ).toBeVisible();
+
+  // And there is always something to press — except when archived, which is
+  // the one state with nothing left to do.
+  const archived = await status.getByRole("heading", { name: "Campaign archived" }).count();
+  if (archived === 0) {
+    await expect(status.getByRole("button").first()).toBeVisible();
+  }
 });
 
 test("every campaign tab opens for a facilitator who holds reporting", async ({ page }) => {
@@ -176,10 +203,25 @@ test("Compare offers cohort dimensions and no person", async ({ page }) => {
 
 /* ── the escape route is authorised, and only there ─────────────────── */
 
-test("a facilitator gets the Open DISC360 escape route", async ({ page }) => {
+test("a facilitator gets a workspace switcher, not a branded link", async ({ page }) => {
   await signInTo(page, FACILITATOR, "/app");
   await page.goto("/wellbeing");
-  await expect(page.getByRole("link", { name: /Open DISC360|DISC360 →/ })).toBeVisible();
+
+  // Wellbeing Pulse is its own product and its chrome carries its own name.
+  // The crossing is still there for somebody who holds scope in the other
+  // workspace — it is a switcher, closed until opened.
+  const switcher = page.getByLabel("Switch workspace");
+  await expect(switcher).toBeVisible();
+
+  // Closed by default: nothing in the chrome a participant or a facilitator
+  // reads at a glance carries the other product's brand.
+  const other = page.locator('header a[href="/app"]');
+  await expect(other).not.toBeVisible();
+
+  // And it is a real crossing once opened.
+  await switcher.click();
+  await expect(other).toBeVisible();
+  await expect(other).toHaveText(/DISC360/);
 });
 
 test("a plain participant gets no route into DISC360", async ({ page }) => {

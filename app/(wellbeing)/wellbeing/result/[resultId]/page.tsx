@@ -368,13 +368,22 @@ function Who5Result({
           <p className="text-[0.95rem] leading-relaxed text-ink">{outcome.body}</p>
         </div>
 
+        {/*
+          THE SOURCE NOTE STAYS VISIBLE. It was briefly moved into the
+          disclosure with the rest of the explanation, and the end-to-end suite
+          caught what that meant: the cut-off — "Suggested threshold 50" — is
+          printed on the scale, so folding away whose cut-off it is leaves a
+          number on screen that the product appears to have decided. The rule
+          is that the cut-off never appears without its source, and a closed
+          <details> is not "appearing".
+        */}
+        <p className="text-sm leading-relaxed text-slate">{WHO5_CUTOFF_SOURCE_NOTE}</p>
+
         <Disclosure label={UNDERSTAND_RESULT_LABEL}>
           {/* Which direction the scale runs is the single most important
               thing to say about WHO-5, and the opposite of what it means on
               GHQ. It leads the explanation for that reason. */}
           <p className="text-[0.95rem] leading-relaxed text-ink">{WHO5_SCORE_MEANING}</p>
-          {/* The cut-off never appears without saying whose it is. */}
-          <p className="text-sm leading-relaxed text-slate">{WHO5_CUTOFF_SOURCE_NOTE}</p>
         </Disclosure>
       </section>
 
