@@ -19,7 +19,9 @@ test("the release endpoint returns three facts and nothing else", () => {
 });
 
 test("it reads only build-time release variables", () => {
-  const envs = [...code.matchAll(/process\.env\.([A-Z0-9_]+)/g)].map((m) => m[1]);
+  const envs = [...code.matchAll(/process\.env\.([A-Z0-9_]+)/g)]
+    .map((m) => m[1])
+    .filter((name): name is string => name !== undefined);
   const allowed = new Set([
     "NEXT_PUBLIC_RELEASE_SHA",
     "NEXT_PUBLIC_RELEASE_REF",

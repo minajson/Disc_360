@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { DEMO_PASSWORD } from "./helpers";
+import { DEMO_PASSWORD, submitSignIn } from "./helpers";
 
 /**
  * The Wellbeing Pulse campaign workspace, and the product boundary around it.
@@ -30,8 +30,21 @@ async function signInTo(page: Page, email: string, next: string): Promise<void> 
   await page.goto(`/sign-in?next=${encodeURIComponent(next)}`);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(DEMO_PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL(`**${next.split("?")[0]}**`);
+  /*
+   * `submitSignIn` rather than a bare click.
+   *
+   * Against a production build the form is server-rendered and looks
+   * interactive before React has attached its submit handler; a click
+   * dispatched inside that window is swallowed and the page simply stays on
+   * /sign-in. `helpers.ts` documents the race and retries through it, and this
+   * spec had its own single-click copy that did not — so an acceptance run
+   * failed "a plain participant cannot open a campaign workspace by URL" with
+   * a 90s timeout in the HELPER, before the privacy assertion ran at all.
+   *
+   * A privacy test that fails for a hydration race is a privacy test people
+   * learn to re-run rather than read.
+   */
+  await submitSignIn(page, `**${next.split("?")[0]}**`);
 }
 
 /**
