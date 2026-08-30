@@ -272,3 +272,61 @@ test("every action has a confirmation sentence for after it succeeds", () => {
     assert.ok(LIFECYCLE_CONFIRMATION[action], `${action} has no confirmation`);
   }
 });
+
+/* ── the campaign row must actually load ────────────────────────────── */
+
+test("every embed of a doubly-linked table names its relationship", () => {
+  /*
+   * `wellbeing_campaigns` has two foreign keys into `wellbeing_versions`:
+   * `version_id → id`, and 00044's composite `(instrument_key, version_id) →
+   * (questionnaire_code, id)` that stops the pair drifting apart. PostgREST
+   * cannot choose between them, so an unqualified embed answers PGRST201 with
+   * NO ROWS — and a caller that destructures only `data` sees a campaign that
+   * appears not to exist.
+   *
+   * That is exactly what happened: a healthy live campaign rendered as "Draft"
+   * with no QR code, because the row carrying its status and its join token
+   * had silently failed to load. Unit tests could not see it; a browser could.
+   */
+  const files = [
+    "campaign-workspace.ts",
+    "campaigns.ts",
+    "campaign-list.ts",
+    "queries.ts",
+    "analytics.ts",
+  ];
+
+  for (const file of files) {
+    let source: string;
+    try {
+      source = readFileSync(new URL(`./${file}`, import.meta.url), "utf8");
+    } catch {
+      continue;
+    }
+    for (const select of source.match(/\.select\(\s*(?:"|`)[\s\S]*?(?:"|`)/g) ?? []) {
+      if (!select.includes("wellbeing_versions")) continue;
+      assert.ok(
+        select.includes("wellbeing_versions!"),
+        `${file}: embedding wellbeing_versions without naming the relationship returns no rows\n${select}`,
+      );
+    }
+  }
+});
+
+test("a campaign that fails to load is reported, not rendered as a draft", () => {
+  const source = readFileSync(new URL("./campaign-workspace.ts", import.meta.url), "utf8");
+  const block = source.slice(
+    source.indexOf("const { data: campaign"),
+    source.indexOf("const campaignInstrument"),
+  );
+  assert.match(
+    block,
+    /error: campaignError/,
+    "the campaign lookup must capture its error rather than destructuring data alone",
+  );
+  assert.match(
+    block,
+    /logRouteDiagnostic/,
+    "and a failed lookup must be logged rather than falling through to a default state",
+  );
+});

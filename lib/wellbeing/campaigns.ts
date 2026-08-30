@@ -5,6 +5,7 @@ import { createSupabaseAnonClient } from "@/lib/db/anon";
 import { createSupabaseAdminClient } from "@/lib/db/admin";
 import { logRouteDiagnostic } from "@/lib/observability/diagnostics";
 import { isInstrumentKey, type InstrumentKey } from "@/data/wellbeing-instruments";
+import { PARTICIPANT_REFUSAL } from "./campaign-lifecycle";
 
 /**
  * Wellbeing campaigns — the ONE place the participant journey resolves through.
@@ -111,18 +112,58 @@ export interface PublicCampaign {
   capacityReached: boolean;
 }
 
-/** Why a campaign will not admit somebody, in words a participant can act on. */
+/**
+ * Why a campaign will not admit somebody, in words a participant can act on.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * THE LIFECYCLE HALF IS NOT WRITTEN HERE.
+ *
+ * It is imported from `campaign-lifecycle.ts`, which owns the states. When
+ * `paused` was added, this map still listed four lifecycle keys and a lookup
+ * for a paused campaign missed — so a participant who scanned a perfectly
+ * valid QR code for a campaign their facilitator had paused for ten minutes
+ * was told:
+ *
+ *     "This link doesn't match a Wellbeing Pulse campaign. Check the link or
+ *      ask whoever invited you for a new one."
+ *
+ * That is wrong, it is alarming, and it sends somebody to find a new link that
+ * does not exist. Deriving the lifecycle messages from the lifecycle means a
+ * future state cannot be added without one.
+ *
+ * `not_found` is now reachable ONLY when the token genuinely resolves to
+ * nothing — see `campaignStateMessage`, which refuses to guess.
+ * ─────────────────────────────────────────────────────────────────────
+ */
 export const CAMPAIGN_STATE_MESSAGES: Record<string, string> = {
+  // Lifecycle states, owned by campaign-lifecycle.ts.
+  ...PARTICIPANT_REFUSAL,
+
   not_found:
     "This link doesn't match a Wellbeing Pulse campaign. Check the link or ask whoever invited you for a new one.",
-  closed: "This campaign has closed, so it is no longer accepting responses.",
-  expired: "This campaign has ended, so it is no longer accepting responses.",
-  draft: "This campaign has not opened yet. Please check back with whoever invited you.",
-  archived: "This campaign has been archived and is no longer accepting responses.",
-  full: "This campaign has reached its participant capacity.",
+  // `active` but past its end date: the campaign ran and has finished.
+  expired: "This check-in has ended, so it is no longer accepting responses.",
+  full: "This campaign has reached its participant capacity, so no new participant can join.",
   service_failure:
     "We couldn't check this campaign just now. Please try again in a moment.",
 };
+
+/**
+ * The sentence for a refusal key, with a fallback that never accuses the link.
+ *
+ * A key this build does not recognise means the product has changed under a
+ * page, not that the participant mistyped something. Telling them their link
+ * is wrong sends them looking for a replacement that does not exist; telling
+ * them the check-in is not open right now is true of every unknown state,
+ * because the only state that admits anybody is `open`.
+ */
+export function campaignStateMessage(blocked: string | null): string | null {
+  if (blocked === null) return null;
+  return (
+    CAMPAIGN_STATE_MESSAGES[blocked] ??
+    "This check-in is not open at the moment. Please check back with whoever invited you."
+  );
+}
 
 export interface CampaignResolution {
   campaign: PublicCampaign | null;

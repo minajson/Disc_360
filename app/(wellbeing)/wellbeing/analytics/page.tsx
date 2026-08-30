@@ -243,9 +243,10 @@ export default async function WellbeingAnalyticsPage({
         </p>
       </header>
 
-      {/* Instrument switcher. Selecting one replaces every metric below. */}
+      {/* Questionnaire switcher. Selecting one replaces every metric below —
+          the scale, the direction and the vocabulary all change with it. */}
       <nav
-        aria-label="Instrument"
+        aria-label="Questionnaire"
         className="-mx-1 mt-5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <ul className="flex min-w-max gap-2">

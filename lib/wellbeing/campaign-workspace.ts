@@ -1,6 +1,7 @@
 import "server-only";
 import { notFound } from "next/navigation";
 import { createSupabaseAdminClient } from "@/lib/db/admin";
+import { logRouteDiagnostic } from "@/lib/observability/diagnostics";
 import { requireTeamAdmin } from "@/lib/auth/guards";
 import { hasWellbeingRole } from "@/lib/wellbeing/access";
 import { readPilotStatus, type PilotStatus } from "@/lib/wellbeing/pilot";
@@ -148,13 +149,45 @@ export async function loadCampaignIdentity(teamId: string): Promise<{
   // the same product-boundary failure in the opposite direction.
   if (team.assessment_type !== "wellbeing") notFound();
 
-  const { data: campaign } = await admin
+  /*
+   * ───────────────────────────────────────────────────────────────────
+   * THE EMBED IS NAMED, AND THE ERROR IS NOT SWALLOWED.
+   *
+   * `wellbeing_campaigns` has TWO foreign keys into `wellbeing_versions` —
+   * `version_id → id`, and 00044's composite `(instrument_key, version_id) →
+   * (questionnaire_code, id)` that makes the pair impossible to drift apart.
+   * An unqualified `wellbeing_versions (…)` embed is therefore ambiguous, and
+   * PostgREST answers PGRST201 with NO ROWS rather than picking one.
+   *
+   * Destructuring only `data` turned that into a campaign that appeared not to
+   * exist: the workspace fell back to reading the roster team, reported a
+   * healthy live campaign as "Draft", and dropped the QR panel entirely —
+   * because the join link comes from the row that had just failed to load.
+   * That is the same failure mode as the `join_enabled` bug it replaced: a
+   * lookup quietly returning nothing, and a page rendering a confident wrong
+   * answer from the fallback.
+   *
+   * So the relationship is named, and a failure is logged rather than
+   * rendered. A campaign that cannot be read is not a campaign in draft.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  const { data: campaign, error: campaignError } = await admin
     .from("wellbeing_campaigns")
     .select(
-      "id, name, status, instrument_key, version_id, participant_capacity, join_token, opened_at, paused_at, closed_at, expires_at, wellbeing_versions (version)",
+      "id, name, status, instrument_key, version_id, participant_capacity, join_token, opened_at, paused_at, closed_at, expires_at, wellbeing_versions!wellbeing_campaigns_version_id_fkey (version)",
     )
     .eq("team_id", teamId)
     .maybeSingle();
+
+  if (campaignError) {
+    logRouteDiagnostic({
+      route: "wellbeing/admin/campaigns/[teamId]",
+      teamId,
+      step: "load_campaign",
+      code: campaignError.code,
+      message: campaignError.message,
+    });
+  }
 
   const campaignInstrument = campaign?.instrument_key;
   const instrumentKey =

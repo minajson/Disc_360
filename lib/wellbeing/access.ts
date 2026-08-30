@@ -111,16 +111,38 @@ export async function resolveWellbeingScope(): Promise<{
     .eq("profile_id", context.user.id)
     .is("revoked_at", null);
 
-  const scope: WellbeingScopeEntry[] = (data ?? []).map((row) => {
+  /*
+   * ───────────────────────────────────────────────────────────────────
+   * ONE ENTRY PER ORGANISATION, NOT ONE PER GRANT.
+   *
+   * The two wellbeing roles are separate grants, and somebody who holds both
+   * in the same organisation — which is the normal shape for whoever set the
+   * programme up — produced TWO scope entries for it. The campaign-creation
+   * form rendered that as a dropdown with the same organisation listed twice.
+   *
+   * Governance outranks analyst, so the strongest grant is the one kept: the
+   * surfaces that gate on `role === "wellbeing_governance"` must not be told
+   * somebody is merely an analyst because that grant sorted first.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  const byOrganisation = new Map<string, WellbeingScopeEntry>();
+  for (const row of data ?? []) {
     const org = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations;
-    return {
-      organizationId: row.organization_id as string,
+    const organizationId = row.organization_id as string;
+    const role = row.role as WellbeingRole;
+    const existing = byOrganisation.get(organizationId);
+    if (existing && existing.role === "wellbeing_governance") continue;
+    byOrganisation.set(organizationId, {
+      organizationId,
+      // 00052 lets a wellbeing role holder read their organisation's name.
+      // Before it, this embed returned null through their own client and every
+      // surface printed the literal word "Organisation".
       organizationName: (org as { name: string } | null)?.name ?? "Organisation",
-      role: row.role as WellbeingRole,
-    };
-  });
+      role,
+    });
+  }
 
-  return { context, scope };
+  return { context, scope: [...byOrganisation.values()] };
 }
 
 /**

@@ -222,7 +222,7 @@ export async function completeInvitedOnboarding(
    * as they did.
    * ─────────────────────────────────────────────────────────────────────
    */
-  const { resolveCampaignByToken, loadAuthorisedCampaignByToken, joinCampaignRoster, campaignJoinPath, CAMPAIGN_STATE_MESSAGES } =
+  const { resolveCampaignByToken, loadAuthorisedCampaignByToken, joinCampaignRoster, campaignJoinPath, campaignStateMessage } =
     await import("@/lib/wellbeing/campaigns");
   const { campaign, blocked } = await resolveCampaignByToken(token);
 
@@ -230,7 +230,7 @@ export async function completeInvitedOnboarding(
     if (blocked) {
       return {
         status: "error",
-        message: CAMPAIGN_STATE_MESSAGES[blocked] ?? CAMPAIGN_STATE_MESSAGES.not_found!,
+        message: campaignStateMessage(blocked)!,
       };
     }
 

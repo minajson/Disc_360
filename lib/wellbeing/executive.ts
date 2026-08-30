@@ -139,14 +139,18 @@ export function buildExecutiveTiles(input: ExecutiveInput): ExecutiveTile[] {
       note:
         input.median === null
           ? "Too few responses to publish"
-          : `${instrument.metricName}, out of ${instrument.primaryScoreMax}`,
+          // The label already names the metric; the note carries the scale,
+          // which is the fact a reader actually needs beside the figure.
+          : `Scale ${instrument.primaryScoreMin}–${instrument.primaryScoreMax}`,
       state: readingState(input.instrumentKey, input.median, input.threshold),
       movement: null,
     },
     {
       key: "movement",
       label: "Change",
-      value: movement === null ? "—" : movement.label.replace(/ since .*/, ""),
+      // The arrow carries the direction and the figure carries the size, so
+      // the sign is not printed twice. "↓ -3.5" reads as a double negative.
+      value: movement === null ? "—" : String(Math.abs(movement.delta)),
       note: movement === null ? "No comparable earlier wave" : `since ${input.previousPeriodLabel}`,
       state: null,
       movement,
@@ -166,8 +170,10 @@ export function buildExecutiveTiles(input: ExecutiveInput): ExecutiveTile[] {
       note:
         withheld === 0
           ? "No group withheld"
-          : `${withheld === 1 ? "group is" : "groups are"} withheld to protect confidentiality`,
-      state: withheld > 0 ? "withheld" : null,
+          : `${withheld === 1 ? "group" : "groups"} too small to report without risking somebody being identified`,
+      // The tile's note already says what "withheld" means, so the state's
+      // own label would print the same sentence twice.
+      state: null,
       movement: null,
     },
   ];

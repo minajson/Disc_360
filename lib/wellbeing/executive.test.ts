@@ -84,7 +84,11 @@ test("the withheld tile counts groups across every dimension", () => {
   const tiles = buildExecutiveTiles(input());
   assert.equal(tiles.find((tile) => tile.key === "reportable")!.value, "7");
   assert.equal(tiles.find((tile) => tile.key === "withheld")!.value, "2");
-  assert.equal(tiles.find((tile) => tile.key === "withheld")!.state, "withheld");
+  // The note carries the meaning; a state label would say the same thing again.
+  assert.match(
+    tiles.find((tile) => tile.key === "withheld")!.note!,
+    /too small to report/,
+  );
 });
 
 /* ── the sentences ──────────────────────────────────────────────────── */

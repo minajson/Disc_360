@@ -35,7 +35,7 @@ export function DeckSlideBody({ slide }: { slide: DeckSlide }) {
           </h2>
           <dl className="flex flex-wrap items-baseline gap-x-8 gap-y-3 border-t border-hairline pt-6 font-mono text-[clamp(0.8rem,1.2vw,1.05rem)] text-slate">
             <div className="flex gap-2">
-              <dt className="sr-only">Instrument</dt>
+              <dt className="sr-only">Questionnaire</dt>
               <dd className="text-ink">{slide.instrument}</dd>
             </div>
             <div className="flex gap-2">

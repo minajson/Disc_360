@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/db/server";
 import {
   campaignJoinPath,
-  CAMPAIGN_STATE_MESSAGES,
+  campaignStateMessage,
   joinCampaignRoster,
   loadAuthorisedCampaignByToken,
   resolveCampaignByToken,
@@ -104,7 +104,7 @@ export default async function WellbeingJoinPage({
   }
 
   const blocked = campaignState
-    ? (CAMPAIGN_STATE_MESSAGES[campaignState] ?? CAMPAIGN_STATE_MESSAGES.not_found!)
+    ? campaignStateMessage(campaignState)!
     : readinessBlocked;
 
   // ── a signed-in visitor is already past this screen ──────────────────

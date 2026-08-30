@@ -6,6 +6,7 @@ import {
   describeCurrentPeriod,
   loadCampaignIdentity,
   loadCampaignParticipation,
+  loadCampaignTally,
 } from "@/lib/wellbeing/campaign-workspace";
 import {
   INSTRUMENT_KEYS,
@@ -70,10 +71,12 @@ export default async function CampaignSettingsPage({
   const { teamId } = await params;
   if (!z.uuid().safeParse(teamId).success) notFound();
 
-  const { identity, pilot } = await loadCampaignIdentity(teamId);
-  const [participation, readiness] = await Promise.all([
+  const { identity } = await loadCampaignIdentity(teamId);
+  const [participation, readiness, tally] = await Promise.all([
     loadCampaignParticipation(teamId, identity.instrumentKey),
     checkCampaignReadiness(teamId, identity.instrumentKey),
+    // The same counting rule as the overview's live panel — see the note there.
+    loadCampaignTally(teamId, identity.instrumentKey, identity.capacity),
   ]);
   const period = describeCurrentPeriod(
     participation.waves.map((wave) => wave.label),
@@ -101,9 +104,9 @@ export default async function CampaignSettingsPage({
       <CampaignHeader
         identity={identity}
         period={period}
-        participation={participation.participation}
-        completed={participation.completed}
-        invited={participation.invited}
+        participation={tally.completionRate}
+        completed={tally.completed}
+        invited={tally.joined}
       />
 
       <div className="mt-7">
@@ -118,7 +121,7 @@ export default async function CampaignSettingsPage({
           teamId={teamId}
           lifecycle={identity.lifecycle}
           capacity={identity.capacity}
-          joined={pilot.joined}
+          joined={tally.joined}
           pausedAt={identity.pausedAt}
           closedAt={identity.closedAt}
         />
@@ -152,7 +155,7 @@ export default async function CampaignSettingsPage({
               fullscreenHref={`/wellbeing/admin/campaigns/${teamId}/qr`}
               lifecycle={identity.lifecycle}
               capacity={identity.capacity}
-              joined={pilot.joined}
+              joined={tally.joined}
               size="compact"
             />
           </Section>

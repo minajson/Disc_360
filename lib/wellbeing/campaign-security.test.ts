@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { isSafeNext } from "../auth/intent.ts";
 import { isSafeJoinNext } from "../join/destination.ts";
+// `campaigns.ts` is `server-only` and cannot be imported by the Node runner,
+// so its participant messages are asserted from source. The lifecycle half is
+// an ordinary module and is imported directly.
+import { PARTICIPANT_REFUSAL } from "./campaign-lifecycle.ts";
 
 /**
  * The campaign token is a credential. This is what that has to mean.
@@ -178,15 +182,73 @@ test("a refusal names no id, count, instrument or organisation state", () => {
   const source = read("lib/wellbeing/campaigns.ts");
   const start = source.indexOf("export const CAMPAIGN_STATE_MESSAGES");
   const messages = source.slice(start, source.indexOf("};", start));
-  for (const leak of ["uuid", "id ", "capacity of", "instrument", "version", "team"]) {
+
+  const all = [messages, ...Object.values(PARTICIPANT_REFUSAL)].join(" ");
+  for (const leak of ["uuid", "capacity of", "instrument", "version", "team"]) {
     assert.ok(
-      !messages.toLowerCase().includes(leak.toLowerCase()),
+      !all.toLowerCase().includes(leak.toLowerCase()),
       `a participant-facing campaign message leaks "${leak}"`,
     );
   }
-  // It must still SAY something — a blank refusal is its own failure.
-  for (const key of ["not_found", "closed", "expired", "draft", "archived", "full"]) {
+
+  // The non-lifecycle keys are written here; the lifecycle keys are spread in
+  // from the module that owns the states, so a new state cannot arrive without
+  // a message.
+  for (const key of ["not_found", "expired", "full", "service_failure"]) {
     assert.match(messages, new RegExp(`${key}:`), `${key} needs a message`);
+  }
+  assert.match(
+    messages,
+    /\.\.\.PARTICIPANT_REFUSAL/,
+    "lifecycle messages must be derived from the lifecycle, not re-listed here",
+  );
+});
+
+test("a paused campaign does not tell the participant their link is wrong", () => {
+  /*
+   * The defect this exists for: `paused` was added to the lifecycle and the
+   * message map still listed four lifecycle keys, so the lookup missed and
+   * fell through to `not_found`. Somebody scanning a valid QR code for a
+   * campaign paused for ten minutes was told the link did not match a
+   * campaign and to ask for a new one — which does not exist.
+   */
+  const paused = PARTICIPANT_REFUSAL.paused;
+  assert.doesNotMatch(paused, /link/i);
+  assert.doesNotMatch(paused, /doesn't match|does not match/i);
+  assert.match(paused, /paused/i);
+
+  // And an unknown state must never accuse the link either: the resolver's
+  // fallback is what a future state falls through to.
+  const source = read("lib/wellbeing/campaigns.ts");
+  const resolver = source.slice(
+    source.indexOf("export function campaignStateMessage"),
+    source.indexOf("/* ── authorised"),
+  );
+  assert.doesNotMatch(
+    resolver,
+    /CAMPAIGN_STATE_MESSAGES\.not_found/,
+    "an unrecognised state must not fall through to 'your link is wrong'",
+  );
+  assert.match(resolver, /not open at the moment/i);
+});
+
+test("every lifecycle state that refuses somebody has its own sentence", () => {
+  for (const lifecycle of ["draft", "paused", "closed", "archived"] as const) {
+    assert.ok(
+      PARTICIPANT_REFUSAL[lifecycle]?.length > 0,
+      `${lifecycle} has no participant message`,
+    );
+  }
+  // And every caller goes through the resolver rather than indexing the map,
+  // which is what made the missing `paused` key a silent fall-through.
+  for (const path of [
+    "app/(wellbeing-public)/wellbeing/join/[token]/page.tsx",
+    "lib/actions/onboarding.ts",
+  ]) {
+    assert.ok(
+      !code(path).includes("CAMPAIGN_STATE_MESSAGES["),
+      `${path} indexes the message map directly; use campaignStateMessage()`,
+    );
   }
 });
 

@@ -116,12 +116,33 @@ export default async function CampaignOverviewPage({
         two populations on one page, which is the one confusion this workspace
         cannot afford.
       */}
+      {/*
+        ─────────────────────────────────────────────────────────────
+        THE HEADER AND THE LIVE PANEL MUST AGREE.
+
+        The header used to read `workspace.participation`, which counts every
+        roster row as invited — including the facilitator, who is on the roster
+        to ADMINISTER the campaign and will usually never answer it. So the
+        header said "53 of 54" directly above a live panel saying "53 of 53",
+        on the same screen, and a facilitator had no way to tell which was
+        right.
+
+        On a LIVE reading both now come from `loadCampaignTally`, which counts
+        an administrator only once they have actually taken part. On a
+        SYNTHETIC reading the header must describe the synthetic population
+        instead — otherwise the campaign's real participation sits above two
+        hundred synthetic responses, which is the one confusion the source
+        switch exists to prevent.
+        ─────────────────────────────────────────────────────────────
+      */}
       <CampaignHeader
         identity={identity}
         period={period}
-        participation={workspace ? workspace.participation : participation.participation}
-        completed={workspace ? workspace.participants : participation.completed}
-        invited={workspace ? workspace.invited : participation.invited}
+        participation={
+          source === "live" ? tally.completionRate : (workspace?.participation ?? null)
+        }
+        completed={source === "live" ? tally.completed : (workspace?.participants ?? 0)}
+        invited={source === "live" ? tally.joined : (workspace?.invited ?? 0)}
       />
 
       <div className="mt-7">

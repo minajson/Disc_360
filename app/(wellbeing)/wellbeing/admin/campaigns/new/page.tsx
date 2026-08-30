@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "New campaign" };
 /**
  * Create a Wellbeing Pulse campaign.
  *
- * The instrument is chosen HERE, before the campaign exists, because the QR
+ * The questionnaire is chosen HERE, before the campaign exists, because the QR
  * code and join link it produces are printed and forwarded and have to mean
  * one thing permanently. It is locked the moment a participant answers.
  */
@@ -38,8 +38,8 @@ export default async function NewWellbeingCampaignPage() {
       </p>
       <h1 className="mt-3 font-display text-h2 font-semibold tracking-tight">Create a campaign</h1>
       <p className="mt-4 text-lead text-slate">
-        A campaign runs one instrument. Its QR code and join link carry that choice permanently, so
-        it is chosen now and locked once someone answers.
+        A campaign asks one questionnaire. Its QR code and join link carry that choice
+        permanently, so it is chosen now and locks once somebody answers.
       </p>
 
       <NewCampaignForm

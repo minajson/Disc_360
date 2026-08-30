@@ -355,3 +355,49 @@ test("completion status grants no route to a result", () => {
     "and no roster row may link to anybody's individual report",
   );
 });
+
+/* ── the organisation a facilitator is working in has a NAME ────────── */
+
+test("wellbeing scope is one entry per organisation, strongest role kept", () => {
+  /*
+   * The two wellbeing roles are separate grants. Somebody who holds both in
+   * one organisation — the normal shape for whoever set the programme up —
+   * produced two scope entries, and the campaign-creation form rendered that
+   * as a dropdown listing the same organisation twice.
+   */
+  const source = code("lib/wellbeing/access.ts");
+  const fn = source.slice(
+    source.indexOf("export async function resolveWellbeingScope"),
+    source.indexOf("export interface WellbeingScopeEntry") > 0
+      ? source.length
+      : source.length,
+  );
+  assert.match(fn, /new Map<string, WellbeingScopeEntry>/, "scope must be keyed by organisation");
+  assert.match(
+    fn,
+    /existing\.role === "wellbeing_governance"/,
+    "governance must outrank analyst when both are held",
+  );
+});
+
+test("a wellbeing role can read its organisation's name", () => {
+  /*
+   * A wellbeing role is deliberately not organisation membership, and
+   * `organizations` was readable only by members — so every surface that
+   * embedded `organizations (name)` through a role holder's own client got
+   * null and printed the literal word "Organisation", including the dropdown
+   * a facilitator uses to choose which organisation to create a campaign in.
+   *
+   * 00052 grants exactly SELECT, exactly to a role held in that organisation.
+   * The name is already shown to an unauthenticated scanner by
+   * `wellbeing_campaign_by_token`, so it is not confidential to the people
+   * running that organisation's programme.
+   */
+  const migration = read("supabase/migrations/00052_wellbeing_role_reads_organisation.sql");
+  assert.match(migration, /on public\.organizations/);
+  assert.match(migration, /for select to authenticated/);
+  assert.match(migration, /has_any_wellbeing_role\(id\)/);
+  // SELECT only: a wellbeing role must not gain the ability to write an
+  // organisation row.
+  assert.ok(!/for (insert|update|delete)/i.test(migration));
+});
