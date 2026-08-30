@@ -142,12 +142,13 @@ do $harness$
 declare
   v_team uuid;
   v_org uuid;
-  v_alice uuid;
-  v_bob uuid;
   v_super uuid;
   v_version uuid := '00000000-0000-4000-8000-0000000000e1';
   v_alice_session uuid := 'aaaa0000-0000-4000-8000-000000000001';
   v_bob_session uuid := 'bbbb0000-0000-4000-8000-000000000001';
+  -- This harness's own participants — see the note where they are created.
+  v_alice uuid := 'aaaa0000-0000-4000-8000-0000000000a1';
+  v_bob uuid := 'bbbb0000-0000-4000-8000-0000000000b1';
   v_spare uuid := 'cccc0000-0000-4000-8000-000000000001';
   v_org_a uuid;
   v_org_b uuid;
@@ -161,9 +162,50 @@ declare
 begin
   select t.id, t.organization_id into v_team, v_org from public.teams t limit 1;
   select id into v_super from public.profiles where is_super_admin order by email limit 1;
-  select id into v_alice from public.profiles where not is_super_admin order by email limit 1;
-  select id into v_bob from public.profiles where not is_super_admin and id <> v_alice
-    order by email limit 1;
+
+  /*
+   * ───────────────────────────────────────────────────────────────────
+   * ALICE AND BOB ARE THIS HARNESS'S OWN, NOT BORROWED.
+   *
+   * They used to be "the first two non-super-admin profiles by email", which
+   * made every check that counts what a participant can SEE depend on data
+   * this harness did not create. Complete one wellbeing journey locally as the
+   * alphabetically-first demo account and
+   *
+   *   "a participant sees exactly their own wellbeing result"
+   *
+   * fails — not because ownership broke, but because that person legitimately
+   * has three results and the fixture expects one. A privacy harness that
+   * cries wolf after ordinary local testing is a privacy harness people learn
+   * to ignore, which is worse than not having one.
+   *
+   * Everything runs inside the transaction this script rolls back, so these
+   * two exist only for the duration of the checks.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
+                          email_confirmed_at, created_at, updated_at)
+  values
+    (v_alice, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+     'harness-alice@privacy.invalid', 'not-a-usable-hash', now(), now(), now()),
+    (v_bob, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+     'harness-bob@privacy.invalid', 'not-a-usable-hash', now(), now(), now());
+
+  -- A trigger on auth.users already creates the profile row, so this fills in
+  -- what onboarding would have and does not assume it is absent.
+  insert into public.profiles (id, email, full_name, onboarded_at, consented_at)
+  values
+    (v_alice, 'harness-alice@privacy.invalid', 'Harness Alice', now(), now()),
+    (v_bob, 'harness-bob@privacy.invalid', 'Harness Bob', now(), now())
+  on conflict (id) do update
+    set full_name = excluded.full_name,
+        onboarded_at = excluded.onboarded_at,
+        consented_at = excluded.consented_at;
+
+  insert into public.team_members (team_id, profile_id, display_name, email)
+  values
+    (v_team, v_alice, 'Harness Alice', 'harness-alice@privacy.invalid'),
+    (v_team, v_bob, 'Harness Bob', 'harness-bob@privacy.invalid');
 
   /* ── fixture: two people complete a pulse on the same team ────────── */
 
