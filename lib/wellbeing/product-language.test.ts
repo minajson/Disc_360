@@ -140,15 +140,29 @@ test("the participant shell offers no DISC assessment and no team comparison", (
   }
 });
 
-test("the DISC360 escape route is the ONE crossing, and it is authorised", () => {
+test("the crossing out of Wellbeing Pulse is a switcher, not an advertisement", () => {
   const chrome = code("components/wellbeing/PulseChrome.tsx");
-  assert.match(chrome, /showPlatformLink/, "the link is conditional");
-  assert.match(chrome, /Open DISC360/, "and it is named plainly rather than disguised");
+  assert.match(chrome, /showSwitcher/, "the crossing is conditional");
+  assert.match(chrome, /ProductSwitcher/, "and it is the switcher, not a branded link");
+
+  // Wellbeing Pulse is its own product. Its chrome carries its own name and
+  // nobody else's: an employee answering a confidential health questionnaire
+  // is not "in DISC360" and must not be told they are.
+  assert.ok(
+    !chrome.includes("DISC360"),
+    "Wellbeing Pulse chrome must not carry the other product's brand",
+  );
+
+  // The other workspace is named only once the switcher is opened, and only
+  // for somebody who holds scope in it.
+  const switcher = code("components/wellbeing/ProductSwitcher.tsx");
+  assert.match(switcher, /Your workspaces/, "it presents as a switcher");
+  assert.match(switcher, /href="\/app"/, "and it does cross");
 
   const layout = code("app/(wellbeing)/layout.tsx");
   assert.match(
     layout,
-    /showPlatformLink =\s*\n?\s*profile\.is_super_admin/,
+    /showSwitcher =\s*\n?\s*profile\.is_super_admin/,
     "and the condition is resolved on the server from memberships, not from a prop",
   );
 

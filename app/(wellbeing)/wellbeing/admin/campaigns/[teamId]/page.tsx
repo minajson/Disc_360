@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   loadCampaignIdentity,
   loadCampaignParticipation,
+  loadCampaignTally,
   describeCurrentPeriod,
   PARTICIPANT_STATE_LABEL,
   type ParticipantState,
@@ -19,6 +20,9 @@ import {
 } from "@/lib/wellbeing/analytics";
 import { CampaignHeader, CampaignNav } from "@/components/wellbeing/campaign/CampaignChrome";
 import { ReadinessPanel } from "@/components/wellbeing/campaign/ReadinessPanel";
+import { LifecyclePanel } from "@/components/wellbeing/campaign/LifecyclePanel";
+import { LiveParticipation } from "@/components/wellbeing/campaign/LiveParticipation";
+import { JoinAccessPanel } from "@/components/wellbeing/campaign/JoinAccessPanel";
 import { checkCampaignReadiness } from "@/lib/wellbeing/readiness";
 import { Section } from "@/components/wellbeing/campaign/Section";
 import { ParticipationProgress } from "@/components/wellbeing/campaign/ParticipationProgress";
@@ -70,9 +74,12 @@ export default async function CampaignOverviewPage({
     searchParams,
   ]);
   const source = parseAnalyticsSource(sourceParam);
-  const [participation, readiness] = await Promise.all([
+  const [participation, readiness, tally] = await Promise.all([
     loadCampaignParticipation(teamId, identity.instrumentKey),
     checkCampaignReadiness(teamId, identity.instrumentKey),
+    // Rendered server-side so the panel is complete and correct before any
+    // stream opens — and stays correct if one never does.
+    loadCampaignTally(teamId, identity.instrumentKey, identity.capacity),
   ]);
   const period = describeCurrentPeriod(
     participation.waves.map((wave) => wave.label),
@@ -138,28 +145,58 @@ export default async function CampaignOverviewPage({
         {/* Before anything else: a campaign nobody can complete. */}
         <ReadinessPanel readiness={readiness} />
 
-        {/* ── 01 · participation ───────────────────────────────────── */}
+        {/*
+          The three questions a facilitator opens this page holding: what state
+          is the campaign in, can people join, and what do I press. Above every
+          figure, because a closed campaign makes the figures below it a report
+          on something that has stopped.
+        */}
+        <LifecyclePanel
+          teamId={teamId}
+          lifecycle={identity.lifecycle}
+          capacity={identity.capacity}
+          joined={tally.joined}
+          pausedAt={identity.pausedAt}
+          closedAt={identity.closedAt}
+        />
+
+        {/* ── 01 · participation, live ─────────────────────────────── */}
         <Section
           index={1}
-          title="Participation"
+          title="Participants"
           lead={
             source === "live"
-              ? "Who has taken part so far. Everything below this line is only as good as this number — a pattern drawn from a third of a workforce describes that third."
-              : "Who has taken part in the LIVE campaign. The figures elsewhere on this page describe the synthetic population selected above, so these two counts are deliberately not the same thing."
-          }
-          aside={
-            participation.participation === null
-              ? "no roster"
-              : `${participation.participation}% complete`
+              ? "Updating as people join and finish — no refresh needed. Everything below this line is only as good as these numbers: a pattern drawn from a third of a workforce describes that third."
+              : "The LIVE campaign's participation. The figures elsewhere on this page describe the synthetic population selected above, so these two counts are deliberately not the same thing."
           }
         >
+          <LiveParticipation teamId={teamId} initial={tally} capacity={identity.capacity} />
           <ParticipationProgress participation={participation} capacity={identity.capacity} />
         </Section>
 
-        {/* ── 02 · overall pattern ─────────────────────────────────── */}
-        {reporting && instrument && (
+        {/* ── 02 · participant access ──────────────────────────────── */}
+        {identity.instrumentKey && identity.joinUrl && (
           <Section
             index={2}
+            title="How people join"
+            lead="Hold this up, print it, or send the link. It always opens this campaign's own questionnaire."
+          >
+            <JoinAccessPanel
+              campaignName={identity.name}
+              joinUrl={identity.joinUrl}
+              questionnaireName={identity.instrument?.name ?? null}
+              fullscreenHref={`/wellbeing/admin/campaigns/${teamId}/qr`}
+              lifecycle={identity.lifecycle}
+              capacity={identity.capacity}
+              joined={tally.joined}
+            />
+          </Section>
+        )}
+
+        {/* ── 03 · overall pattern ─────────────────────────────────── */}
+        {reporting && instrument && (
+          <Section
+            index={3}
             title="Overall pattern"
             lead={
               instrument.scoreDirection === "higher_is_more_distress"
@@ -194,10 +231,10 @@ export default async function CampaignOverviewPage({
           </Section>
         )}
 
-        {/* ── 03 · dimension profile, where the instrument has one ─── */}
+        {/* ── 04 · dimension profile, where the questionnaire has one ─ */}
         {reporting && profile!.view.dimensions && profile!.view.dimensions.length > 0 && (
           <Section
-            index={3}
+            index={4}
             title={instrument!.subscales.length > 0 ? "Subscale profile" : "Dimension profile"}
             lead={
               instrument!.key === "disc360_wellbeing_v1"
@@ -241,10 +278,10 @@ export default async function CampaignOverviewPage({
           </Section>
         )}
 
-        {/* ── 04 · movement ────────────────────────────────────────── */}
+        {/* ── 05 · movement ────────────────────────────────────────── */}
         {reporting && (
           <Section
-            index={4}
+            index={5}
             title="Movement"
             lead="How this campaign compares with its own previous wave. Composition changes between waves — different people answer — so a shift describes the responses received, not the same group of individuals moving."
             aside={
@@ -290,10 +327,10 @@ export default async function CampaignOverviewPage({
           </Section>
         )}
 
-        {/* ── 05 · coverage and confidentiality ────────────────────── */}
+        {/* ── 06 · coverage and confidentiality ────────────────────── */}
         {reporting && (
           <Section
-            index={5}
+            index={6}
             title="Coverage and confidentiality"
             lead="How much of this workforce can be reported on, before any comparison is read. Groups below the minimum are withheld and are never named, sized or reconstructable."
             aside={`minimum group ${coverage!.coverage.minCohort}`}
@@ -305,10 +342,10 @@ export default async function CampaignOverviewPage({
           </Section>
         )}
 
-        {/* ── 06 · where to look next ──────────────────────────────── */}
+        {/* ── 07 · where to look next ──────────────────────────────── */}
         {reporting && patterns!.signals.length > 0 && (
           <Section
-            index={6}
+            index={7}
             title="Where to look next"
             lead="Patterns the evidence layer found in the aggregate figures above. Each names the figures it is built from. None is a finding about a person, a cause, or a risk."
           >
@@ -318,14 +355,14 @@ export default async function CampaignOverviewPage({
 
         {/* ── roster ───────────────────────────────────────────────── */}
         <Section
-          index={identity.canReport ? 7 : 2}
-          title="Participants"
+          index={identity.canReport ? 8 : 3}
+          title="Who is on the roster"
           lead="Administrative status only. Individual wellbeing scores and answers are not available on this page, in this workspace, or to any role in this product. Completing the questionnaire does not make anybody's result visible."
           aside={`${participation.invited} on the roster`}
         >
           {participation.participants.length === 0 ? (
             <p className="text-sm text-slate">
-              No participants yet. Share the campaign&rsquo;s QR code or join link from Settings.
+              Nobody has joined yet. Share the QR code or link above.
             </p>
           ) : (
             <ul className="flex flex-col divide-y divide-hairline">

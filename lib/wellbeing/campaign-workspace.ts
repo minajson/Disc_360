@@ -10,6 +10,12 @@ import {
   type InstrumentKey,
   type InstrumentMetadata,
 } from "@/data/wellbeing-instruments";
+import {
+  lifecycleOf,
+  type CampaignLifecycle as CampaignLifecycleValue,
+} from "./campaign-lifecycle";
+import { campaignJoinPath } from "./campaigns";
+import { getPublicBaseUrl } from "@/lib/utils/site-url";
 
 /**
  * The Wellbeing Pulse CAMPAIGN workspace.
@@ -45,57 +51,63 @@ import {
 /* ── identity ───────────────────────────────────────────────────────── */
 
 /**
- * A campaign's lifecycle state, DERIVED from facts the schema already holds.
+ * A campaign's lifecycle state.
  *
- * Deliberately not a new status column. A stored status is a second source of
- * truth that drifts from the join token, the capacity control and the archive
- * flag the moment one of them changes without it, and a campaign that reports
- * "Active" while refusing every participant is worse than no status at all.
+ * ─────────────────────────────────────────────────────────────────────
+ * THIS USED TO BE DERIVED, AND THE DERIVATION WAS WRONG.
+ *
+ * The previous implementation computed a status from three unrelated facts —
+ * `teams.archived_at`, `teams.join_enabled`, and whether any session existed —
+ * on the reasoning that a stored status drifts from reality. In practice it
+ * derived the wrong reality: `join_enabled` is FALSE on every wellbeing roster
+ * by design (it is what stops `resolve_join_token` delivering a wellbeing
+ * participant into the DISC assessment), so every healthy campaign in
+ * production reported
+ *
+ *     Closed — "Joining is switched off."
+ *
+ * while admitting participants normally, and with no control anywhere to
+ * "switch it on" because there was nothing switched off.
+ *
+ * The state is now read from `wellbeing_campaigns.status`, which is the column
+ * `wellbeing_campaign_admits()` and `wellbeing_campaign_by_token()` actually
+ * enforce. There is exactly one source of truth, and it is the one the
+ * participant experiences.
+ * ─────────────────────────────────────────────────────────────────────
  */
-export type CampaignStatus = "draft" | "active" | "full" | "closed" | "archived";
-
-export const CAMPAIGN_STATUS_LABEL: Record<CampaignStatus, string> = {
-  draft: "Draft",
-  active: "Active",
-  full: "At capacity",
-  closed: "Closed",
-  archived: "Archived",
-};
-
-export const CAMPAIGN_STATUS_DETAIL: Record<CampaignStatus, string> = {
-  draft: "No one has taken part yet. The join link and QR code are live.",
-  active: "Open, and receiving responses.",
-  full: "Every pilot place has been taken. No further participant can join.",
-  closed: "Joining is switched off. Existing responses are unaffected.",
-  archived: "Archived. Kept for the record and no longer running.",
-};
+export type { CampaignLifecycle } from "./campaign-lifecycle";
 
 export interface CampaignIdentity {
+  /**
+   * The ROSTER team id — what every existing route, aggregate and cohort query
+   * is keyed by, and therefore what `/wellbeing/admin/campaigns/[teamId]`
+   * carries. Kept as `id` so those call sites are unchanged.
+   */
   id: string;
+  /** The `wellbeing_campaigns` row. Null only for a roster with no campaign. */
+  campaignId: string | null;
   name: string;
   organizationId: string;
   organizationName: string;
   instrumentKey: InstrumentKey | null;
   instrument: InstrumentMetadata | null;
-  teamCode: string;
+  /** The pinned questionnaire version's human label, e.g. "1.0". */
+  versionLabel: string | null;
+  /** True once anybody has answered: the questionnaire can no longer change. */
+  questionnaireLocked: boolean;
   capacity: number | null;
-  status: CampaignStatus;
+  lifecycle: CampaignLifecycleValue;
+  openedAt: string | null;
+  pausedAt: string | null;
+  closedAt: string | null;
+  expiresAt: string | null;
+  /** The participant join URL. Null when the campaign has no token to share. */
+  joinUrl: string | null;
   createdAt: string;
   /** Whether this viewer may see aggregate figures for this campaign. */
   canReport: boolean;
   /** Never true for a plain participant — used only for the escape route. */
   canOpenPlatform: boolean;
-}
-
-function deriveStatus(
-  team: { archived_at: string | null; join_enabled: boolean | null },
-  pilot: PilotStatus,
-  attempts: number,
-): CampaignStatus {
-  if (team.archived_at) return "archived";
-  if (team.join_enabled === false) return "closed";
-  if (pilot.isFull) return "full";
-  return attempts > 0 ? "active" : "draft";
 }
 
 /**
@@ -105,6 +117,15 @@ function deriveStatus(
  * legitimate. The wellbeing role is checked afterwards, through the caller's
  * own client, and only decides whether figures may be shown — never whether
  * the campaign may be administered.
+ *
+ * THE CAMPAIGN ROW IS THE AUTHORITY ON THE INSTRUMENT TOO.
+ *
+ * It has to be. The participant journey resolves instrument and version from
+ * `wellbeing_campaigns` (see `beginWellbeingPulse`), so a facilitator page
+ * that read the instrument from `teams` could show one questionnaire while the
+ * QR code served another. `teams.wellbeing_instrument_key` is kept in step by
+ * `setCampaignInstrumentAction` and is used only as a fallback for a roster
+ * that predates campaigns.
  */
 export async function loadCampaignIdentity(teamId: string): Promise<{
   identity: CampaignIdentity;
@@ -116,7 +137,7 @@ export async function loadCampaignIdentity(teamId: string): Promise<{
   const { data: team } = await admin
     .from("teams")
     .select(
-      "id, name, session_name, assessment_type, wellbeing_instrument_key, wellbeing_pilot_capacity, team_code, organization_id, archived_at, join_enabled, created_at, organizations (name)",
+      "id, name, session_name, assessment_type, wellbeing_instrument_key, wellbeing_pilot_capacity, organization_id, archived_at, created_at, organizations (name)",
     )
     .eq("id", teamId)
     .maybeSingle();
@@ -127,23 +148,45 @@ export async function loadCampaignIdentity(teamId: string): Promise<{
   // the same product-boundary failure in the opposite direction.
   if (team.assessment_type !== "wellbeing") notFound();
 
+  const { data: campaign } = await admin
+    .from("wellbeing_campaigns")
+    .select(
+      "id, name, status, instrument_key, version_id, participant_capacity, join_token, opened_at, paused_at, closed_at, expires_at, wellbeing_versions (version)",
+    )
+    .eq("team_id", teamId)
+    .maybeSingle();
+
+  const campaignInstrument = campaign?.instrument_key;
   const instrumentKey =
-    typeof team.wellbeing_instrument_key === "string" &&
-    isInstrumentKey(team.wellbeing_instrument_key)
-      ? team.wellbeing_instrument_key
-      : null;
+    typeof campaignInstrument === "string" && isInstrumentKey(campaignInstrument)
+      ? campaignInstrument
+      : typeof team.wellbeing_instrument_key === "string" &&
+          isInstrumentKey(team.wellbeing_instrument_key)
+        ? team.wellbeing_instrument_key
+        : null;
 
   const organizationId = team.organization_id as string;
   const organization = Array.isArray(team.organizations)
     ? team.organizations[0]
     : team.organizations;
+  const version = Array.isArray(campaign?.wellbeing_versions)
+    ? campaign?.wellbeing_versions[0]
+    : campaign?.wellbeing_versions;
 
-  const [pilot, { count: attempts }, canReport] = await Promise.all([
+  const [pilot, { count: answered }, canReport] = await Promise.all([
     readPilotStatus(teamId),
-    admin
-      .from("wellbeing_sessions")
-      .select("id", { count: "exact", head: true })
-      .eq("team_id", teamId),
+    // The lock the facilitator is shown is the one the DATABASE enforces:
+    // 00044's trigger counts sessions belonging to the campaign, so this
+    // counts the same thing rather than approximating it from the roster.
+    campaign
+      ? admin
+          .from("wellbeing_sessions")
+          .select("id", { count: "exact", head: true })
+          .eq("campaign_id", campaign.id)
+      : admin
+          .from("wellbeing_sessions")
+          .select("id", { count: "exact", head: true })
+          .eq("team_id", teamId),
     organizationId
       ? hasWellbeingRole(context, organizationId, "wellbeing_analyst").then(
           async (analyst) =>
@@ -152,31 +195,49 @@ export async function loadCampaignIdentity(teamId: string): Promise<{
       : Promise.resolve(false),
   ]);
 
+  // Archived is a filing state on the roster; the campaign's own status is
+  // everything else. A roster archived out from under a live campaign should
+  // still read as archived, so that one flag is honoured on top.
+  const lifecycle: CampaignLifecycleValue = team.archived_at
+    ? "archived"
+    : lifecycleOf(campaign?.status as string | undefined);
+
+  const joinToken = campaign?.join_token as string | undefined;
+
   return {
     pilot,
     identity: {
       id: teamId,
-      name: (team.session_name as string | null) || (team.name as string),
+      campaignId: (campaign?.id as string | undefined) ?? null,
+      name:
+        (campaign?.name as string | null) ||
+        (team.session_name as string | null) ||
+        (team.name as string),
       organizationId,
       organizationName: (organization as { name: string } | null)?.name ?? "Organisation",
       instrumentKey,
       instrument: instrumentKey ? INSTRUMENTS[instrumentKey] : null,
-      teamCode: team.team_code as string,
-      capacity: (team.wellbeing_pilot_capacity as number | null) ?? null,
-      status: deriveStatus(
-        {
-          archived_at: team.archived_at as string | null,
-          join_enabled: team.join_enabled as boolean | null,
-        },
-        pilot,
-        attempts ?? 0,
-      ),
+      versionLabel: (version as { version: string } | null)?.version ?? null,
+      questionnaireLocked: (answered ?? 0) > 0,
+      capacity:
+        (campaign?.participant_capacity as number | null) ??
+        (team.wellbeing_pilot_capacity as number | null) ??
+        null,
+      lifecycle,
+      openedAt: (campaign?.opened_at as string | null) ?? null,
+      pausedAt: (campaign?.paused_at as string | null) ?? null,
+      closedAt: (campaign?.closed_at as string | null) ?? null,
+      expiresAt: (campaign?.expires_at as string | null) ?? null,
+      joinUrl: joinToken
+        ? `${getPublicBaseUrl().url}${campaignJoinPath(joinToken)}`
+        : null,
       createdAt: team.created_at as string,
       canReport,
       canOpenPlatform: true,
     },
   };
 }
+
 
 /* ── participation administration ───────────────────────────────────── */
 
@@ -315,6 +376,99 @@ export async function loadCampaignParticipation(
       const [year, month] = quarter.split("-").map(Number);
       return describePeriod(new Date(Date.UTC(year!, month!, 1)).toISOString(), index + 1);
     }),
+  };
+}
+
+/* ── the live tally ─────────────────────────────────────────────────── */
+
+/**
+ * Five integers, and nothing else in the payload.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * WHY A SEPARATE READER FROM `loadCampaignParticipation`.
+ *
+ * This one is polled — by the SSE stream behind the facilitator's live panel —
+ * so it runs perhaps once every few seconds for as long as a facilitator has
+ * the page open. `loadCampaignParticipation` builds a named roster to render a
+ * list; re-fetching names on a timer to display four counters puts a workforce
+ * roster on the wire dozens of times an hour for no reason, and the safest
+ * payload is the one that never contains a name in the first place.
+ *
+ * WHY `joined` IS NOT SIMPLY THE ROSTER SIZE.
+ *
+ * The facilitator who creates a campaign is inserted onto its roster as a
+ * `team_admin` so they can administer it. Counting them as a participant makes
+ * every campaign report one person who will never complete, which drags the
+ * completion rate down permanently and is most visible on exactly the small
+ * campaigns where it matters — "0 of 1 completed" before anybody has scanned
+ * anything. An administrator who genuinely takes part has a session, and is
+ * counted from that.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export interface CampaignTally {
+  joined: number;
+  inProgress: number;
+  completed: number;
+  /** Completed over joined, to one decimal. Null when nobody has joined. */
+  completionRate: number | null;
+  /** Null when the campaign is uncapped. */
+  placesRemaining: number | null;
+}
+
+export async function loadCampaignTally(
+  teamId: string,
+  instrumentKey: InstrumentKey | null,
+  capacity: number | null,
+): Promise<CampaignTally> {
+  const admin = createSupabaseAdminClient();
+  const [{ data: members }, { data: sessions }] = await Promise.all([
+    admin.from("team_members").select("profile_id, role").eq("team_id", teamId),
+    admin
+      .from("wellbeing_sessions")
+      .select("profile_id, status, current_index, instrument_key")
+      .eq("team_id", teamId),
+  ]);
+
+  const attempts = (sessions ?? []).filter(
+    (session) => !instrumentKey || session.instrument_key === instrumentKey,
+  );
+
+  const furthest = new Map<string, { status: string; current_index: number }>();
+  for (const session of attempts) {
+    const profileId = session.profile_id as string;
+    const candidate = {
+      status: session.status as string,
+      current_index: (session.current_index as number) ?? 0,
+    };
+    const existing = furthest.get(profileId);
+    if (!existing || rank(candidate) > rank(existing)) furthest.set(profileId, candidate);
+  }
+
+  const participants = (members ?? []).filter((member) => {
+    const profileId = member.profile_id as string | null;
+    if (!profileId) return true;
+    // An administrator counts only once they have actually taken part.
+    return member.role !== "team_admin" || furthest.has(profileId);
+  });
+
+  let inProgress = 0;
+  let completed = 0;
+  for (const member of participants) {
+    const state = stateOf(
+      member.profile_id ? furthest.get(member.profile_id as string) : undefined,
+    );
+    if (state === "completed") completed += 1;
+    else if (state === "started" || state === "opened") inProgress += 1;
+  }
+
+  const joined = participants.length;
+
+  return {
+    joined,
+    inProgress,
+    completed,
+    completionRate: joined > 0 ? Math.round((completed / joined) * 1000) / 10 : null,
+    placesRemaining: capacity === null ? null : Math.max(0, capacity - joined),
   };
 }
 

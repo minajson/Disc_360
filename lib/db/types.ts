@@ -1397,6 +1397,81 @@ export type Database = {
           },
         ]
       }
+      organization_support_settings: {
+        Row: {
+          created_at: string
+          eap_email: string | null
+          eap_enabled: boolean
+          eap_hours: string | null
+          eap_phone: string | null
+          eap_provider_name: string | null
+          eap_url: string | null
+          oh_email: string | null
+          oh_enabled: boolean
+          oh_hours: string | null
+          oh_phone: string | null
+          oh_service_name: string | null
+          oh_url: string | null
+          organization_id: string
+          support_note: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          eap_email?: string | null
+          eap_enabled?: boolean
+          eap_hours?: string | null
+          eap_phone?: string | null
+          eap_provider_name?: string | null
+          eap_url?: string | null
+          oh_email?: string | null
+          oh_enabled?: boolean
+          oh_hours?: string | null
+          oh_phone?: string | null
+          oh_service_name?: string | null
+          oh_url?: string | null
+          organization_id: string
+          support_note?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          eap_email?: string | null
+          eap_enabled?: boolean
+          eap_hours?: string | null
+          eap_phone?: string | null
+          eap_provider_name?: string | null
+          eap_url?: string | null
+          oh_email?: string | null
+          oh_enabled?: boolean
+          oh_hours?: string | null
+          oh_phone?: string | null
+          oh_service_name?: string | null
+          oh_url?: string | null
+          organization_id?: string
+          support_note?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_support_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_support_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           archived_at: string | null
@@ -2122,8 +2197,10 @@ export type Database = {
           instrument_key: string
           join_token: string
           name: string
+          opened_at: string | null
           organization_id: string
           participant_capacity: number | null
+          paused_at: string | null
           status: Database["public"]["Enums"]["wellbeing_campaign_status"]
           team_id: string | null
           updated_at: string
@@ -2138,8 +2215,10 @@ export type Database = {
           instrument_key: string
           join_token: string
           name: string
+          opened_at?: string | null
           organization_id: string
           participant_capacity?: number | null
+          paused_at?: string | null
           status?: Database["public"]["Enums"]["wellbeing_campaign_status"]
           team_id?: string | null
           updated_at?: string
@@ -2154,8 +2233,10 @@ export type Database = {
           instrument_key?: string
           join_token?: string
           name?: string
+          opened_at?: string | null
           organization_id?: string
           participant_capacity?: number | null
+          paused_at?: string | null
           status?: Database["public"]["Enums"]["wellbeing_campaign_status"]
           team_id?: string | null
           updated_at?: string
@@ -3331,6 +3412,7 @@ export type Database = {
           team_name: string
         }[]
       }
+      takes_part_in_org: { Args: { org: string }; Returns: boolean }
       team_holds_assessment_work: {
         Args: { p_team_id: string }
         Returns: boolean
@@ -3450,7 +3532,12 @@ export type Database = {
       session_status: "in_progress" | "completed" | "abandoned"
       team_member_role: "member" | "team_admin"
       wellbeing_access_role: "wellbeing_governance" | "wellbeing_analyst"
-      wellbeing_campaign_status: "draft" | "active" | "closed" | "archived"
+      wellbeing_campaign_status:
+        | "draft"
+        | "active"
+        | "paused"
+        | "closed"
+        | "archived"
       wellbeing_content_status: "structure_only" | "licensed" | "retired"
       wellbeing_delivery_status:
         | "requested"
@@ -3652,7 +3739,13 @@ export const Constants = {
       session_status: ["in_progress", "completed", "abandoned"],
       team_member_role: ["member", "team_admin"],
       wellbeing_access_role: ["wellbeing_governance", "wellbeing_analyst"],
-      wellbeing_campaign_status: ["draft", "active", "closed", "archived"],
+      wellbeing_campaign_status: [
+        "draft",
+        "active",
+        "paused",
+        "closed",
+        "archived",
+      ],
       wellbeing_content_status: ["structure_only", "licensed", "retired"],
       wellbeing_delivery_status: [
         "requested",

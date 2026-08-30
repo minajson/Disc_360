@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { CampaignIdentity, CampaignPeriod } from "@/lib/wellbeing/campaign-workspace";
-import { CAMPAIGN_STATUS_DETAIL, CAMPAIGN_STATUS_LABEL } from "@/lib/wellbeing/campaign-workspace";
+import { LIFECYCLE_DETAIL } from "@/lib/wellbeing/campaign-lifecycle";
+import { LifecycleChip } from "./LifecycleChip";
 
 /**
  * The campaign workspace chrome.
@@ -20,10 +21,15 @@ import { CAMPAIGN_STATUS_DETAIL, CAMPAIGN_STATUS_LABEL } from "@/lib/wellbeing/c
  * than with a member count and an avatar row. Everything below it inherits
  * that framing.
  *
- * The escape route back to DISC360 is NOT repeated here. The Wellbeing Pulse
- * shell already carries exactly one, resolved server-side from memberships the
+ * The workspace switcher is NOT repeated here. The Wellbeing Pulse shell
+ * already carries exactly one, resolved server-side from memberships the
  * viewer actually holds; a second copy would be a second thing to get wrong,
  * and an ordinary participant must never see either.
+ *
+ * The status here is a CHIP, not the control. The operational panel that
+ * changes the campaign's state lives on Overview and Settings, where there is
+ * room for the transition, its consequence and its confirmation. A header
+ * shared by seven tabs is the wrong place to close a campaign from.
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -53,14 +59,6 @@ export const CAMPAIGN_TABS = [
 
 export type CampaignTab = (typeof CAMPAIGN_TABS)[number]["key"];
 
-const STATUS_TONE: Record<string, { background: string; color: string }> = {
-  active: { background: "var(--color-pulse-soft)", color: "var(--color-pulse-deep)" },
-  draft: { background: "var(--color-sand)", color: "var(--color-slate)" },
-  full: { background: "var(--color-pulse-attention-soft)", color: "#7a5510" },
-  closed: { background: "var(--color-sand)", color: "var(--color-slate)" },
-  archived: { background: "var(--color-sand)", color: "var(--color-slate)" },
-};
-
 export function CampaignHeader({
   identity,
   period,
@@ -75,10 +73,14 @@ export function CampaignHeader({
   completed: number;
   invited: number;
 }) {
-  const tone = STATUS_TONE[identity.status] ?? STATUS_TONE.draft!;
-
   return (
     <header className="flex flex-col gap-5">
+      <Link
+        href="/wellbeing/admin/campaigns"
+        className="pulse-focus w-fit rounded text-sm font-medium text-slate transition-colors hover:text-pulse"
+      >
+        ← All campaigns
+      </Link>
       <div className="flex flex-col gap-3">
         <p className="font-mono text-[11px] tracking-[0.18em] text-pulse-teal uppercase">
           {identity.organizationName} · Wellbeing Pulse campaign
@@ -89,15 +91,15 @@ export function CampaignHeader({
       </div>
 
       {/*
-        Instrument, wave, status and participation on one line. These four
+        Questionnaire, wave, status and participation on one line. These four
         qualify every number on every tab below, so they are chrome rather
         than a card someone can scroll past.
       */}
       <dl className="flex flex-wrap items-center gap-x-6 gap-y-3 border-y border-hairline py-3.5">
         <div className="flex items-baseline gap-2">
-          <dt className="sr-only">Instrument</dt>
+          <dt className="sr-only">Questionnaire</dt>
           <dd className="text-sm font-medium text-ink">
-            {identity.instrument?.name ?? "No instrument selected"}
+            {identity.instrument?.name ?? "No questionnaire chosen"}
           </dd>
         </div>
 
@@ -114,14 +116,8 @@ export function CampaignHeader({
 
         <div className="flex items-baseline gap-2">
           <dt className="sr-only">Status</dt>
-          <dd>
-            <span
-              className="rounded-full px-2.5 py-1 text-xs font-medium"
-              style={{ background: tone.background, color: tone.color }}
-              title={CAMPAIGN_STATUS_DETAIL[identity.status]}
-            >
-              {CAMPAIGN_STATUS_LABEL[identity.status]}
-            </span>
+          <dd title={LIFECYCLE_DETAIL[identity.lifecycle]}>
+            <LifecycleChip lifecycle={identity.lifecycle} />
           </dd>
         </div>
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { WELLBEING_PRODUCT_NAME } from "@/data/wellbeing-content";
+import { ProductSwitcher } from "./ProductSwitcher";
 
 /**
  * Wellbeing Pulse chrome.
@@ -10,11 +11,14 @@ import { WELLBEING_PRODUCT_NAME } from "@/data/wellbeing-content";
  * team comparison, no platform administration, and no route back into the
  * wider product.
  *
- * `showPlatformLink` is the one exception, and it is deliberately narrow: a
- * person who already holds facilitator, coach or platform scope gets a single
- * restrained escape hatch. It is resolved server-side in the layout from
- * memberships the person actually holds — an ordinary participant cannot be
- * given it by a prop, a query string or a client-side toggle.
+ * `showSwitcher` is the one exception, and it is deliberately narrow: a person
+ * who already holds facilitator, coach or platform scope gets a workspace
+ * switcher. It is resolved server-side in the layout from memberships the
+ * person actually holds — an ordinary participant cannot be given it by a
+ * prop, a query string or a client-side toggle.
+ *
+ * It is a SWITCHER and not a link to the other product by name. Wellbeing
+ * Pulse chrome does not advertise DISC360 anywhere; see `ProductSwitcher`.
  */
 
 export interface PulseNavItem {
@@ -83,12 +87,12 @@ export function PulseMark({
 
 export function PulseHeader({
   links = [],
-  showPlatformLink = false,
+  showSwitcher = false,
   homeHref = "/wellbeing",
 }: {
   links?: PulseNavItem[];
   /** Only ever true for an existing facilitator, coach or platform admin. */
-  showPlatformLink?: boolean;
+  showSwitcher?: boolean;
   homeHref?: string;
 }) {
   return (
@@ -115,17 +119,10 @@ export function PulseHeader({
           </nav>
         )}
 
-        {showPlatformLink && (
-          <Link
-            href="/app"
-            className={`pulse-focus shrink-0 rounded-full border border-[rgba(31,78,95,0.2)] px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-slate transition-colors hover:border-pulse hover:text-pulse sm:px-3 ${
-              links.length > 0 ? "" : "ml-auto"
-            }`}
-          >
-            {/* Shortened on a phone so the row never clips. */}
-            <span className="hidden sm:inline">Open DISC360 →</span>
-            <span className="sm:hidden">DISC360 →</span>
-          </Link>
+        {showSwitcher && (
+          <div className={links.length > 0 ? "" : "ml-auto"}>
+            <ProductSwitcher />
+          </div>
         )}
       </div>
     </header>
@@ -141,10 +138,11 @@ export function PulseFooter({ disclaimer }: { disclaimer?: string } = {}) {
     <footer className="mt-auto border-t border-[rgba(31,78,95,0.14)] px-5 py-8 sm:px-8">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 text-xs leading-relaxed text-slate">
         {/*
-          Instrument-neutral by default. The platform runs four instruments,
-          and naming one of them in shared chrome would put "GHQ-12 is a
-          screening questionnaire" underneath a DISC360 Wellbeing result. A
-          surface that knows its instrument passes that instrument's wording.
+          Questionnaire-neutral by default. The platform runs four
+          questionnaires, and naming one of them in shared chrome would put
+          "GHQ-12 is a screening questionnaire" underneath a Wellbeing Pulse
+          result. A surface that knows which one it is showing passes that
+          questionnaire's own wording.
         */}
         <p className="font-medium text-ink">{disclaimer ?? WELLBEING_SHELL_DISCLAIMER}</p>
         <p>

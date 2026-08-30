@@ -264,10 +264,9 @@ test("the management-surface gate demands elevated scope and redirects", () => {
   assert.match(fn, /redirect\("\/wellbeing"\)/, "everyone else is redirected, not refused");
 });
 
-test("the participant shell never links to a management demo route", () => {
+test("no participant surface links to a management route", () => {
   for (const path of [
     "components/wellbeing/PulseChrome.tsx",
-    "app/(wellbeing)/layout.tsx",
     "app/(wellbeing)/wellbeing/page.tsx",
     "app/(wellbeing)/wellbeing/history/page.tsx",
     "app/(wellbeing)/wellbeing/result/[resultId]/page.tsx",
@@ -278,6 +277,31 @@ test("the participant shell never links to a management demo route", () => {
       `${path} must not expose a management route to participants`,
     );
   }
+});
+
+test("the shell offers Campaigns only to somebody who runs one", () => {
+  // A facilitator needs the campaign list in the navigation — burying the
+  // product's central object at the bottom of a settings page is what this
+  // link exists to fix. A participant must still never see it, and the gate
+  // is resolved on the SERVER from memberships, not from a prop or a search
+  // parameter.
+  const layout = code("app/(wellbeing)/layout.tsx");
+
+  const link = layout.indexOf("/wellbeing/admin/campaigns");
+  assert.ok(link > -1, "a facilitator must be able to reach their campaigns");
+
+  const guarded = layout.slice(Math.max(0, link - 120), link);
+  assert.match(guarded, /if \(runsCampaigns\)/, "the campaigns link must be conditional");
+
+  assert.match(
+    layout,
+    /const runsCampaigns =\s*\n?\s*profile\.is_super_admin/,
+    "and the condition must be computed from server-resolved memberships",
+  );
+
+  // Team administration of a DISC team is not a reason to be shown a wellbeing
+  // campaign list, so the membership lookup that grants it is instrument-typed.
+  assert.match(layout, /assessment_type", "wellbeing"/);
 });
 
 /* ── the facilitator never sees a score ─────────────────────────────── */

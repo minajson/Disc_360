@@ -227,6 +227,62 @@ export async function setCampaignInstrumentAction(
     };
   }
 
+  const admin = createSupabaseAdminClient();
+
+  /*
+   * ───────────────────────────────────────────────────────────────────
+   * THE CAMPAIGN ROW IS WHAT THE QR CODE SERVES, SO IT MUST MOVE TOO.
+   *
+   * This action used to update `teams.wellbeing_instrument_key` alone. But
+   * the participant journey resolves its instrument and its pinned version
+   * from `wellbeing_campaigns` — see `beginWellbeingPulse` — so changing the
+   * instrument here left the campaign pinned to the OLD instrument's version.
+   * A facilitator switched their campaign to WHO-5, the settings page agreed,
+   * and everybody who scanned the code was still served GHQ-12.
+   *
+   * So the new instrument's active licensed version is re-pinned in the same
+   * operation. 00044's trigger refuses the change outright once anybody has
+   * answered, which is the lock this page reports rather than reimplements.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  const { data: campaign } = await admin
+    .from("wellbeing_campaigns")
+    .select("id, instrument_key")
+    .eq("team_id", teamId as string)
+    .maybeSingle();
+
+  if (campaign && campaign.instrument_key !== requested) {
+    const { data: version } = await admin
+      .from("wellbeing_versions")
+      .select("id")
+      .eq("instrument_key", requested)
+      .eq("is_active", true)
+      .eq("content_status", "licensed")
+      .maybeSingle();
+
+    if (!version) {
+      return {
+        ok: false,
+        message: `${REGISTRY[requested].name} has no licensed, active questionnaire version to use.`,
+      };
+    }
+
+    const { error: campaignError } = await admin
+      .from("wellbeing_campaigns")
+      .update({ instrument_key: requested, version_id: version.id })
+      .eq("id", campaign.id);
+
+    if (campaignError) {
+      // 00044's freeze trigger raises a check_violation naming the campaign
+      // and the number of sessions. Neither belongs in front of a facilitator.
+      return {
+        ok: false,
+        message:
+          "This campaign already has responses, so its questionnaire cannot be changed. Create a new campaign to run a different one.",
+      };
+    }
+  }
+
   const { error } = await context.supabase
     .from("teams")
     .update({ wellbeing_instrument_key: requested })
@@ -239,12 +295,11 @@ export async function setCampaignInstrumentAction(
     return {
       ok: false,
       message: locked
-        ? "This campaign already has participant attempts, so its instrument cannot be changed. Create a new campaign to run a different instrument."
-        : "Could not set the instrument for this campaign.",
+        ? "This campaign already has responses, so its questionnaire cannot be changed. Create a new campaign to run a different one."
+        : "Could not set the questionnaire for this campaign.",
     };
   }
 
-  const admin = createSupabaseAdminClient();
   await admin.from("audit_logs").insert({
     actor_id: context.user.id,
     action: "wellbeing.campaign_instrument_set",
@@ -254,6 +309,7 @@ export async function setCampaignInstrumentAction(
   });
 
   revalidatePath(`/wellbeing/admin/campaigns/${teamId as string}`);
+  revalidatePath(`/wellbeing/admin/campaigns/${teamId as string}/settings`);
   revalidatePath("/wellbeing/analytics");
   return { ok: true, message: `${REGISTRY[requested].name} selected for this campaign.` };
 }

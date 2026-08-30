@@ -46,6 +46,33 @@
   --color-pulse-attention: #8a6a2f;
   --color-pulse-attention-soft: #f0e7d5;
 
+  /* ── Wellbeing · semantic reading states ────────────────── */
+  /* WHAT THESE MEAN, AND WHAT THEY DO NOT.
+     Colour here reports where a reading sits in ITS OWN instrument's
+     favourable-to-unfavourable direction — never "high is good". WHO-5
+     counts upward and GHQ counts downward, so the same number is a
+     different state in each; `lib/wellbeing/semantics.ts` decides which,
+     and this palette only renders the decision.
+     Deliberately low-chroma and deliberately not a traffic light: no red
+     appears anywhere in a wellbeing surface, because a screening figure is
+     a prompt to look, never an alarm about a person.
+     COLOUR IS NEVER THE ONLY SIGNAL. Every use is paired with an arrow, a
+     label, a value or a pattern — see components/wellbeing/analytics. */
+  --color-pulse-positive: #2f6f5c;
+  --color-pulse-positive-soft: #dbeae2;
+  --color-pulse-steady: #47707d;
+  --color-pulse-steady-soft: #dfe9ec;
+  --color-pulse-watch: #8a6a2f;
+  --color-pulse-watch-soft: #f0e7d5;
+  /* One step warmer than `watch`, and still not red. */
+  --color-pulse-focus-area: #9a5836;
+  --color-pulse-focus-area-soft: #f2e0d5;
+  /* Withheld for confidentiality, and "not enough responses yet" — two
+     different reasons to show no figure, both rendered as absence rather
+     than as a state of the workforce. */
+  --color-pulse-withheld: #8b948f;
+  --color-pulse-withheld-soft: #eceeed;
+
   /* ── typography ─────────────────────────────────────────── */
   --font-display: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
