@@ -273,7 +273,38 @@ test("presentation mode shows no participant and no navigation", async ({ page }
   // It is a deck: keyboard-driven, with a slide count.
   await expect(page.getByText(/\d+ \/ \d+/)).toBeVisible();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByText("Participation and coverage")).toBeVisible();
+
+  /*
+   * Asserted by REACHABILITY, not by position.
+   *
+   * This used to expect "Participation and coverage" on the second slide, so
+   * inserting the room slide — the QR people scan, with live counts beside it
+   * — broke a test about privacy for a reason that had nothing to do with
+   * privacy. What matters is that the deck advances and that the participation
+   * slide exists somewhere in it.
+   */
+  await expect(page.getByText(/\d+ \/ \d+/)).toContainText(/^(?!1 \/)/);
+
+  const headings: string[] = [];
+  for (let step = 0; step < 12; step += 1) {
+    headings.push(await page.locator("main").innerText());
+    await page.keyboard.press("ArrowRight");
+    await page.waitForTimeout(150);
+  }
+  // `innerText` returns CSS-transformed text, and the deck's eyebrows are
+  // uppercased in the stylesheet — so these are matched case-insensitively
+  // rather than against the casing that happens to be in the source.
+  const deck = headings.join("\n");
+  expect(deck, `the deck must reach participation and coverage. Deck was:\n${deck}`).toMatch(
+    /participation and coverage/i,
+  );
+
+  // A campaign that is OPEN puts the code people scan on a slide of its own.
+  expect(deck, "an open campaign projects its join code").toMatch(/scan to join/i);
+
+  // And nowhere in the whole deck does a participant appear.
+  expect(deck).not.toContain("Demo Participant");
+  expect(deck).not.toMatch(/@[a-z0-9.-]+\.[a-z]{2,}/i);
 });
 
 /* ── the DISC dashboard entry is a workspace, not an assessment ─────── */

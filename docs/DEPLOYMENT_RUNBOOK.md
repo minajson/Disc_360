@@ -142,23 +142,62 @@ env vars set — no extra configuration. Session persistence is cookie-based via
 
 ## Phase 6 — email (Resend)
 
-1. Resend → **API Keys** → create → set `RESEND_API_KEY` in Netlify.
-2. `EMAIL_FROM`: until a verified DISC360 domain exists, use Resend's shared
-   `onboarding@resend.dev` sender (test-mode delivery is limited) **and set a
-   Reply-To of `minajjumbo@gmail.com`** so replies reach you. Wire this in
-   `lib/email/send.ts` (see below).
-3. To send from a branded address, verify a domain in Resend (adds DKIM/SPF DNS
-   records — **this is the slow, start-early step**), then set
-   `EMAIL_FROM="DISC360 <notifications@yourdomain>"`.
-4. Templates already implemented: invitation, password reset (Supabase Auth),
-   verification (Supabase Auth), assessment completed / report ready, team
-   reminder. Product emails send only when `RESEND_API_KEY` is set; otherwise
-   they are logged to `notification_logs`.
+**Production is on Vercel** (`disc-360`, alias `https://disc-360.vercel.app`).
+Set these in **Vercel → Project → Settings → Environment Variables →
+Production** (and Preview, if preview deployments should send at all — they
+should usually not).
 
-**Verify by receiving a real email** — trigger a report-ready or an invitation
-and confirm it lands in an inbox. Do not mark email PASS from logs alone.
+### The three variables, exactly
 
----
+| Variable | Required? | Format | Example |
+|---|---|---|---|
+| `RESEND_API_KEY` | **Yes — nothing sends without it** | Resend secret key, `re_` + token | `re_XXXXXXXX_XXXXXXXXXXXXXXXXXXXXXXXX` |
+| `EMAIL_FROM` | **Yes** | RFC-5322 mailbox, `Name <address>` | `Wellbeing Pulse <notifications@yourdomain.com>` |
+| `EMAIL_REPLY_TO` | Recommended | bare address | `wellbeing@yourdomain.com` |
+
+Notes that matter:
+
+- `EMAIL_FROM` **must be an address on a domain verified in Resend**, or Resend
+  rejects the send and the participant is told (correctly) that it failed.
+  Until a domain is verified, the only address that will deliver is Resend's
+  shared `onboarding@resend.dev`, and that is test-mode only — it will not
+  reach arbitrary recipients.
+- Verifying a domain adds DKIM/SPF DNS records and is the slow step. Start it
+  before you need it.
+- `EMAIL_REPLY_TO` exists because a wellbeing participant who replies to their
+  report notification must reach a human. Without it, replies go nowhere.
+- **Nothing about email is secret except `RESEND_API_KEY`.** It must never
+  appear in `netlify.toml`, `vercel.json`, the repo, or a client bundle.
+
+### What the product does without them
+
+`lib/email/send.ts` records every message in `notification_logs` with status
+`logged` and returns `logged` rather than `sent`. The participant is told "We
+could not send your report just now. Nothing was sent, and you can still
+download it here." — the outcome shown is the outcome that happened.
+`wellbeing_report_deliveries` records `not_delivered` with the reason.
+
+`/admin/emails` now shows a banner naming exactly which variables are missing,
+so this state is visible in the product rather than only in a log.
+
+### Verifying once the key is set
+
+Do **not** mark email as passing from logs alone.
+
+1. `/admin/emails` — the "Email not fully configured" banner must be gone.
+2. Complete a check-in and press **Email my report**. The state must read
+   *"Report sent. We've sent a copy to n\*\*\*@example.com."* — a masked
+   address, from the provider's own confirmation.
+3. Receive the message in a real inbox and open the report link.
+4. `notification_logs` must show `sent` with a `provider_id`, and
+   `wellbeing_report_deliveries` must show `sent`.
+5. Repeat for all four questionnaires — the report body differs per
+   questionnaire and each is built from its own content.
+6. Press the button twice quickly: the button is disabled while a send is in
+   flight, so exactly one row must appear.
+7. Confirm no questionnaire answer, score or item response appears anywhere in
+   `notification_logs` or `wellbeing_report_deliveries` — the delivery record
+   carries a masked recipient and a status, and nothing else.
 
 ## Phase 7 — Netlify
 
@@ -177,8 +216,9 @@ here, never in netlify.toml or git:**
 | `SUPABASE_SERVICE_ROLE_KEY` | **secret** service-role key |
 | `NEXT_PUBLIC_SITE_URL` | `https://<netlify-domain>` |
 | `SITE_URL` | `https://<netlify-domain>` (runtime; must match) |
-| `RESEND_API_KEY` | **secret** Resend key |
-| `EMAIL_FROM` | branded sender or `onboarding@resend.dev` |
+| `RESEND_API_KEY` | **secret** Resend key — see Phase 6 |
+| `EMAIL_FROM` | `Name <address@verified-domain>` — see Phase 6 |
+| `EMAIL_REPLY_TO` | bare address a human reads — see Phase 6 |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | when configured |
 | `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` / `AZURE_TENANT_URL` | when configured |
 

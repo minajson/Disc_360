@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "node --test lib/scoring/*.test.ts lib/teams/*.test.ts lib/utils/*.test.ts lib/navigation/*.test.ts lib/auth/*.test.ts lib/join/*.test.ts lib/presentations/*.test.ts lib/visuals/*.test.ts lib/insights/*.test.ts lib/history/*.test.ts lib/ai/*.test.ts lib/reports/*.test.ts lib/identity/*.test.ts lib/wellbeing/*.test.ts data/*.test.ts",
+    "test": "node --test lib/scoring/*.test.ts lib/teams/*.test.ts lib/utils/*.test.ts lib/navigation/*.test.ts lib/auth/*.test.ts lib/join/*.test.ts lib/presentations/*.test.ts lib/visuals/*.test.ts lib/insights/*.test.ts lib/history/*.test.ts lib/ai/*.test.ts lib/reports/*.test.ts lib/identity/*.test.ts lib/wellbeing/*.test.ts lib/email/*.test.ts data/*.test.ts",
     "test:e2e": "playwright test",
     "media:guide": "node scripts/generate-media-guide.ts"
   },

@@ -423,6 +423,24 @@ test("dimension extremes appear only where the questionnaire ranks them", () => 
   );
 });
 
+test("equal medians produce no highest and no lowest", () => {
+  // Every dimension at the same figure is a real state — a small or evenly
+  // answered cohort — and naming an extreme there asserts a difference the
+  // data does not contain.
+  const flat = buildExecutiveHighlights(
+    input({
+      instrumentKey: "disc360_wellbeing_v1",
+      threshold: null,
+      dimensionExtremes: {
+        highest: { label: "Capacity", median: 63 },
+        lowest: { label: "Everyday Wellbeing", median: 63 },
+        max: 100,
+      },
+    }),
+  );
+  assert.ok(!flat.some((h) => h.key.startsWith("dimension:")));
+});
+
 test("a questionnaire with no threshold is given no configured-level fact", () => {
   const none = buildExecutiveHighlights(
     input({ instrumentKey: "disc360_wellbeing_v1", threshold: null }),

@@ -797,7 +797,8 @@ async function DimensionProfileSection({
       {/* Highest and lowest are named only where the questionnaire's own
           dimensions are designed to be read as a ranked shape. GHQ-28's
           sections are not, so `rankable` is false and nothing is named. */}
-      {view.rankable && view.highest && view.lowest && (
+      {/* Equal medians are not extremes — see `buildExecutiveHighlights`. */}
+      {view.rankable && view.highest && view.lowest && view.highest.median !== view.lowest.median && (
         <dl className="grid gap-x-8 gap-y-4 border-t border-hairline pt-6 sm:grid-cols-2">
           <div>
             <dt className="font-mono text-[10px] tracking-[0.14em] text-faint uppercase">

@@ -3,6 +3,7 @@ import { requireSuperAdmin } from "@/lib/auth/guards";
 import { createSupabaseAdminClient } from "@/lib/db/admin";
 import { AdminSearch, Pager, StatusBadge } from "@/components/admin/table";
 import { Eyebrow } from "@/components/ui/Eyebrow";
+import { describeEmailReadiness, readEmailReadiness } from "@/lib/email/readiness";
 
 export const metadata: Metadata = { title: "Emails · Admin" };
 
@@ -38,6 +39,16 @@ export default async function AdminEmailsPage({
 
   const pageCount = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
 
+  /*
+   * WHY the log looks the way it does.
+   *
+   * Without a provider key every row here reads `logged` and nothing is
+   * delivered — which is correct behaviour and completely silent about the
+   * cause. In production that state persisted unnoticed. The banner names the
+   * missing variables; it never prints their values.
+   */
+  const email = readEmailReadiness();
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1.5">
@@ -46,6 +57,27 @@ export default async function AdminEmailsPage({
           {count ?? 0} notification{(count ?? 0) === 1 ? "" : "s"}
         </h1>
       </div>
+
+      {email.missing.length > 0 && (
+        <section
+          aria-label="Email configuration"
+          className="flex flex-col gap-2 rounded-2xl border border-[rgba(169,118,20,0.32)] bg-[rgba(169,118,20,0.07)] px-5 py-4"
+        >
+          <p className="font-mono text-[11px] tracking-[0.16em] text-[#7a5510] uppercase">
+            Email not fully configured
+          </p>
+          <p className="text-sm leading-relaxed text-slate">
+            {describeEmailReadiness(email)}
+          </p>
+          <p className="font-mono text-xs text-slate">
+            Missing: {email.missing.join(" · ")}
+          </p>
+          <p className="text-xs leading-relaxed text-faint">
+            Sending as {email.sender}
+            {email.hasReplyTo ? " with a Reply-To set" : " with no Reply-To"}.
+          </p>
+        </section>
+      )}
 
       <AdminSearch
         placeholder="Search recipient…"

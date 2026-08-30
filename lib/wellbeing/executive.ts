@@ -256,7 +256,17 @@ export function buildExecutiveHighlights(input: ExecutiveInput): ExecutiveHighli
   }
 
   const extremes = input.dimensionExtremes;
-  if (extremes?.highest && extremes.lowest) {
+  /*
+   * Equal medians are not extremes.
+   *
+   * Where every dimension sits at the same figure — which happens on a small
+   * or evenly-answered cohort — "highest: Capacity, 63" beside "lowest:
+   * Everyday Wellbeing, 63" asserts a difference the data does not contain,
+   * and a reader will act on the labels rather than on the identical numbers.
+   * The profile below still publishes every dimension; only the superlative
+   * is withheld.
+   */
+  if (extremes?.highest && extremes.lowest && extremes.highest.median !== extremes.lowest.median) {
     // Only reached for a questionnaire whose dimensions share one scale and
     // are designed to be read as a shape — Wellbeing Pulse V1 today.
     highlights.push({
