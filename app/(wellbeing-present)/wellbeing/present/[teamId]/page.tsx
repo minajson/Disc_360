@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { loadCampaignReporting } from "@/lib/wellbeing/campaign-workspace";
-import { LIFECYCLE_LABEL } from "@/lib/wellbeing/campaign-lifecycle";
+import { admitsParticipants, LIFECYCLE_LABEL } from "@/lib/wellbeing/campaign-lifecycle";
 import { buildWellbeingDeck } from "@/lib/wellbeing/presentation";
 import { DeckView } from "@/components/wellbeing/present/DeckView";
 import { ILLUSTRATIVE_DATA_BANNER } from "@/lib/wellbeing/demo-population";
@@ -81,6 +81,11 @@ export default async function WellbeingPresentationPage({
     invited: headline.invited,
     completedParticipants: headline.completed,
     participationPercent: headline.participation,
+    // The room slide, and only for a campaign that will actually admit
+    // somebody: projecting a QR for a paused or closed campaign invites a room
+    // to scan something that refuses them.
+    joinUrl: admitsParticipants(identity.lifecycle) ? identity.joinUrl : null,
+    teamId,
   });
 
   return (

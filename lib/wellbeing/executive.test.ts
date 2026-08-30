@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
+  buildExecutiveHighlights,
   buildExecutiveTiles,
   buildInsights,
   describeSpread,
@@ -344,5 +345,121 @@ test("no part of the executive reading is model-generated", () => {
       !source.includes(forbidden),
       `the executive reading must be derived, not generated (found ${forbidden})`,
     );
+  }
+});
+
+/* ── the secondary facts ────────────────────────────────────────────── */
+
+const withMovement = (over: Partial<ExecutiveInput> = {}) =>
+  input({
+    cohortMovements: [
+      {
+        dimensionLabel: "Department / Function",
+        cohorts: [
+          { label: "Operations", delta: -6 },
+          { label: "Finance", delta: 1 },
+          { label: "Engineering", delta: 0 },
+          { label: "Withheld group", delta: null },
+        ],
+      },
+    ],
+    ...over,
+  });
+
+test("largest movement is a highlight; highest and lowest group never are", () => {
+  const highlights = buildExecutiveHighlights(withMovement());
+  const movement = highlights.find((h) => h.key.startsWith("movement:"))!;
+  assert.equal(movement.value, "Operations");
+  assert.match(movement.detail, /-6 points/);
+
+  // A league table is the one thing this panel must not become.
+  for (const highlight of highlights) {
+    assert.doesNotMatch(
+      `${highlight.label} ${highlight.value} ${highlight.detail}`,
+      /\b(best|worst|top|bottom|poorest|healthiest|ranked)\b/i,
+    );
+  }
+});
+
+test("one movable group is not a comparison", () => {
+  const highlights = buildExecutiveHighlights(
+    input({
+      cohortMovements: [
+        { dimensionLabel: "Team", cohorts: [{ label: "Only one", delta: -6 }] },
+      ],
+    }),
+  );
+  assert.ok(!highlights.some((h) => h.key.startsWith("movement:")));
+});
+
+test("dimension extremes appear only where the questionnaire ranks them", () => {
+  // Wellbeing Pulse V1: six dimensions on one scale, designed to be read as a
+  // shape — the profile supplies extremes.
+  const ranked = buildExecutiveHighlights(
+    input({
+      instrumentKey: "disc360_wellbeing_v1",
+      threshold: null,
+      dimensionExtremes: {
+        highest: { label: "Connection & Safety", median: 71 },
+        lowest: { label: "Recovery & Demand", median: 54 },
+        max: 100,
+      },
+    }),
+  );
+  assert.ok(ranked.some((h) => h.key === "dimension:highest"));
+  assert.match(ranked.find((h) => h.key === "dimension:lowest")!.detail, /Median 54 of 100/);
+
+  // GHQ-28: the profile withholds the superlative, so none is rendered.
+  const unranked = buildExecutiveHighlights(
+    input({ instrumentKey: "ghq28", dimensionExtremes: { highest: null, lowest: null, max: 7 } }),
+  );
+  assert.ok(!unranked.some((h) => h.key.startsWith("dimension:")));
+
+  // And a questionnaire with no dimensions at all supplies nothing.
+  assert.ok(
+    !buildExecutiveHighlights(input({ instrumentKey: "ghq12" })).some((h) =>
+      h.key.startsWith("dimension:"),
+    ),
+  );
+});
+
+test("a questionnaire with no threshold is given no configured-level fact", () => {
+  const none = buildExecutiveHighlights(
+    input({ instrumentKey: "disc360_wellbeing_v1", threshold: null }),
+  );
+  assert.ok(!none.some((h) => h.key === "threshold"));
+
+  // And where there IS one, it is described in that questionnaire's direction.
+  assert.match(
+    buildExecutiveHighlights(input({ instrumentKey: "ghq12", threshold: 4 })).find(
+      (h) => h.key === "threshold",
+    )!.detail,
+    /at or above/i,
+  );
+  assert.match(
+    buildExecutiveHighlights(
+      input({ instrumentKey: "who5", threshold: 50, median: 66, previousMedian: 70 }),
+    ).find((h) => h.key === "threshold")!.detail,
+    /below/i,
+  );
+});
+
+test("groups that did not move are named as unchanged, never as 'stable'", () => {
+  const insights = buildInsights(withMovement());
+  const steady = insights.filter((insight) => /same median/.test(insight.text));
+  assert.equal(steady.length, 1);
+  assert.match(steady[0]!.text, /Engineering/);
+  // "Broadly stable" is a judgement about magnitude; "unchanged" is arithmetic.
+  assert.doesNotMatch(steady[0]!.text, /stable|steady|healthy|fine/i);
+  assert.match(steady[0]!.basis, /1 of 4 groups unchanged/);
+});
+
+test("every highlight and stability sentence passes the language screen", () => {
+  const texts = [
+    ...buildExecutiveHighlights(withMovement()).flatMap((h) => [h.label, h.value, h.detail]),
+    ...buildInsights(withMovement()).map((i) => i.text),
+  ];
+  for (const text of texts) {
+    assert.deepEqual(screenWellbeingCopy(text), [], `unsafe: "${text}"`);
   }
 });

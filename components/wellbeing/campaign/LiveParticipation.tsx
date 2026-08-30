@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePrefersReducedMotion } from "@/lib/motion/preferences";
+import { AnimatedNumber } from "@/components/wellbeing/analytics/AnimatedNumber";
 import type { CampaignTally } from "@/lib/wellbeing/campaign-workspace";
 
 /**
@@ -24,10 +24,11 @@ import type { CampaignTally } from "@/lib/wellbeing/campaign-workspace";
  * MOTION.
  *
  * A counter that changes gets one short flash of its own background and counts
- * up to the new figure over 400ms. That is the entire animation budget: a
- * number that pulses forever is a number nobody reads twice, and this panel
- * lives on screen for the length of a session. Under
- * `prefers-reduced-motion` the figure simply changes.
+ * up to the new figure. That is the entire animation budget: a number that
+ * pulses forever is a number nobody reads twice, and this panel lives on
+ * screen for the length of a session. The counting itself is
+ * `AnimatedNumber`, shared with the executive tiles so there is one
+ * implementation and not two.
  *
  * DEGRADATION.
  *
@@ -116,7 +117,7 @@ export function LiveParticipation({
               {stat.label}
             </dt>
             <dd className="font-display text-[clamp(1.6rem,3.8vw,2.15rem)] leading-none font-semibold text-ink tabular-nums">
-              <Counter value={stat.value} />
+              <AnimatedNumber value={stat.value} />
             </dd>
             {stat.hint && <p className="text-xs text-slate">{stat.hint}</p>}
           </div>
@@ -134,50 +135,4 @@ export function LiveParticipation({
       </p>
     </div>
   );
-}
-
-/**
- * Counts from the previous figure to the new one.
- *
- * Only for values that are actually numbers: "Unrestricted" and "—" are
- * rendered straight through rather than animated character by character.
- *
- * The animated text is stored WITH the value it belongs to, and the render
- * falls back to the incoming value whenever the two disagree. That is what
- * keeps this free of a synchronising `setState` in the effect body — there is
- * nothing to reset, because a frame from the previous figure simply stops
- * matching.
- */
-function Counter({ value }: { value: string }) {
-  const reduced = usePrefersReducedMotion();
-  const [frameText, setFrameText] = useState<{ of: string; text: string } | null>(null);
-  const from = useRef(value);
-  const frame = useRef<number | null>(null);
-
-  useEffect(() => {
-    const to = Number(value);
-    const previous = Number(from.current);
-    from.current = value;
-
-    if (reduced || !Number.isFinite(to) || !Number.isFinite(previous) || previous === to) {
-      return;
-    }
-
-    const start = performance.now();
-    const DURATION = 400;
-    const step = (now: number) => {
-      const t = Math.min(1, (now - start) / DURATION);
-      // Ease-out: the figure arrives rather than skidding to a halt.
-      const eased = 1 - (1 - t) * (1 - t);
-      setFrameText({ of: value, text: String(Math.round(previous + (to - previous) * eased)) });
-      if (t < 1) frame.current = requestAnimationFrame(step);
-    };
-    frame.current = requestAnimationFrame(step);
-
-    return () => {
-      if (frame.current !== null) cancelAnimationFrame(frame.current);
-    };
-  }, [value, reduced]);
-
-  return <>{frameText?.of === value ? frameText.text : value}</>;
 }

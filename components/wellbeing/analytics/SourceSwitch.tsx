@@ -22,6 +22,17 @@ import type { AnalyticsSource } from "@/lib/wellbeing/analytics";
  * tool and its option simply does not render anywhere else.
  */
 
+/** The sources on offer, so the filter bar and this switch cannot drift. */
+export function analyticsSourceOptions(
+  fixtureOffered: boolean,
+): { key: AnalyticsSource; label: string }[] {
+  return [
+    { key: "live", label: "Live pilot" },
+    { key: "demo", label: "Analytics demo" },
+    ...(fixtureOffered ? [{ key: "fixture" as const, label: "Local fixture" }] : []),
+  ];
+}
+
 const BANNER: Partial<Record<AnalyticsSource, { label: string; note: string }>> = {
   demo: { label: ILLUSTRATIVE_DATA_BANNER, note: DEMO_SOURCE_NOTE },
   fixture: { label: LOCAL_FIXTURE_BANNER, note: LOCAL_FIXTURE_NOTE },
@@ -34,6 +45,7 @@ export function SourceSwitch({
   tab,
   basePath = "/wellbeing/analytics",
   fixtureOffered = false,
+  bannerOnly = false,
 }: {
   source: AnalyticsSource;
   organizationId: string;
@@ -42,17 +54,35 @@ export function SourceSwitch({
   /** The surface this switch belongs to — the workspace, or one campaign. */
   basePath?: string;
   fixtureOffered?: boolean;
+  /**
+   * Render the standing banner WITHOUT the switch.
+   *
+   * The organisational workspace moved the source control into
+   * `AnalyticsFilters`, alongside the organisation and the questionnaire,
+   * because all three change what the server computes. The BANNER still has to
+   * appear on its own — it is the thing that must never scroll out of the way
+   * of a synthetic figure — so it is rendered separately from the control that
+   * chose it.
+   */
+  bannerOnly?: boolean;
 }) {
   const href = (next: AnalyticsSource) =>
     `${basePath}?org=${organizationId}&instrument=${instrumentKey}&tab=${tab}&source=${next}`;
 
-  const options: { key: AnalyticsSource; label: string }[] = [
-    { key: "live", label: "Live pilot" },
-    { key: "demo", label: "Analytics demo" },
-    ...(fixtureOffered ? [{ key: "fixture" as const, label: "Local fixture" }] : []),
-  ];
-
   const banner = BANNER[source];
+
+  const options = analyticsSourceOptions(fixtureOffered);
+
+  if (bannerOnly) {
+    return banner ? (
+      <div className="flex flex-col gap-1.5 rounded-2xl border border-[rgba(169,118,20,0.28)] bg-[rgba(169,118,20,0.07)] px-5 py-4">
+        <p className="font-mono text-[11px] tracking-[0.16em] text-[#7a5510] uppercase">
+          {banner.label}
+        </p>
+        <p className="text-sm leading-relaxed text-slate">{banner.note}</p>
+      </div>
+    ) : null;
+  }
 
   return (
     <div className="flex flex-col gap-3">

@@ -8,10 +8,10 @@ import { QRCodeSVG } from "qrcode.react";
  * the server. Sized in viewport units because it is scanned from across a room
  * rather than read on a desk.
  */
-export function PresentationQr({ value }: { value: string }) {
+export function PresentationQr({ url }: { url: string }) {
   return (
     <QRCodeSVG
-      value={value}
+      value={url}
       size={512}
       level="M"
       marginSize={0}

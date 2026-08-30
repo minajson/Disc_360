@@ -352,3 +352,38 @@ export function itemSignals(itemPositions: number[][], itemIds: readonly string[
     };
   });
 }
+
+
+/**
+ * The previous wave's distribution, but ONLY where overlaying it is honest.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * THREE CONDITIONS, ALL REQUIRED.
+ *
+ *  1 · There IS a previous wave. One point is not a comparison.
+ *  2 · Both waves used the same threshold. `thresholdConsistent` is false when
+ *      the cut-off changed between them, and a shape drawn across a policy
+ *      change describes the policy rather than the workforce.
+ *  3 · Both share the same bucket layout. A distribution grouped in 10s cannot
+ *      be laid over one grouped in 1s; the bars would not line up with the
+ *      axis they are drawn against.
+ *
+ * Returns null rather than a best effort. An overlay that is nearly right is
+ * worse than none, because it is read as exact.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export function comparablePreviousWave(
+  trend: WellbeingTrend,
+): { label: string; distribution: DistributionBucket[] } | null {
+  const current = trend.points.at(-1);
+  const previous = trend.points.at(-2);
+  if (!current || !previous) return null;
+  if (!trend.thresholdConsistent) return null;
+
+  const a = current.aggregate.distribution;
+  const b = previous.aggregate.distribution;
+  if (a.length !== b.length) return null;
+  if (a.some((bucket, index) => bucket.score !== b[index]?.score)) return null;
+
+  return { label: previous.label, distribution: b };
+}

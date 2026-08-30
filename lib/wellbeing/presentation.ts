@@ -64,6 +64,15 @@ export interface DeckWave {
 
 export type DeckSlide =
   | { kind: "title"; campaign: string; organisation: string; instrument: string; period: string; status: string }
+  /**
+   * The room slide: the code people scan, and the counts moving while they do.
+   *
+   * Only rendered for a campaign that is OPEN and has a join URL — a projected
+   * QR for a closed campaign invites a room full of people to scan something
+   * that will refuse them. It carries no figure a facilitator surface would
+   * not already show, and no name.
+   */
+  | { kind: "join"; campaignName: string; instrument: string; joinUrl: string; teamId: string }
   | { kind: "participation"; figures: DeckFigure[]; coverage: { label: string; published: number; withheld: number; covered: number; participants: number }[]; minCohort: number }
   | { kind: "pattern"; scoreLabel: string; scoreMin: number; scoreMax: number; distribution: { label: string; count: number }[]; median: number; mean: number; level: string | null; levelDetail: string | null; threshold: number | null; thresholdShare: number | null; responses: number }
   | { kind: "dimensions"; heading: string; max: number; form: "radar" | "bars"; dimensions: { key: string; label: string; median: number; mean: number; completed: number }[]; highest: string | null; lowest: string | null }
@@ -94,6 +103,8 @@ export async function buildWellbeingDeck({
   completedParticipants,
   participationPercent,
   dimension = "department",
+  joinUrl = null,
+  teamId = null,
 }: {
   organizationId: string;
   instrumentKey: InstrumentKey;
@@ -107,6 +118,10 @@ export async function buildWellbeingDeck({
   completedParticipants: number;
   participationPercent: number | null;
   dimension?: CompareDimension;
+  /** The campaign's own join URL, when it is open and has one. */
+  joinUrl?: string | null;
+  /** The roster team id, for the live participation stream. */
+  teamId?: string | null;
 }): Promise<WellbeingDeck> {
   const plan = analyticsPlanFor(instrumentKey);
 
@@ -139,7 +154,18 @@ export async function buildWellbeingDeck({
     status,
   });
 
-  /* 2 · participation and coverage */
+  /* 2 · the room — scan to join, and the counts moving as they do */
+  if (joinUrl && teamId) {
+    slides.push({
+      kind: "join",
+      campaignName,
+      instrument: instrument.name,
+      joinUrl,
+      teamId,
+    });
+  }
+
+  /* 3 · participation and coverage */
   slides.push({
     kind: "participation",
     minCohort: context.minCohort,

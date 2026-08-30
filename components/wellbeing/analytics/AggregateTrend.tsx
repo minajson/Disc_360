@@ -1,5 +1,6 @@
 import type { WellbeingTrend } from "@/lib/wellbeing/aggregate";
 import { TREND_CAVEAT } from "@/data/wellbeing-content";
+import { ChartReveal } from "./ChartReveal";
 
 /**
  * Aggregate movement across waves.
@@ -25,6 +26,11 @@ import { TREND_CAVEAT } from "@/data/wellbeing-content";
  * a movement in people that was actually a movement in policy. Historical
  * results are never rescored under a new threshold to make the line join up —
  * each wave keeps the threshold that actually applied to it.
+ *
+ * MOTION. The median line draws itself once, on entering the viewport, and the
+ * points resolve behind it. A soft area under the line gives the series weight
+ * at hero size without adding a second encoding — it is the same line, filled.
+ * Nothing loops, and `prefers-reduced-motion` renders the finished state.
  * ─────────────────────────────────────────────────────────────────────
  */
 export function AggregateTrend({
@@ -33,6 +39,8 @@ export function AggregateTrend({
   scoreMax,
   hasThreshold,
   showParticipation = false,
+  size = "default",
+  thresholdShareLabel = "% at or above threshold",
 }: {
   trend: WellbeingTrend;
   scoreLabel: string;
@@ -41,6 +49,16 @@ export function AggregateTrend({
   hasThreshold: boolean;
   /** Draws responses per wave beneath the plot as a small bar row. */
   showParticipation?: boolean;
+  /** `hero` is the primary trend on the analytics landing. */
+  size?: "default" | "hero";
+  /**
+   * How to name the dashed series.
+   *
+   * "% at or above threshold" is GHQ's reading. WHO-5's noteworthy share is
+   * BELOW its cut-off, so the caller passes that questionnaire's own wording
+   * rather than this chart assuming one.
+   */
+  thresholdShareLabel?: string;
 }) {
   const points = trend.points;
   if (points.length === 0) return null;
@@ -64,6 +82,23 @@ export function AggregateTrend({
   const scoreLine = points
     .map((point, index) => `${x(index)},${yScore(point.aggregate.median)}`)
     .join(" ");
+  // The same line, closed along the baseline. Weight without a second
+  // encoding: it says nothing the line does not already say.
+  const scoreArea =
+    points.length > 1
+      ? `${padX},${padTop + plotHeight} ${scoreLine} ${x(points.length - 1)},${padTop + plotHeight}`
+      : null;
+  // Segment lengths, so the dash animation has something to count down from.
+  const lineLength = points.reduce((total, point, index) => {
+    if (index === 0) return total;
+    return (
+      total +
+      Math.hypot(
+        x(index) - x(index - 1),
+        yScore(point.aggregate.median) - yScore(points[index - 1]!.aggregate.median),
+      )
+    );
+  }, 0);
   const shareLine = points
     .map((point, index) => `${x(index)},${yShare(point.aggregate.atOrAboveThresholdShare)}`)
     .join(" ");
@@ -72,12 +107,13 @@ export function AggregateTrend({
   const maxResponses = Math.max(...points.map((point) => point.aggregate.completed), 1);
 
   return (
-    <figure className="flex flex-col gap-4">
+    <ChartReveal>
+      <figure className="flex flex-col gap-4">
       {/* Wide plots scroll inside their own box; the page never scrolls. */}
       <div className="-mx-1 overflow-x-auto px-1">
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          className="h-auto w-full min-w-[520px]"
+          className={`h-auto w-full ${size === "hero" ? "min-w-[600px]" : "min-w-[520px]"}`}
           role="img"
           aria-label={`Median ${scoreLabel} by wave: ${points
             .map(
@@ -116,35 +152,51 @@ export function AggregateTrend({
                 textAnchor="start"
                 fontSize="11"
                 className="font-mono"
-                fill="var(--color-pulse-attention)"
+                fill="var(--color-pulse-watch)"
               >
                 {share}%
               </text>
             ))}
 
+          {scoreArea && (
+            <polygon
+              points={scoreArea}
+              fill="var(--color-pulse)"
+              opacity={size === "hero" ? 0.1 : 0.07}
+              className="chart-appear"
+            />
+          )}
+
           <polyline
             points={scoreLine}
             fill="none"
             stroke="var(--color-pulse)"
-            strokeWidth="2.5"
+            strokeWidth={size === "hero" ? 3 : 2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
+            className="chart-draw"
+            style={{ "--chart-length": lineLength } as React.CSSProperties}
           />
 
           {drawShare && (
             <polyline
               points={shareLine}
               fill="none"
-              stroke="var(--color-pulse-attention)"
+              stroke="var(--color-pulse-watch)"
               strokeWidth="2"
               strokeDasharray="6 4"
               strokeLinecap="round"
               strokeLinejoin="round"
+              className="chart-appear"
             />
           )}
 
           {points.map((point, index) => (
-            <g key={point.key}>
+            <g
+              key={point.key}
+              className="chart-appear"
+              style={{ "--chart-index": index } as React.CSSProperties}
+            >
               <circle
                 cx={x(index)}
                 cy={yScore(point.aggregate.median)}
@@ -237,10 +289,10 @@ export function AggregateTrend({
                 className="h-0.5 w-5 rounded"
                 style={{
                   background:
-                    "repeating-linear-gradient(90deg, var(--color-pulse-attention) 0 4px, transparent 4px 7px)",
+                    "repeating-linear-gradient(90deg, var(--color-pulse-watch) 0 4px, transparent 4px 7px)",
                 }}
               />
-              % at or above threshold (right axis)
+              {thresholdShareLabel} (right axis)
             </span>
           )}
         </span>
@@ -256,6 +308,7 @@ export function AggregateTrend({
 
         <span>{TREND_CAVEAT}</span>
       </figcaption>
-    </figure>
+      </figure>
+    </ChartReveal>
   );
 }

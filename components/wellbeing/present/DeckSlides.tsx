@@ -1,4 +1,6 @@
 import type { DeckSlide } from "@/lib/wellbeing/presentation";
+import { PresentationQr } from "@/components/wellbeing/PresentationQr";
+import { DeckLiveParticipation } from "./DeckLiveParticipation";
 import { DimensionRadar } from "@/components/wellbeing/analytics/DimensionRadar";
 
 /**
@@ -47,6 +49,31 @@ export function DeckSlideBody({ slide }: { slide: DeckSlide }) {
               <dd>{slide.status}</dd>
             </div>
           </dl>
+        </div>
+      );
+
+    case "join":
+      /*
+       * The room slide.
+       *
+       * A projected QR is the whole point of presenting a live campaign, and
+       * the counts beside it move as people scan — the same server-aggregated
+       * stream the facilitator's own panel uses, carrying five integers and no
+       * name. It is rendered only for an OPEN campaign, so nobody in a room is
+       * invited to scan a code that will refuse them.
+       */
+      return (
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-3">
+            <p className={EYEBROW}>{slide.instrument}</p>
+            <h2 className={HEADING}>Scan to join</h2>
+          </div>
+          <div className="flex flex-col items-center gap-10 lg:flex-row lg:items-center lg:gap-16">
+            <PresentationQr url={slide.joinUrl} />
+            <div className="min-w-0 flex-1">
+              <DeckLiveParticipation teamId={slide.teamId} />
+            </div>
+          </div>
         </div>
       );
 
@@ -452,6 +479,7 @@ export function DeckSlideBody({ slide }: { slide: DeckSlide }) {
 /** The short title shown in the progress rail and the slide counter. */
 export const SLIDE_TITLE: Record<DeckSlide["kind"], string> = {
   title: "Wellbeing Pulse",
+  join: "Scan to join",
   participation: "Participation & coverage",
   pattern: "Overall pattern",
   dimensions: "What the workforce is telling us",

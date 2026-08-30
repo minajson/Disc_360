@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MOVEMENT_GLYPH, STATE_VISUAL } from "@/lib/wellbeing/semantics";
-import type { ExecutiveTile, Insight } from "@/lib/wellbeing/executive";
+import type { ExecutiveHighlight, ExecutiveTile, Insight } from "@/lib/wellbeing/executive";
+import { AnimatedNumber } from "./AnimatedNumber";
 
 /**
  * The first screen: what is happening, and whether to believe it.
@@ -29,12 +30,17 @@ import type { ExecutiveTile, Insight } from "@/lib/wellbeing/executive";
  */
 export function ExecutiveOverview({
   organizationName,
+  questionnaireName,
   tiles,
+  highlights,
   insights,
   whereToLook,
 }: {
   organizationName: string;
+  questionnaireName: string;
   tiles: ExecutiveTile[];
+  /** Conditional secondary facts — see `buildExecutiveHighlights`. */
+  highlights: ExecutiveHighlight[];
   insights: Insight[];
   /** The comparison dimensions, as links. Alphabetical, never ranked. */
   whereToLook: { label: string; href: string; published: number; withheld: number }[];
@@ -43,7 +49,7 @@ export function ExecutiveOverview({
     <section className="flex flex-col gap-8">
       <div>
         <p className="font-mono text-[11px] tracking-[0.18em] text-pulse-teal uppercase">
-          {organizationName}
+          {organizationName} · {questionnaireName}
         </p>
         <h2 className="mt-2 font-display text-h2 font-semibold tracking-tight text-ink">
           Wellbeing overview
@@ -67,7 +73,7 @@ export function ExecutiveOverview({
                 </span>
               )}
               <span className="font-display text-[clamp(1.9rem,4.4vw,2.7rem)] leading-none font-semibold text-ink tabular-nums">
-                {tile.value}
+                <AnimatedNumber value={tile.value} />
               </span>
             </dd>
             {tile.state && tile.state !== "unbanded" && (
@@ -87,6 +93,33 @@ export function ExecutiveOverview({
           </div>
         ))}
       </dl>
+
+      {/* ── the facts that do not fit the headline row ────────────── */}
+      {highlights.length > 0 && (
+        <dl className="grid gap-x-6 gap-y-5 border-t border-hairline pt-7 sm:grid-cols-2 lg:grid-cols-4">
+          {highlights.map((highlight) => (
+            <div key={highlight.key} className="flex min-w-0 flex-col gap-1">
+              <dt className="font-mono text-[10px] tracking-[0.14em] text-faint uppercase">
+                {highlight.label}
+              </dt>
+              <dd className="flex items-baseline gap-2">
+                {highlight.movement && (
+                  <span
+                    aria-hidden="true"
+                    className="font-display text-base leading-none text-pulse-teal"
+                  >
+                    {MOVEMENT_GLYPH[highlight.movement.direction]}
+                  </span>
+                )}
+                <span className="font-display text-[1.15rem] leading-tight font-semibold text-ink">
+                  {highlight.value}
+                </span>
+              </dd>
+              <p className="text-xs leading-relaxed text-slate">{highlight.detail}</p>
+            </div>
+          ))}
+        </dl>
+      )}
 
       {/* ── where to look ─────────────────────────────────────────── */}
       {whereToLook.length > 0 && (

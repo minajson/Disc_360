@@ -1199,6 +1199,31 @@ export interface DimensionProfileView {
   /** Highest and lowest by median, for the overview headline. */
   highest: DimensionAggregate | null;
   lowest: DimensionAggregate | null;
+  /**
+   * The dimensions' OWN axis maximum.
+   *
+   * ─────────────────────────────────────────────────────────────────
+   * Not 100, and not the instrument's primary maximum either. Wellbeing Pulse
+   * V1's six dimensions are each normalised to a 0–100 index; GHQ-28's four
+   * subscales are raw counts over seven items, so a subscale median of 3 is
+   * near the middle of ITS scale and would draw as a sliver on a 0–100 axis.
+   *
+   * Published here so no rendering surface has to guess — every one that did
+   * guessed differently.
+   * ─────────────────────────────────────────────────────────────────
+   */
+  max: number;
+  /**
+   * Whether naming a highest and lowest dimension is meaningful FOR THIS
+   * questionnaire.
+   *
+   * True for Wellbeing Pulse V1, whose six dimensions share one scale and are
+   * designed to be read as a shape. False for GHQ-28: its four sections are
+   * profile dimensions that carry no threshold and name no condition, so
+   * "Severe depression is this workforce's highest section" is a sentence the
+   * instrument does not support and the product will not print.
+   */
+  rankable: boolean;
 }
 
 /**
@@ -1218,20 +1243,33 @@ export async function getWellbeingDimensionProfile(
 ): Promise<{ context: WellbeingAnalyticsContext; view: DimensionProfileView }> {
   const context = await resolveContext(organizationId, instrumentKey);
 
+  // Wellbeing Pulse V1's dimensions are normalised to a 0–100 index; GHQ-28's
+  // subscales are raw counts over their seven items.
+  const dimensionMax =
+    context.instrument.subscales.length > 0
+      ? (context.instrument.subscales[0]?.itemCount ?? 7)
+      : 100;
+  // Only Wellbeing Pulse V1's dimensions are designed to be read as a ranked
+  // shape — see `rankable` on the view.
+  const rankable = instrumentKey === "disc360_wellbeing_v1";
+
+  const empty = (suppressed: string | null): DimensionProfileView => ({
+    dimensions: null,
+    suppressed,
+    highest: null,
+    lowest: null,
+    max: dimensionMax,
+    rankable,
+  });
+
   if (context.instrument.subscales.length === 0 && instrumentKey !== "disc360_wellbeing_v1") {
-    return {
-      context,
-      view: { dimensions: null, suppressed: null, highest: null, lowest: null },
-    };
+    return { context, view: empty(null) };
   }
 
   const { rows, counts } = await loadAnalyticsRows(organizationId, instrumentKey, source, scope);
   const slice = checkSlice(counts.overall, context.minCohort);
   if (!slice.publishable) {
-    return {
-      context,
-      view: { dimensions: null, suppressed: SUPPRESSION_MESSAGE, highest: null, lowest: null },
-    };
+    return { context, view: empty(SUPPRESSION_MESSAGE) };
   }
 
   const byDimension = new Map<string, number[]>();
@@ -1255,9 +1293,9 @@ export async function getWellbeingDimensionProfile(
     .map((definition) => {
       const values = byDimension.get(definition.key as string) ?? [];
       const aggregate = aggregateScores(values, {
-        maxScore: 100,
+        maxScore: dimensionMax,
         threshold: null,
-        bucketSize: 10,
+        bucketSize: Math.max(1, Math.round(dimensionMax / 10)),
       });
       return {
         key: definition.key as string,
@@ -1276,8 +1314,160 @@ export async function getWellbeingDimensionProfile(
     view: {
       dimensions,
       suppressed: null,
-      highest: ranked[0] ?? null,
-      lowest: ranked[ranked.length - 1] ?? null,
+      // Withheld for a questionnaire whose sections are not a ranking. The
+      // figures are still published; the superlative is not.
+      highest: rankable ? (ranked[0] ?? null) : null,
+      lowest: rankable ? (ranked[ranked.length - 1] ?? null) : null,
+      max: dimensionMax,
+      rankable,
+    },
+  };
+}
+
+/* ── dimensions, wave by wave ───────────────────────────────────────── */
+
+export interface DimensionTrendSeries {
+  key: string;
+  label: string;
+  /** Median for each wave in `waves`, null where that wave is suppressed. */
+  medians: (number | null)[];
+}
+
+export interface DimensionTrendView {
+  waves: { key: string; label: string }[];
+  series: DimensionTrendSeries[];
+  max: number;
+  /** Waves dropped entirely for being below the floor. */
+  suppressedWaves: number;
+}
+
+/**
+ * Each dimension's median, wave by wave.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * SUPPRESSION IS APPLIED PER WAVE, BEFORE ANY DIMENSION IS COMPUTED.
+ *
+ * A questionnaire's dimensions are computed from the SAME responses as its
+ * total, so a wave too small to publish a median is too small to publish six
+ * of them. The wave is dropped whole rather than per-dimension: dropping it
+ * per-dimension would leave a row with one wave missing beside rows that have
+ * it, and the count of responses behind the missing cell is then recoverable
+ * from the others.
+ *
+ * Returns at most the waves that survive. A single surviving wave produces no
+ * trend — one point is not a direction — and the caller renders the profile
+ * instead.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export async function getWellbeingDimensionTrend(
+  organizationId: string,
+  instrumentKey: InstrumentKey,
+  source: AnalyticsSource = "live",
+  scope: AnalyticsScope | null = null,
+): Promise<{ context: WellbeingAnalyticsContext; view: DimensionTrendView }> {
+  const context = await resolveContext(organizationId, instrumentKey);
+  const dimensionMax =
+    context.instrument.subscales.length > 0
+      ? (context.instrument.subscales[0]?.itemCount ?? 7)
+      : 100;
+
+  if (context.instrument.subscales.length === 0 && instrumentKey !== "disc360_wellbeing_v1") {
+    return { context, view: { waves: [], series: [], max: dimensionMax, suppressedWaves: 0 } };
+  }
+
+  const { rows, waves: campaignWaves } = await loadAnalyticsRows(
+    organizationId,
+    instrumentKey,
+    source,
+    scope,
+  );
+
+  const series = periodSeries(rows, campaignWaves, "wave");
+
+  const admin = createSupabaseAdminClient();
+  const { data: definitions } = await admin
+    .from("wellbeing_dimensions")
+    .select("key, label, position")
+    .eq("instrument_key", instrumentKey)
+    .order("position");
+
+  // Rows grouped by wave. Within ONE wave a person contributes at most one
+  // result — the active-attempt indexes enforce it — so a row count here is a
+  // people count, which is what suppression needs.
+  const rowsByWave = new Map<string, AnalyticsRow[]>();
+  for (const row of rows) {
+    const bucket = row.wave_id ? series.bucketFor.get(row.wave_id) : undefined;
+    if (!bucket) continue;
+    rowsByWave.set(bucket.key, [...(rowsByWave.get(bucket.key) ?? []), row]);
+  }
+
+  /*
+   * The same partition the cohort comparison uses, applied across waves.
+   *
+   * It matters that this is `suppressPartition` and not a per-wave threshold
+   * test: where only ONE wave would fall below the floor, a second is withheld
+   * alongside it, because a single hidden wave beside a published overall
+   * figure is recoverable by subtraction.
+   */
+  const waveDecisions = suppressPartition(
+    series.buckets.map((bucket) => {
+      const waveRows = rowsByWave.get(bucket.key) ?? [];
+      return {
+        key: bucket.key,
+        label: bucket.label,
+        completed: waveRows.length,
+        stats: waveRows,
+      };
+    }),
+    { minCohort: context.minCohort },
+  );
+
+  const published: { key: string; label: string }[] = [];
+  const byDimension = new Map<string, (number | null)[]>();
+  for (const definition of definitions ?? []) {
+    byDimension.set(definition.key as string, []);
+  }
+
+  let suppressedWaves = 0;
+  for (const decision of waveDecisions.cohorts) {
+    if (decision.suppressed || !decision.stats) {
+      suppressedWaves += 1;
+      continue;
+    }
+
+    published.push({ key: decision.key, label: decision.label });
+    const values = new Map<string, number[]>();
+    for (const row of decision.stats) {
+      for (const dimension of row.wellbeing_result_dimensions ?? []) {
+        values.set(dimension.dimension_key, [
+          ...(values.get(dimension.dimension_key) ?? []),
+          dimension.index_score,
+        ]);
+      }
+    }
+    for (const [key, medians] of byDimension) {
+      const scores = values.get(key) ?? [];
+      medians.push(
+        scores.length > 0
+          ? aggregateScores(scores, { maxScore: dimensionMax, threshold: null }).median
+          : null,
+      );
+    }
+  }
+
+  return {
+    context,
+    view: {
+      waves: published,
+      series: (definitions ?? [])
+        .map((definition) => ({
+          key: definition.key as string,
+          label: definition.label as string,
+          medians: byDimension.get(definition.key as string) ?? [],
+        }))
+        .filter((entry) => entry.medians.some((value) => value !== null)),
+      max: dimensionMax,
+      suppressedWaves,
     },
   };
 }

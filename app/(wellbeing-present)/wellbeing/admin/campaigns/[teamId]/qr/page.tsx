@@ -86,7 +86,7 @@ export default async function WellbeingCampaignQrPage({
       )}
 
       <div className="rounded-[3vmin] border border-hairline bg-white p-[3vmin] shadow-[0_24px_64px_-40px_rgba(23,32,29,0.4)] print:border-0 print:shadow-none">
-        <PresentationQr value={joinUrl} />
+        <PresentationQr url={joinUrl} />
       </div>
 
       <p className="text-[clamp(1rem,2.2vmin,1.7rem)] font-medium text-ink">

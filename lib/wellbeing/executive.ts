@@ -54,6 +54,22 @@ export interface CohortMovementInput {
   cohorts: { label: string; delta: number | null }[];
 }
 
+/**
+ * The dimension profile's extremes, where the questionnaire supports naming
+ * them at all.
+ *
+ * Supplied as null for GHQ-28: its four sections are profile dimensions that
+ * carry no threshold and name no condition, so "Severe depression is this
+ * workforce's highest section" is a sentence the instrument does not support.
+ * `getWellbeingDimensionProfile` decides that and returns nulls; this module
+ * only renders the decision.
+ */
+export interface DimensionExtremesInput {
+  highest: { label: string; median: number } | null;
+  lowest: { label: string; median: number } | null;
+  max: number;
+}
+
 export interface ExecutiveInput {
   instrumentKey: InstrumentKey;
   /** People on the roster. */
@@ -69,6 +85,8 @@ export interface ExecutiveInput {
   threshold: number | null;
   coverage: CoverageInput[];
   cohortMovements: CohortMovementInput[];
+  /** Null where the questionnaire's dimensions are not a ranking. */
+  dimensionExtremes?: DimensionExtremesInput | null;
   /** How the previous point should be named, e.g. "Wave 2". */
   previousPeriodLabel: string;
 }
@@ -81,6 +99,23 @@ export interface ExecutiveTile {
   /** Only where a questionnaire's own documented threshold justifies one. */
   state: ReadingState | null;
   /** For the movement tile: the arrow's direction. */
+  movement: MovementReading | null;
+}
+
+/**
+ * A secondary fact, shown beneath the headline tiles.
+ *
+ * Separate from `ExecutiveTile` because these are conditional: a campaign with
+ * one wave has no largest movement, and a questionnaire without rankable
+ * dimensions has no highest or lowest. A tile that reads "—" for structural
+ * reasons is worse than no tile, because a reader cannot tell the difference
+ * between "not applicable here" and "suppressed".
+ */
+export interface ExecutiveHighlight {
+  key: string;
+  label: string;
+  value: string;
+  detail: string;
   movement: MovementReading | null;
 }
 
@@ -177,6 +212,85 @@ export function buildExecutiveTiles(input: ExecutiveInput): ExecutiveTile[] {
       movement: null,
     },
   ];
+}
+
+/**
+ * The two facts that do not fit the headline row, when they exist.
+ *
+ * "Largest movement" names WHERE the biggest change is, never who is highest
+ * or lowest — a wellbeing comparison ordered by score is a performance table,
+ * and a department reads its position as a verdict on its manager. Movement is
+ * a different question: it says where to look next, and it is the question an
+ * Occupational Health lead actually opens the page with.
+ */
+export function buildExecutiveHighlights(input: ExecutiveInput): ExecutiveHighlight[] {
+  const instrument = INSTRUMENTS[input.instrumentKey];
+  const highlights: ExecutiveHighlight[] = [];
+
+  for (const dimension of input.cohortMovements) {
+    const moved = dimension.cohorts.filter(
+      (cohort): cohort is { label: string; delta: number } => cohort.delta !== null,
+    );
+    if (moved.length < 2) continue;
+
+    const largest = moved.reduce((furthest, cohort) =>
+      Math.abs(cohort.delta) > Math.abs(furthest.delta) ? cohort : furthest,
+    );
+    const reading = movementReading(
+      input.instrumentKey,
+      largest.delta,
+      0,
+      input.previousPeriodLabel,
+    );
+    highlights.push({
+      key: `movement:${dimension.dimensionLabel}`,
+      label: `Largest movement · ${dimension.dimensionLabel}`,
+      value: largest.label,
+      detail:
+        largest.delta === 0
+          ? `No group's median moved from ${input.previousPeriodLabel}`
+          : `${largest.delta > 0 ? "+" : ""}${largest.delta} points from ${input.previousPeriodLabel}`,
+      movement: largest.delta === 0 ? null : reading,
+    });
+    break;
+  }
+
+  const extremes = input.dimensionExtremes;
+  if (extremes?.highest && extremes.lowest) {
+    // Only reached for a questionnaire whose dimensions share one scale and
+    // are designed to be read as a shape — Wellbeing Pulse V1 today.
+    highlights.push({
+      key: "dimension:highest",
+      label: "Highest dimension",
+      value: extremes.highest.label,
+      detail: `Median ${extremes.highest.median} of ${extremes.max}`,
+      movement: null,
+    });
+    highlights.push({
+      key: "dimension:lowest",
+      label: "Lowest dimension",
+      value: extremes.lowest.label,
+      detail: `Median ${extremes.lowest.median} of ${extremes.max} — where this questionnaire suggests looking first`,
+      movement: null,
+    });
+  }
+
+  // A questionnaire with no threshold has no "share on the flagged side" to
+  // report, and inventing one would be the band it deliberately does not have.
+  if (instrument.hasThreshold && input.threshold !== null && input.median !== null) {
+    highlights.push({
+      key: "threshold",
+      label: "Configured level",
+      value: String(input.threshold),
+      detail:
+        instrument.scoreDirection === "higher_is_more_distress"
+          ? "Responses at or above this are counted as the noteworthy side"
+          : "Responses below this are counted as the noteworthy side",
+      movement: null,
+    });
+  }
+
+  return highlights;
 }
 
 /* ── the sentences ──────────────────────────────────────────────────── */
@@ -278,6 +392,27 @@ export function buildInsights(input: ExecutiveInput): Insight[] {
         `That is a difference worth looking at, not an explanation of one.`,
       basis: `${moved.length} reportable groups compared`,
     });
+  }
+
+  /* 3b · what did NOT move? */
+  for (const dimension of input.cohortMovements) {
+    const steady = dimension.cohorts
+      .filter((cohort): cohort is { label: string; delta: number } => cohort.delta === 0)
+      .map((cohort) => cohort.label);
+    if (steady.length === 0) continue;
+
+    // Named, and counted, and nothing more. "Broadly stable" is a judgement
+    // about magnitude; "unchanged" is arithmetic.
+    const named = steady.slice(0, 2).join(" and ");
+    const rest = steady.length - Math.min(2, steady.length);
+    insights.push({
+      kind: "cohort",
+      text:
+        `${named}${rest > 0 ? ` and ${rest} other ${rest === 1 ? "group" : "groups"}` : ""} ` +
+        `recorded the same median as ${input.previousPeriodLabel}.`,
+      basis: `${steady.length} of ${dimension.cohorts.length} groups unchanged`,
+    });
+    break;
   }
 
   /* 4 · what is not on screen, and why? */

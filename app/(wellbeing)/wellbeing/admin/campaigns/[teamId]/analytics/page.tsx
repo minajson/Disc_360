@@ -17,6 +17,7 @@ import { CampaignHeader, CampaignNav } from "@/components/wellbeing/campaign/Cam
 import { CampaignFrame } from "@/components/wellbeing/campaign/CampaignFrame";
 import { ReportingUnavailable } from "@/components/wellbeing/campaign/ReportingUnavailable";
 import { Section } from "@/components/wellbeing/campaign/Section";
+import { comparablePreviousWave } from "@/lib/wellbeing/aggregate";
 import { DistributionChart } from "@/components/wellbeing/analytics/DistributionChart";
 import { DimensionRadar } from "@/components/wellbeing/analytics/DimensionRadar";
 import { DimensionBars } from "@/components/wellbeing/analytics/DimensionBars";
@@ -86,6 +87,8 @@ export default async function CampaignAnalyticsPage({
   ]);
 
   const { context, overview } = workspace;
+  // Only where the two waves are genuinely comparable — see the helper.
+  const previousDistribution = comparablePreviousWave(workspace.trend);
   const level = overview ? aggregateWellbeingLevel(plan, overview.median) : null;
 
   return (
@@ -158,6 +161,9 @@ export default async function CampaignAnalyticsPage({
                   completed={overview.completed}
                   maxScore={overview.maxScore}
                   bucketSize={overview.bucketSize}
+                  thresholdDirection={overview.thresholdDirection}
+                  previous={previousDistribution?.distribution ?? null}
+                  previousLabel={previousDistribution?.label ?? null}
                 />
               </div>
 

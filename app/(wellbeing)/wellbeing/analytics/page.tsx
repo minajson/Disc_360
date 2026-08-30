@@ -7,9 +7,11 @@ import {
   getWellbeingComparison,
   getWellbeingCoverage,
   getWellbeingDimensionProfile,
+  getWellbeingDimensionTrend,
   getWellbeingSignals,
   getWellbeingSignalPatterns,
   getWellbeingWorkspace,
+  localFixtureOffered,
   parseAnalyticsSource,
   type AnalyticsSource,
   type CohortMovementCell,
@@ -17,12 +19,7 @@ import {
   type CompareDimension,
   type CoverageDimension,
 } from "@/lib/wellbeing/analytics";
-import {
-  INSTRUMENT_KEYS,
-  INSTRUMENTS,
-  isInstrumentKey,
-  type InstrumentKey,
-} from "@/data/wellbeing-instruments";
+import { INSTRUMENTS, isInstrumentKey, type InstrumentKey } from "@/data/wellbeing-instruments";
 import {
   DISC_ANALYTICS_NOTE,
   DISC_HIGHEST_DIMENSION_LABEL,
@@ -35,6 +32,7 @@ import {
   NO_COMBINATION_NOTICE,
   THRESHOLD_POLICY_NOTE,
 } from "@/data/wellbeing-content";
+import { comparablePreviousWave } from "@/lib/wellbeing/aggregate";
 import { itemIdsFor } from "@/lib/wellbeing/instrument-analytics";
 import { DistributionChart } from "@/components/wellbeing/analytics/DistributionChart";
 import { AggregateTrend } from "@/components/wellbeing/analytics/AggregateTrend";
@@ -46,9 +44,19 @@ import {
   parseWorkspaceTab,
   WorkspaceNav,
 } from "@/components/wellbeing/analytics/WorkspaceNav";
-import { SourceSwitch } from "@/components/wellbeing/analytics/SourceSwitch";
+import {
+  analyticsSourceOptions,
+  SourceSwitch,
+} from "@/components/wellbeing/analytics/SourceSwitch";
 import { ExecutiveOverview } from "@/components/wellbeing/analytics/ExecutiveOverview";
-import { buildExecutiveTiles, buildInsights } from "@/lib/wellbeing/executive";
+import {
+  buildExecutiveHighlights,
+  buildExecutiveTiles,
+  buildInsights,
+} from "@/lib/wellbeing/executive";
+import { AnalyticsFilters } from "@/components/wellbeing/analytics/AnalyticsFilters";
+import { DimensionTrend } from "@/components/wellbeing/analytics/DimensionTrend";
+import { DimensionBars } from "@/components/wellbeing/analytics/DimensionBars";
 import { HowToRead } from "@/components/wellbeing/analytics/HowToRead";
 import { SignalCards } from "@/components/wellbeing/analytics/SignalCards";
 import { ReportsPanel } from "@/components/wellbeing/analytics/ReportsPanel";
@@ -158,6 +166,11 @@ export default async function WellbeingAnalyticsPage({
             getWellbeingCoverage(organizationId, instrumentKey, source),
             getWellbeingCohortMovement(organizationId, instrumentKey, "department", source),
           ]);
+          const profile = await getWellbeingDimensionProfile(
+            organizationId,
+            instrumentKey,
+            source,
+          );
 
           const waves = movement.view.waves;
           const previousWave = waves.at(-2) ?? null;
@@ -209,11 +222,25 @@ export default async function WellbeingAnalyticsPage({
               covered: entry.covered,
             })),
             cohortMovements,
+            // Null for a questionnaire whose dimensions are not a ranking —
+            // the profile decides, this page only passes it on.
+            dimensionExtremes: profile.view.rankable
+              ? {
+                  highest: profile.view.highest
+                    ? { label: profile.view.highest.label, median: profile.view.highest.median }
+                    : null,
+                  lowest: profile.view.lowest
+                    ? { label: profile.view.lowest.label, median: profile.view.lowest.median }
+                    : null,
+                  max: profile.view.max,
+                }
+              : null,
             previousPeriodLabel: trend.points.at(-2)?.label ?? "the previous wave",
           };
 
           return {
             tiles: buildExecutiveTiles(input),
+            highlights: buildExecutiveHighlights(input),
             insights: buildInsights(input),
             coverage: coverage.coverage,
           };
@@ -222,76 +249,57 @@ export default async function WellbeingAnalyticsPage({
   const instrument = context.instrument;
   const isDisc = instrumentKey === "disc360_wellbeing_v1";
 
+  const sourceOptions = analyticsSourceOptions(localFixtureOffered());
+  // The previous wave's shape, drawn behind the current bars — but only where
+  // the two are genuinely comparable. See `comparablePreviousWave`.
+  const previousDistribution = comparablePreviousWave(trend);
+
   const dimension: CompareDimension =
     (by as CompareDimension | undefined) ?? TAB_DIMENSION[tab] ?? "department";
 
   return (
     <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-12">
       <header className="flex flex-col gap-2">
+        {/* The eyebrow is the QUESTIONNAIRE's own descriptor, from the
+            registry. Everything below it is computed on that questionnaire's
+            scale, so naming it here rather than in a static string is what
+            stops the page describing one instrument above another's figures. */}
         <p className="font-mono text-[11px] tracking-[0.18em] text-pulse-teal uppercase">
-          {instrument.descriptor}
+          {instrument.descriptor} · Organisational analytics
         </p>
-        <h1 className="font-display text-h2 font-semibold tracking-tight">Wellbeing Pulse</h1>
-        <p className="text-sm text-slate">
-          {context.organizationName} ·{" "}
-          <span className="font-mono">
-            {context.threshold !== null
-              ? `threshold ${context.threshold} · `
-              : "no threshold · "}
-            minimum group {context.minCohort}
-          </span>
-        </p>
+        <h1 className="font-display text-h2 font-semibold tracking-tight">
+          {context.organizationName}
+        </h1>
       </header>
 
-      {/* Questionnaire switcher. Selecting one replaces every metric below —
-          the scale, the direction and the vocabulary all change with it. */}
-      <nav
-        aria-label="Questionnaire"
-        className="-mx-1 mt-5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        <ul className="flex min-w-max gap-2">
-          {INSTRUMENT_KEYS.map((key) => (
-            <li key={key}>
-              <Link
-                href={`/wellbeing/analytics?org=${organizationId}&instrument=${key}&tab=${tab}&source=${source}`}
-                aria-current={key === instrumentKey ? "page" : undefined}
-                className={`pulse-focus block rounded-full border px-3.5 py-1.5 text-xs font-medium whitespace-nowrap transition-colors ${
-                  key === instrumentKey
-                    ? "border-pulse bg-pulse text-white"
-                    : "border-[rgba(31,78,95,0.24)] text-slate hover:text-pulse"
-                }`}
-              >
-                {INSTRUMENTS[key].name}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      {/*
+        ONE control row, not four.
 
-      {scope.length > 1 && (
-        <div className="mt-5 flex flex-wrap gap-2">
-          {scope.map((entry) => (
-            <Link
-              key={entry.organizationId}
-              href={`/wellbeing/analytics?org=${entry.organizationId}&instrument=${instrumentKey}&tab=${tab}&source=${source}`}
-              className={`pulse-focus rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
-                entry.organizationId === organizationId
-                  ? "border-pulse bg-pulse text-white"
-                  : "border-[rgba(31,78,95,0.24)] text-slate hover:text-pulse"
-              }`}
-            >
-              {entry.organizationName}
-            </Link>
-          ))}
-        </div>
-      )}
-
+        Organisation, questionnaire and data source were three separate rows of
+        identically-styled pills above a fourth row of tabs, filling most of
+        the first screen before a single figure appeared. They are now one
+        labelled bar — see `AnalyticsFilters` for why the labels are the point.
+      */}
       <div className="mt-6">
+        <AnalyticsFilters
+          organizations={scope}
+          organizationId={organizationId}
+          instrumentKey={instrumentKey}
+          source={source}
+          tab={tab}
+          sources={sourceOptions}
+        />
+      </div>
+
+      {/* The standing banner for a synthetic source, which must never scroll
+          out of the way of a figure. */}
+      <div className="mt-4">
         <SourceSwitch
           source={source}
           organizationId={organizationId}
           instrumentKey={instrumentKey}
           tab={tab}
+          bannerOnly
         />
       </div>
 
@@ -314,7 +322,9 @@ export default async function WellbeingAnalyticsPage({
               <section className="pulse-card p-6 sm:p-9">
                 <ExecutiveOverview
                   organizationName={context.organizationName}
+                  questionnaireName={instrument.name}
                   tiles={executive.tiles}
+                  highlights={executive.highlights}
                   insights={executive.insights}
                   whereToLook={executive.coverage.dimensions.map((entry: CoverageDimension) => ({
                     label: entry.label,
@@ -371,10 +381,9 @@ export default async function WellbeingAnalyticsPage({
 
                   <div className="border-t border-[rgba(31,78,95,0.14)] pt-8">
                     <h2 className="font-display text-h3 font-semibold">Score distribution</h2>
-                    <p className="mt-1.5 mb-6 text-sm text-slate">
-                      How the workforce is spread across the {instrument.primaryScoreMin}–
-                      {instrument.primaryScoreMax} {instrument.primaryScoreLabel.toLowerCase()}{" "}
-                      range.
+                    <p className="mt-1.5 mb-6 font-mono text-xs text-faint">
+                      {instrument.primaryScoreMin}–{instrument.primaryScoreMax}{" "}
+                      {instrument.primaryScoreLabel.toLowerCase()}
                     </p>
                     <DistributionChart
                       distribution={overview.distribution}
@@ -382,6 +391,9 @@ export default async function WellbeingAnalyticsPage({
                       completed={overview.completed}
                       maxScore={overview.maxScore}
                       bucketSize={overview.bucketSize}
+                      thresholdDirection={overview.thresholdDirection}
+                      previous={previousDistribution?.distribution ?? null}
+                      previousLabel={previousDistribution?.label ?? null}
                     />
 
                     <div className="mt-6">
@@ -456,10 +468,9 @@ export default async function WellbeingAnalyticsPage({
         {tab === "trends" && (
           <section className="pulse-card flex flex-col gap-6 p-6 sm:p-9">
             <div>
-              <h2 className="font-display text-h3 font-semibold">Movement across pulses</h2>
-              <p className="mt-1.5 text-sm text-slate">
-                Quarterly waves. Only waves with enough completed responses to protect
-                confidentiality are shown.
+              <h2 className="font-display text-h3 font-semibold">Movement across waves</h2>
+              <p className="mt-1.5 font-mono text-xs text-faint">
+                Waves below the confidentiality floor are not plotted
               </p>
             </div>
             {trend.points.length > 0 ? (
@@ -736,87 +747,115 @@ async function DimensionProfileSection({
   instrumentKey: InstrumentKey;
   source: AnalyticsSource;
 }) {
-  const { context, view } = await getWellbeingDimensionProfile(
-    organizationId,
-    instrumentKey,
-    source,
-  );
+  /*
+   * ───────────────────────────────────────────────────────────────────
+   * THE PROFILE AND ITS TREND, ON THE DIMENSIONS' OWN SCALE.
+   *
+   * This section used to draw every dimension as a percentage width and print
+   * "/ 100" beside it. That is correct for Wellbeing Pulse V1, whose six
+   * dimensions are normalised to a 0–100 index, and wrong for GHQ-28, whose
+   * four sections are raw counts over seven items — a median of 3 drew as a
+   * 3% sliver under a label reading "3 / 100".
+   *
+   * `DimensionProfileView.max` now carries the dimensions' own ceiling and
+   * `DimensionBars` renders against it, so both questionnaires are drawn to
+   * the scale they are actually scored on.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  const [{ context, view }, trend] = await Promise.all([
+    getWellbeingDimensionProfile(organizationId, instrumentKey, source),
+    getWellbeingDimensionTrend(organizationId, instrumentKey, source),
+  ]);
+
+  const heading =
+    context.instrument.subscales.length > 0 ? "Subscale profile" : "Dimension profile";
+
   if (!view.dimensions || view.dimensions.length === 0) {
     return (
       <section className="pulse-card flex flex-col gap-5 p-6 sm:p-9">
-        <h2 className="font-display text-h3 font-semibold">Dimension profile</h2>
+        <h2 className="font-display text-h3 font-semibold">{heading}</h2>
         <SuppressionNotice minCohort={context.minCohort} />
       </section>
     );
   }
 
   return (
-    <section className="pulse-card flex flex-col gap-6 p-6 sm:p-9">
-      <div>
-        <h2 className="font-display text-h3 font-semibold">Dimension profile</h2>
-        <p className="mt-1.5 text-sm text-slate">
-          Median score for each dimension across everyone who completed this pulse.
-        </p>
+    <section className="pulse-card flex flex-col gap-7 p-6 sm:p-9">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <h2 className="font-display text-h3 font-semibold">{heading}</h2>
+        <span className="ml-auto font-mono text-xs text-faint tabular-nums">
+          scale 0–{view.max}
+        </span>
       </div>
 
-      <ul className="flex flex-col gap-4">
-        {view.dimensions.map((entry) => (
-          <li key={entry.key} className="flex flex-col gap-1.5">
-            <div className="flex flex-wrap items-baseline gap-x-3">
-              <span className="text-sm font-medium text-ink">{entry.label}</span>
-              <span className="ml-auto font-mono text-sm tabular-nums text-pulse-deep">
-                {entry.median}
-                <span className="text-faint"> / 100</span>
-              </span>
-            </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-pulse-soft/60">
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${Math.max(entry.median, 1.5)}%`,
-                  background: "var(--color-pulse)",
-                }}
-              />
-            </div>
-          </li>
-        ))}
-      </ul>
+      <DimensionBars
+        dimensions={view.dimensions}
+        max={view.max}
+        direction={context.instrument.scoreDirection}
+      />
 
-      {view.highest && view.lowest && (
-        <div className="grid gap-4 border-t border-[rgba(31,78,95,0.14)] pt-5 sm:grid-cols-2">
+      {/* Highest and lowest are named only where the questionnaire's own
+          dimensions are designed to be read as a ranked shape. GHQ-28's
+          sections are not, so `rankable` is false and nothing is named. */}
+      {view.rankable && view.highest && view.lowest && (
+        <dl className="grid gap-x-8 gap-y-4 border-t border-hairline pt-6 sm:grid-cols-2">
           <div>
-            <p className="text-xs tracking-[0.12em] text-faint uppercase">
+            <dt className="font-mono text-[10px] tracking-[0.14em] text-faint uppercase">
               {DISC_HIGHEST_DIMENSION_LABEL}
-            </p>
-            <p className="mt-1.5 text-sm text-ink">
-              {view.highest.label} · {view.highest.median}
-            </p>
+            </dt>
+            <dd className="mt-1 text-sm font-medium text-ink">
+              {view.highest.label}
+              <span className="font-mono text-xs text-slate"> · median {view.highest.median}</span>
+            </dd>
           </div>
           <div>
-            <p className="text-xs tracking-[0.12em] text-faint uppercase">
+            <dt className="font-mono text-[10px] tracking-[0.14em] text-faint uppercase">
               {DISC_LOWEST_DIMENSION_LABEL}
-            </p>
-            <p className="mt-1.5 text-sm text-ink">
-              {view.lowest.label} · {view.lowest.median}
-            </p>
+            </dt>
+            <dd className="mt-1 text-sm font-medium text-ink">
+              {view.lowest.label}
+              <span className="font-mono text-xs text-slate"> · median {view.lowest.median}</span>
+            </dd>
+          </div>
+          {/* The approved wording, rather than a paraphrase: "lower-scoring"
+              is deliberately not "worst", and the note says what it is not. */}
+          <p className="text-xs leading-relaxed text-slate sm:col-span-2">
+            {DISC_LOWER_DIMENSION_NOTE}
+          </p>
+        </dl>
+      )}
+
+      {trend.view.waves.length > 1 && (
+        <div className="border-t border-hairline pt-7">
+          <h3 className="font-display text-[1.05rem] font-semibold text-ink">
+            Each {context.instrument.subscales.length > 0 ? "section" : "dimension"}, wave by wave
+          </h3>
+          <div className="mt-4">
+            <DimensionTrend
+              view={trend.view}
+              direction={context.instrument.scoreDirection}
+            />
           </div>
         </div>
       )}
 
-      <p className="text-xs leading-relaxed text-slate">{DISC_LOWER_DIMENSION_NOTE}</p>
+      <HowToRead
+        seeing={`The median for each ${context.instrument.subscales.length > 0 ? "section" : "dimension"}, across everyone who completed this questionnaire, on a 0–${view.max} scale.`}
+        matters={
+          context.instrument.subscales.length > 0
+            ? "The four sections describe different aspects of what the questionnaire asks about. Comparing them over time shows which part of the picture is moving."
+            : "The dimensions share one scale, so the SHAPE across them is the reading — which areas people reported more of, and which less."
+        }
+        notTelling={
+          context.instrument.subscales.length > 0
+            ? "No section carries a threshold, none names a condition, and none is separately interpretable. A higher section is not a finding about this workforce, and it is not ranked against the others here for that reason."
+            : "It does not say why a dimension sits where it does, and it identifies nobody. A dimension is a description of answers, not a judgement about people or their managers."
+        }
+      />
     </section>
   );
 }
 
-/**
- * Field Based vs Office Based.
- *
- * Its own surface rather than a row in the generic comparison, because it is
- * the split management most often asks about and a two-group question deserves
- * a two-group composition. The work-location values come from the stored
- * taxonomy, not a hard-coded pair — an organisation that configures a third
- * value gets it here without a deployment.
- */
 async function FieldVsOfficeSection({
   organizationId,
   instrumentKey,

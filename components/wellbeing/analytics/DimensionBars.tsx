@@ -1,5 +1,6 @@
 import type { DimensionAggregate } from "@/lib/wellbeing/analytics";
 import type { ScoreDirection } from "@/data/wellbeing-instruments";
+import { ChartReveal } from "./ChartReveal";
 
 /**
  * Sub-scores as bars on a shared scale.
@@ -12,6 +13,13 @@ import type { ScoreDirection } from "@/data/wellbeing-instruments";
  * Every bar is drawn against the same ceiling, so two subscales of different
  * medians are visually comparable. Drawing each against its own maximum makes
  * every profile look identical, which is the failure mode this replaces.
+ *
+ * The ceiling is the DIMENSIONS' own — 0–7 for GHQ-28's seven-item sections,
+ * 0–100 for Wellbeing Pulse V1's normalised index — and it arrives from
+ * `DimensionProfileView.max` rather than being guessed per surface.
+ *
+ * Bars grow once, in published order, on entering the viewport. The stagger is
+ * reading order, not a ranking: rows are never sorted by figure.
  */
 export function DimensionBars({
   dimensions,
@@ -25,9 +33,9 @@ export function DimensionBars({
   const distress = direction === "higher_is_more_distress";
 
   return (
-    <div className="flex flex-col gap-5">
+    <ChartReveal className="flex flex-col gap-5">
       <ul className="flex flex-col divide-y divide-hairline">
-        {dimensions.map((dimension) => (
+        {dimensions.map((dimension, index) => (
           <li key={dimension.key} className="flex flex-col gap-2 py-3.5">
             <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
               <span className="text-sm font-medium text-ink">{dimension.label}</span>
@@ -39,13 +47,16 @@ export function DimensionBars({
             </div>
             <div className="relative h-2.5 overflow-hidden rounded-full bg-sand">
               <div
-                className="absolute inset-y-0 left-0 rounded-full"
-                style={{
-                  width: `${Math.max(1.5, Math.min(100, (dimension.median / max) * 100))}%`,
-                  background: distress
-                    ? "var(--color-pulse-attention)"
-                    : "var(--color-pulse)",
-                }}
+                className="chart-appear absolute inset-y-0 left-0 rounded-full transition-[width] duration-700 ease-[cubic-bezier(0.32,0.94,0.6,1)]"
+                style={
+                  {
+                    width: `${Math.max(1.5, Math.min(100, (dimension.median / max) * 100))}%`,
+                    background: distress
+                      ? "var(--color-pulse-watch)"
+                      : "var(--color-pulse)",
+                    "--chart-index": index,
+                  } as React.CSSProperties
+                }
               />
             </div>
           </li>
@@ -57,6 +68,6 @@ export function DimensionBars({
           ? `Each subscale is scored 0–${max} on its own items. A higher figure reports more of what that subscale asks about; it carries no threshold and is not separately interpretable.`
           : `Each dimension is scored 0–${max}. A higher figure reports more of the experience described.`}
       </p>
-    </div>
+    </ChartReveal>
   );
 }

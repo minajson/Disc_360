@@ -24,6 +24,7 @@ import { LifecyclePanel } from "@/components/wellbeing/campaign/LifecyclePanel";
 import { LiveParticipation } from "@/components/wellbeing/campaign/LiveParticipation";
 import { JoinAccessPanel } from "@/components/wellbeing/campaign/JoinAccessPanel";
 import { checkCampaignReadiness } from "@/lib/wellbeing/readiness";
+import { comparablePreviousWave } from "@/lib/wellbeing/aggregate";
 import { Section } from "@/components/wellbeing/campaign/Section";
 import { ParticipationProgress } from "@/components/wellbeing/campaign/ParticipationProgress";
 import { CohortCoverage } from "@/components/wellbeing/campaign/CohortCoverage";
@@ -32,6 +33,7 @@ import { DimensionRadar } from "@/components/wellbeing/analytics/DimensionRadar"
 import { SignalCards } from "@/components/wellbeing/analytics/SignalCards";
 import { SourceSwitch } from "@/components/wellbeing/analytics/SourceSwitch";
 import { SuppressionNotice } from "@/components/wellbeing/analytics/SuppressionNotice";
+import { HowToRead } from "@/components/wellbeing/analytics/HowToRead";
 import { AGGREGATE_ONLY_NOTICE } from "@/data/wellbeing-content";
 
 export const metadata: Metadata = { title: "Campaign overview" };
@@ -104,6 +106,7 @@ export default async function CampaignOverviewPage({
       : null;
 
   const [workspace, coverage, profile, patterns] = reporting ?? [null, null, null, null];
+  const previousDistribution = workspace ? comparablePreviousWave(workspace.trend) : null;
   const instrument = identity.instrument;
   const overview = workspace?.overview ?? null;
 
@@ -187,8 +190,8 @@ export default async function CampaignOverviewPage({
           title="Participants"
           lead={
             source === "live"
-              ? "Updating as people join and finish — no refresh needed. Everything below this line is only as good as these numbers: a pattern drawn from a third of a workforce describes that third."
-              : "The LIVE campaign's participation. The figures elsewhere on this page describe the synthetic population selected above, so these two counts are deliberately not the same thing."
+              ? "Updating as people join and finish — no refresh needed."
+              : "The LIVE campaign's participation. Every figure elsewhere on this page describes the synthetic population selected above."
           }
         >
           <LiveParticipation teamId={teamId} initial={tally} capacity={identity.capacity} />
@@ -234,6 +237,9 @@ export default async function CampaignOverviewPage({
                   completed={overview.completed}
                   maxScore={overview.maxScore}
                   bucketSize={overview.bucketSize}
+                  thresholdDirection={overview.thresholdDirection}
+                  previous={previousDistribution?.distribution ?? null}
+                  previousLabel={previousDistribution?.label ?? null}
                 />
                 {workspace!.context.threshold !== null && (
                   <p className="font-mono text-xs text-slate tabular-nums">
@@ -304,7 +310,7 @@ export default async function CampaignOverviewPage({
           <Section
             index={5}
             title="Movement"
-            lead="How this campaign compares with its own previous wave. Composition changes between waves — different people answer — so a shift describes the responses received, not the same group of individuals moving."
+            lead="How this campaign compares with its own previous wave."
             aside={
               workspace!.trend.points.length > 0
                 ? `${workspace!.trend.points.length} wave${workspace!.trend.points.length === 1 ? "" : "s"}`
@@ -330,6 +336,13 @@ export default async function CampaignOverviewPage({
                 >
                   Open the full trend →
                 </Link>
+                {/* The caveat that qualifies every wave comparison, kept in
+                    full and kept out of the way of the figure it qualifies. */}
+                <HowToRead
+                  seeing="The median for this wave, against the previous comparable one."
+                  matters="A single wave is a snapshot. Movement across waves is what separates a persistent pattern from ordinary variation."
+                  notTelling="Composition changes between waves — different people answer — so a shift describes the responses received, not the same group of individuals moving. It attributes the movement to no cause."
+                />
               </div>
             ) : (
               <p className="text-sm leading-relaxed text-slate">
@@ -353,7 +366,7 @@ export default async function CampaignOverviewPage({
           <Section
             index={6}
             title="Coverage and confidentiality"
-            lead="How much of this workforce can be reported on, before any comparison is read. Groups below the minimum are withheld and are never named, sized or reconstructable."
+            lead="How much of this workforce can be reported on."
             aside={`minimum group ${coverage!.coverage.minCohort}`}
           >
             <CohortCoverage coverage={coverage!.coverage} />
@@ -368,7 +381,7 @@ export default async function CampaignOverviewPage({
           <Section
             index={7}
             title="Where to look next"
-            lead="Patterns the evidence layer found in the aggregate figures above. Each names the figures it is built from. None is a finding about a person, a cause, or a risk."
+            lead="Patterns found in the figures above. Each names the figures it is built from."
           >
             <SignalCards signals={patterns!.signals} />
           </Section>
@@ -378,7 +391,7 @@ export default async function CampaignOverviewPage({
         <Section
           index={identity.canReport ? 8 : 3}
           title="Who is on the roster"
-          lead="Administrative status only. Individual wellbeing scores and answers are not available on this page, in this workspace, or to any role in this product. Completing the questionnaire does not make anybody's result visible."
+          lead="Administrative status only. Individual scores and answers are not available to any role in this product."
           aside={`${participation.invited} on the roster`}
         >
           {participation.participants.length === 0 ? (
