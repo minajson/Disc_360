@@ -6,15 +6,17 @@ import {
 } from "@/lib/reports/model";
 import { reportFilename } from "@/lib/reports/identity";
 import { loadOwnWellbeingResult } from "@/lib/wellbeing/queries";
-import { DEFAULT_SCREENING_THRESHOLD, WELLBEING_MAX_SCORE } from "@/lib/scoring/wellbeing";
+import { DEFAULT_SCREENING_THRESHOLD } from "@/lib/scoring/wellbeing";
+import { INSTRUMENTS } from "@/data/wellbeing-instruments";
 import { WORK_LOCATION_LABEL } from "@/data/wellbeing-taxonomy";
 import {
+  ghqOutcomeCopy,
+  ghqScoreLabel,
+  ghqScoreMeaning,
   MOVEMENT_CAVEAT,
   MOVEMENT_LABEL,
   movementDetail,
-  outcomeCopy,
-  SCORE_MEANING,
-  SCREENING_DISCLAIMER_LONG,
+  participantDisclaimerFor,
 } from "@/data/wellbeing-content";
 import {
   DISC_DIMENSION_LEAD,
@@ -155,26 +157,48 @@ export async function loadOwnWellbeingReport(
     };
   }
 
-  const outcome = outcomeCopy(record.atOrAboveThreshold === true);
+  /*
+   * ─────────────────────────────────────────────────────────────────────
+   * BOTH GHQ QUESTIONNAIRES REACH THIS BRANCH, AND THEY ARE NOT THE SAME.
+   *
+   * This block used to hard-code GHQ-12 throughout — `WELLBEING_MAX_SCORE`
+   * (12), `SCREENING_DISCLAIMER_LONG` (which opens with the words "GHQ-12"),
+   * `outcomeCopy` (which names the GHQ-12 threshold) and GHQ-12's 3/4 split as
+   * the fallback threshold. So a participant who answered twenty-eight
+   * questions downloaded a report that named GHQ-12, explained a 0–12 range,
+   * and drew their score — which can reach 28 — on a twelve-cell scale.
+   *
+   * Everything below is now read from the questionnaire that was actually
+   * answered. `data/wellbeing-instruments.ts` already held all of it.
+   * ─────────────────────────────────────────────────────────────────────
+   */
+  const ghq = record.instrumentKey === "ghq28" ? "ghq28" : "ghq12";
+  const instrument = INSTRUMENTS[ghq];
+  const outcome = ghqOutcomeCopy(ghq, record.atOrAboveThreshold === true);
+  // The questionnaire's own split — GHQ-12 at 3/4, GHQ-28 at 4/5. One shared
+  // fallback classified GHQ-28 a point early wherever a stored value was
+  // missing.
+  const fallbackThreshold = instrument.defaultThreshold ?? DEFAULT_SCREENING_THRESHOLD;
 
   const document = buildWellbeingReport({
     participantName,
     completedAt: record.completedAt,
     totalScore: record.totalScore,
-    maxScore: WELLBEING_MAX_SCORE,
+    maxScore: instrument.primaryScoreMax,
     // GHQ always carries a threshold; the schema enforces it. The fallback
     // exists so a type-level null can never render as "threshold null".
-    threshold: record.threshold ?? DEFAULT_SCREENING_THRESHOLD,
+    threshold: record.threshold ?? fallbackThreshold,
     atOrAboveThreshold: record.atOrAboveThreshold === true,
+    scoreLabel: ghqScoreLabel(ghq),
     outcomeHeadline: outcome.headline,
     outcomeBody: outcome.body,
     outcomeDetail: outcome.detail,
-    scoreMeaning: SCORE_MEANING,
-    disclaimer: SCREENING_DISCLAIMER_LONG,
+    scoreMeaning: ghqScoreMeaning(ghq),
+    disclaimer: participantDisclaimerFor(ghq),
     history: upToHere.map((entry) => ({
       completedAt: entry.completedAt,
       totalScore: entry.totalScore,
-      threshold: entry.threshold ?? DEFAULT_SCREENING_THRESHOLD,
+      threshold: entry.threshold ?? fallbackThreshold,
     })),
     movementLabel: record.comparison ? MOVEMENT_LABEL[record.comparison.movement] : undefined,
     movementDetail: record.comparison

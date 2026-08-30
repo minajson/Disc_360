@@ -3,14 +3,19 @@ import Link from "next/link";
 import { resolveWellbeingScope } from "@/lib/wellbeing/access";
 import {
   COMPARE_DIMENSIONS,
+  getWellbeingCohortMovement,
   getWellbeingComparison,
+  getWellbeingCoverage,
   getWellbeingDimensionProfile,
   getWellbeingSignals,
   getWellbeingSignalPatterns,
   getWellbeingWorkspace,
   parseAnalyticsSource,
   type AnalyticsSource,
+  type CohortMovementCell,
+  type CohortMovementRow,
   type CompareDimension,
+  type CoverageDimension,
 } from "@/lib/wellbeing/analytics";
 import {
   INSTRUMENT_KEYS,
@@ -42,6 +47,8 @@ import {
   WorkspaceNav,
 } from "@/components/wellbeing/analytics/WorkspaceNav";
 import { SourceSwitch } from "@/components/wellbeing/analytics/SourceSwitch";
+import { ExecutiveOverview } from "@/components/wellbeing/analytics/ExecutiveOverview";
+import { buildExecutiveTiles, buildInsights } from "@/lib/wellbeing/executive";
 import { HowToRead } from "@/components/wellbeing/analytics/HowToRead";
 import { SignalCards } from "@/components/wellbeing/analytics/SignalCards";
 import { ReportsPanel } from "@/components/wellbeing/analytics/ReportsPanel";
@@ -132,6 +139,86 @@ export default async function WellbeingAnalyticsPage({
 
   const workspace = await getWellbeingWorkspace(organizationId, instrumentKey, source);
   const { context, overview, trend } = workspace;
+
+  /*
+   * ───────────────────────────────────────────────────────────────────
+   * THE EXECUTIVE READING — computed only for the tab that shows it.
+   *
+   * Coverage and departmental movement are two extra passes over the same
+   * suppressed aggregates, so they are fetched only on Overview rather than on
+   * every tab. Everything the headline and its sentences are built from has
+   * already been through the confidentiality floor: a withheld cohort arrives
+   * here as a null, never as a figure this page then hides.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  const executive =
+    tab === "overview"
+      ? await (async () => {
+          const [coverage, movement] = await Promise.all([
+            getWellbeingCoverage(organizationId, instrumentKey, source),
+            getWellbeingCohortMovement(organizationId, instrumentKey, "department", source),
+          ]);
+
+          const waves = movement.view.waves;
+          const previousWave = waves.at(-2) ?? null;
+          const latestWave = waves.at(-1) ?? null;
+
+          const cohortMovements =
+            previousWave && latestWave
+              ? [
+                  {
+                    dimensionLabel: movement.view.label,
+                    cohorts: movement.view.rows.map((row: CohortMovementRow) => {
+                      const before = row.cells.find(
+                        (cell: CohortMovementCell) => cell.waveKey === previousWave.key,
+                      );
+                      const after = row.cells.find(
+                        (cell: CohortMovementCell) => cell.waveKey === latestWave.key,
+                      );
+                      return {
+                        label: row.label,
+                        // A cohort withheld in either wave contributes no
+                        // movement at all. Differencing across a suppressed
+                        // cell is how a hidden figure gets reconstructed.
+                        delta:
+                          before?.median != null && after?.median != null
+                            ? Math.round((after.median - before.median) * 10) / 10
+                            : null,
+                      };
+                    }),
+                  },
+                ]
+              : [];
+
+          const input = {
+            instrumentKey,
+            invited: workspace.invited,
+            participants: workspace.participants,
+            participation: workspace.participation,
+            median: overview?.median ?? null,
+            previousMedian:
+              trend.points.length > 1
+                ? (trend.points.at(-2)?.aggregate.median ?? null)
+                : null,
+            threshold: context.threshold,
+            coverage: coverage.coverage.dimensions.map((entry: CoverageDimension) => ({
+              key: entry.key,
+              label: entry.label,
+              published: entry.published,
+              withheld: entry.withheld,
+              covered: entry.covered,
+            })),
+            cohortMovements,
+            previousPeriodLabel: trend.points.at(-2)?.label ?? "the previous wave",
+          };
+
+          return {
+            tiles: buildExecutiveTiles(input),
+            insights: buildInsights(input),
+            coverage: coverage.coverage,
+          };
+        })()
+      : null;
   const instrument = context.instrument;
   const isDisc = instrumentKey === "disc360_wellbeing_v1";
 
@@ -220,6 +307,24 @@ export default async function WellbeingAnalyticsPage({
         {/* ── Overview ─────────────────────────────────────────────── */}
         {tab === "overview" && (
           <>
+            {/* What is happening, whether to believe it, and where to look —
+                before any chart. */}
+            {executive && (
+              <section className="pulse-card p-6 sm:p-9">
+                <ExecutiveOverview
+                  organizationName={context.organizationName}
+                  tiles={executive.tiles}
+                  insights={executive.insights}
+                  whereToLook={executive.coverage.dimensions.map((entry: CoverageDimension) => ({
+                    label: entry.label,
+                    href: `/wellbeing/analytics?org=${organizationId}&instrument=${instrumentKey}&tab=compare&by=${entry.key}&source=${source}`,
+                    published: entry.published,
+                    withheld: entry.withheld,
+                  }))}
+                />
+              </section>
+            )}
+
             <section className="pulse-card flex flex-col gap-8 p-6 sm:p-9">
               {overview ? (
                 <>

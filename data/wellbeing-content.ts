@@ -158,6 +158,70 @@ export const outcomeCopy = (atOrAbove: boolean) =>
         detail: BELOW_THRESHOLD_DETAIL,
       };
 
+/* ── GHQ-28's own wording ───────────────────────────────────────────── */
+
+/**
+ * ─────────────────────────────────────────────────────────────────────
+ * WHY GHQ-28 NEEDED ITS OWN STRINGS RATHER THAN GHQ-12'S.
+ *
+ * `outcomeCopy`, `SCORE_LABEL` and `SCORE_MEANING` above are GHQ-12's
+ * approved wording, and they NAME GHQ-12 and its 0–12 range. Both GHQ
+ * questionnaires were being sent through them, so a participant who answered
+ * twenty-eight questions was told, on their own result and in their own
+ * downloaded report:
+ *
+ *   · "GHQ-12 screening score"
+ *   · "below the current GHQ-12 screening threshold"
+ *   · "counts how many of the twelve areas … runs from 0 to 12"
+ *
+ * with a figure that can reach 28. The questionnaire is half the meaning of a
+ * screening result, and misnaming it to the one person entitled to know is not
+ * a cosmetic error — it is the same class of defect that put GHQ-12's
+ * disclaimer under a GHQ-28 result and was fixed by `GHQ28_DISCLAIMER_LONG`.
+ *
+ * The wording below mirrors GHQ-12's structure exactly, with GHQ-28's name and
+ * range. The shared sentences — the ones that describe what a threshold is and
+ * what a snapshot is not — are reused verbatim, because they are true of both
+ * and re-stating them differently would be a second approval to obtain.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export const GHQ28_SCORE_LABEL = "GHQ-28 screening score";
+
+export const GHQ28_BELOW_THRESHOLD_BODY =
+  "Your responses are below the current GHQ-28 screening threshold.";
+export const GHQ28_ABOVE_THRESHOLD_BODY =
+  "Your responses are at or above the current GHQ-28 screening threshold and indicate " +
+  "more recent difficulty than usual across several wellbeing areas.";
+
+export const GHQ28_SCORE_MEANING =
+  "The score counts how many of the twenty-eight areas you described as harder than usual " +
+  "recently. It runs from 0 to 28. A higher number means more areas felt harder than usual, " +
+  "compared with how things normally are for you.";
+
+/** The two GHQ questionnaires, each in its own words. */
+export function ghqScoreLabel(instrumentKey: "ghq12" | "ghq28"): string {
+  return instrumentKey === "ghq28" ? GHQ28_SCORE_LABEL : SCORE_LABEL;
+}
+
+export function ghqScoreMeaning(instrumentKey: "ghq12" | "ghq28"): string {
+  return instrumentKey === "ghq28" ? GHQ28_SCORE_MEANING : SCORE_MEANING;
+}
+
+export function ghqOutcomeCopy(
+  instrumentKey: "ghq12" | "ghq28",
+  atOrAbove: boolean,
+): { headline: string; body: string; detail: string } {
+  const base = outcomeCopy(atOrAbove);
+  if (instrumentKey === "ghq12") return base;
+  return {
+    // The headline and the detail name no questionnaire, so they are true of
+    // both and are shared rather than duplicated with a different phrasing.
+    headline: base.headline,
+    body: atOrAbove ? GHQ28_ABOVE_THRESHOLD_BODY : GHQ28_BELOW_THRESHOLD_BODY,
+    detail: base.detail,
+  };
+}
+
 export const SCORE_MEANING =
   "The score counts how many of the twelve areas you described as harder than usual " +
   "recently. It runs from 0 to 12. A higher number means more areas felt harder than usual, " +

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { loadOwnWellbeingResult, type WellbeingHistoryRecord } from "@/lib/wellbeing/queries";
-import { WELLBEING_MAX_SCORE } from "@/lib/scoring/wellbeing";
 import { DISC_WELLBEING_MAX_RAW, rankDimensions } from "@/lib/scoring/disc360-wellbeing";
 import { ScoreScale } from "@/components/wellbeing/ScoreScale";
 import { Who5Scale } from "@/components/wellbeing/Who5Scale";
@@ -31,20 +30,20 @@ import { DimensionProfile } from "@/components/wellbeing/DimensionProfile";
 import { ReportActions } from "@/components/wellbeing/ReportActions";
 import { WORK_LOCATION_LABEL } from "@/data/wellbeing-taxonomy";
 import { DIMENSION_META } from "@/data/disc360-wellbeing-items";
-import type { InstrumentMetadata } from "@/data/wellbeing-instruments";
+import { INSTRUMENTS, type InstrumentMetadata } from "@/data/wellbeing-instruments";
 import {
   MOVEMENT_CAVEAT,
   MOVEMENT_LABEL,
   movementDetail,
+  ghqOutcomeCopy,
+  ghqScoreLabel,
+  ghqScoreMeaning,
   NEXT_STEP_BODY,
   NEXT_STEP_HEADING,
   NEXT_STEP_WITH_SUPPORT,
-  outcomeCopy,
   RESULT_HEADING,
   RESULT_PRIVACY_BODY,
   RESULT_PRIVACY_HEADING,
-  SCORE_LABEL,
-  SCORE_MEANING,
   UNDERSTAND_RESULT_LABEL,
   participantDisclaimerFor,
 } from "@/data/wellbeing-content";
@@ -448,8 +447,25 @@ function GhqResult({
   record: WellbeingHistoryRecord;
   upToHere: WellbeingHistoryRecord[];
 }) {
-  const outcome = outcomeCopy(record.atOrAboveThreshold === true);
-  const threshold = record.threshold ?? 4;
+  /*
+   * ───────────────────────────────────────────────────────────────────
+   * BOTH GHQ QUESTIONNAIRES RENDER HERE. THEY DO NOT SHARE WORDING.
+   *
+   * `outcomeCopy`, `SCORE_LABEL` and `SCORE_MEANING` are GHQ-12's approved
+   * strings and they NAME GHQ-12 and its 0–12 range. Sending GHQ-28 through
+   * them told a participant who had answered twenty-eight questions that they
+   * were "below the current GHQ-12 screening threshold", beside a score that
+   * can reach 28.
+   *
+   * The threshold fallback is the questionnaire's own default too: GHQ-12
+   * splits at 3/4 and GHQ-28 at 4/5, so one shared `?? 4` classified GHQ-28 a
+   * point early wherever the stored value was missing.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  const ghq = record.instrumentKey === "ghq28" ? "ghq28" : "ghq12";
+  const outcome = ghqOutcomeCopy(ghq, record.atOrAboveThreshold === true);
+  const threshold =
+    record.threshold ?? (INSTRUMENTS[ghq].defaultThreshold ?? 4);
 
   // GHQ-28 only, and only on the participant's own result.
   //
@@ -493,8 +509,8 @@ function GhqResult({
           score={record.totalScore}
           threshold={threshold}
           atOrAbove={record.atOrAboveThreshold === true}
-          label={SCORE_LABEL}
-          max={record.instrumentKey === "ghq28" ? 28 : WELLBEING_MAX_SCORE}
+          label={ghqScoreLabel(ghq)}
+          max={INSTRUMENTS[ghq].primaryScoreMax}
         />
 
         {/* ── B · what it means, in two sentences ──────────────── */}
@@ -508,7 +524,7 @@ function GhqResult({
             between a participant and their own figure. */}
         <Disclosure label={UNDERSTAND_RESULT_LABEL}>
           <p className="text-[0.95rem] leading-relaxed text-ink">{outcome.detail}</p>
-          <p className="text-[0.95rem] leading-relaxed text-slate">{SCORE_MEANING}</p>
+          <p className="text-[0.95rem] leading-relaxed text-slate">{ghqScoreMeaning(ghq)}</p>
         </Disclosure>
       </section>
 
@@ -530,7 +546,7 @@ function GhqResult({
         <section className="pulse-card mt-6 flex flex-col gap-4 p-6 sm:p-9">
           <h2 className="font-display text-h3 font-semibold">Your pulses over time</h2>
           <PulseTrend
-            max={record.instrumentKey === "ghq28" ? 28 : WELLBEING_MAX_SCORE}
+            max={INSTRUMENTS[ghq].primaryScoreMax}
             points={upToHere.map((entry) => ({
               label: monthLabel(entry.completedAt),
               score: entry.totalScore,

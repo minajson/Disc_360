@@ -46,6 +46,78 @@ function flatten(module: Record<string, unknown>): Record<string, string> {
 const allCopy = () => flatten(content as unknown as Record<string, unknown>);
 const allDiscCopy = () => flatten(discContent as unknown as Record<string, unknown>);
 
+/* ── the two GHQ questionnaires are not interchangeable ─────────────── */
+
+test("GHQ-28's result wording never names GHQ-12", () => {
+  // A participant who answered twenty-eight questions was being told, on their
+  // own result and in their own downloaded report, that they were "below the
+  // current GHQ-12 screening threshold".
+  for (const atOrAbove of [true, false]) {
+    const copy = content.ghqOutcomeCopy("ghq28", atOrAbove);
+    for (const text of [copy.headline, copy.body, copy.detail]) {
+      assert.doesNotMatch(text, /GHQ-12/, `GHQ-28 copy names the wrong questionnaire: "${text}"`);
+    }
+    assert.match(copy.body, /GHQ-28/);
+  }
+  assert.doesNotMatch(content.ghqScoreLabel("ghq28"), /GHQ-12/);
+  assert.doesNotMatch(content.ghqScoreMeaning("ghq28"), /GHQ-12/);
+});
+
+test("each GHQ questionnaire describes its own range", () => {
+  assert.match(content.ghqScoreMeaning("ghq12"), /twelve areas/);
+  assert.match(content.ghqScoreMeaning("ghq12"), /0 to 12/);
+  assert.match(content.ghqScoreMeaning("ghq28"), /twenty-eight areas/);
+  assert.match(content.ghqScoreMeaning("ghq28"), /0 to 28/);
+});
+
+test("GHQ-12's approved wording is unchanged by GHQ-28 gaining its own", () => {
+  // The GHQ-12 strings are approved copy. Parameterising the accessors must
+  // not have rewritten them.
+  assert.equal(content.ghqScoreLabel("ghq12"), content.SCORE_LABEL);
+  assert.equal(content.ghqScoreMeaning("ghq12"), content.SCORE_MEANING);
+  assert.deepEqual(content.ghqOutcomeCopy("ghq12", true), content.outcomeCopy(true));
+  assert.deepEqual(content.ghqOutcomeCopy("ghq12", false), content.outcomeCopy(false));
+});
+
+test("ALL GHQ-28 copy passes the safety-language screen", () => {
+  const texts = [
+    content.GHQ28_SCORE_LABEL,
+    content.GHQ28_SCORE_MEANING,
+    content.GHQ28_ABOVE_THRESHOLD_BODY,
+    content.GHQ28_BELOW_THRESHOLD_BODY,
+  ];
+  for (const text of texts) {
+    assert.deepEqual(
+      screenWellbeingCopy(text),
+      [],
+      `unsafe GHQ-28 copy: "${text}"`,
+    );
+  }
+});
+
+test("the downloadable report reads its scale and disclaimer from the questionnaire", () => {
+  const source = readFileSync(new URL("../lib/wellbeing/report.ts", import.meta.url), "utf8");
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  // The GHQ branch is shared by both questionnaires, so nothing in this file
+  // may hard-code one of them.
+  for (const forbidden of [
+    "WELLBEING_MAX_SCORE",
+    "SCREENING_DISCLAIMER_LONG",
+    "SCORE_MEANING",
+    "outcomeCopy",
+  ]) {
+    // Word-bounded: WHO5_SCORE_MEANING is WHO-5's own and belongs here.
+    assert.doesNotMatch(
+      code,
+      new RegExp(`(^|[^A-Z0-9_])${forbidden}\\b`, "m"),
+      `lib/wellbeing/report.ts hard-codes GHQ-12 via ${forbidden}`,
+    );
+  }
+  assert.match(code, /instrument\.primaryScoreMax/, "the scale must come from the questionnaire");
+  assert.match(code, /participantDisclaimerFor\(ghq\)/, "and so must the disclaimer");
+});
+
 /* ── confidential support ───────────────────────────────────────────── */
 
 test("ALL support copy passes the safety-language screen", () => {

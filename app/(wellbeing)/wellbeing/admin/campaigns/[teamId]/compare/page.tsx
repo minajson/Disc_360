@@ -18,7 +18,6 @@ import { Section } from "@/components/wellbeing/campaign/Section";
 import { CohortComparison } from "@/components/wellbeing/analytics/CohortComparison";
 import { CohortCoverage } from "@/components/wellbeing/campaign/CohortCoverage";
 import { SourceSwitch } from "@/components/wellbeing/analytics/SourceSwitch";
-import { HowToRead } from "@/components/wellbeing/analytics/HowToRead";
 
 export const metadata: Metadata = { title: "Compare cohorts" };
 
@@ -151,20 +150,16 @@ export default async function CampaignComparePage({
               : `${comparison.view.publishedCount} group${comparison.view.publishedCount === 1 ? "" : "s"}`
           }
         >
+          {/* The explanation now travels WITH the chart rather than beside it,
+              so every surface that draws this comparison gets the same one. */}
           <CohortComparison
             cohorts={comparison.view.cohorts}
+            instrumentKey={comparison.context.instrumentKey}
             scoreLabel={instrument.primaryScoreLabel}
             scoreMin={instrument.primaryScoreMin}
             scoreMax={instrument.primaryScoreMax}
             threshold={plan.thresholdRate ? comparison.context.threshold : null}
             minCohort={comparison.context.minCohort}
-            distress={instrument.scoreDirection === "higher_is_more_distress"}
-          />
-
-          <HowToRead
-            seeing={`Each group's median ${instrument.primaryScoreLabel.toLowerCase()} and the band covering its middle, on one shared scale.`}
-            matters="Two groups with the same median can be very different: one tightly clustered, one pulled apart. The band is what shows that, and it is usually the more useful half of the comparison."
-            notTelling="It does not say why a group differs, and it identifies nobody inside one. Groups differ in size, in the work they do and in who chose to take part — any of which can move a median on its own. Treat a difference as a question worth asking, never as a result for a group or its manager."
           />
         </Section>
 
