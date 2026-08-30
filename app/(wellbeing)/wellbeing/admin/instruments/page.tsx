@@ -332,12 +332,12 @@ const OPERATING_MODELS: { key: string; title: string; note: string }[] = [
   },
   {
     key: "D",
-    title: "DISC360 Wellbeing Pulse only",
+    title: "Wellbeing Pulse only",
     note: "Original content with no third-party licensing dependency and a six-dimension profile. Not psychometrically validated, and carries no threshold.",
   },
   {
     key: "E",
-    title: "Established screener plus DISC360 Wellbeing",
+    title: "Established screener plus Wellbeing Pulse",
     note: "Two instruments run as separate campaigns — one for screening against a configured threshold, one for reflection and dimension trends. Scores stay separate; the platform does not combine them.",
   },
   {

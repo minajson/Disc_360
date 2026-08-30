@@ -64,9 +64,12 @@
   --color-pulse-steady-soft: #dfe9ec;
   --color-pulse-watch: #8a6a2f;
   --color-pulse-watch-soft: #f0e7d5;
-  /* One step warmer than `watch`, and still not red. */
-  --color-pulse-focus-area: #9a5836;
-  --color-pulse-focus-area-soft: #f2e0d5;
+  /* There is deliberately no tier above `watch`.
+     A second, louder band would be a clinical severity judgement, and none of
+     these questionnaires publishes one at the individual or the group level.
+     `watch` means "this is the side of the questionnaire's own documented
+     line that invites a conversation", which is the strongest claim the
+     evidence supports — see lib/wellbeing/semantics.ts. */
   /* Withheld for confidentiality, and "not enough responses yet" — two
      different reasons to show no figure, both rendered as absence rather
      than as a state of the workforce. */
@@ -125,6 +128,79 @@ body {
   outline: 2px solid var(--color-botanical);
   outline-offset: 3px;
   border-radius: 4px;
+}
+
+/* ── chart motion ─────────────────────────────────────────────
+   ONE mechanism for every wellbeing chart, so motion is consistent and
+   is switched off in exactly one place.
+
+   `ChartReveal` sets data-revealed="true" when a figure first enters the
+   viewport; until then a line is undrawn and a bar has no height. Nothing
+   animates on a loop, nothing animates on hover, and nothing animates a
+   second time — a chart that keeps moving is a chart nobody reads twice,
+   and these are read by people deciding what to do about a workforce.
+
+   Under prefers-reduced-motion every rule below collapses to the final
+   state, which is also what a reader gets if the observer never fires. */
+
+[data-chart-reveal] .chart-draw {
+  stroke-dasharray: var(--chart-length, 1200);
+  stroke-dashoffset: var(--chart-length, 1200);
+}
+[data-chart-reveal="true"] .chart-draw {
+  animation: chart-draw 900ms var(--ease-meridian) forwards;
+}
+@keyframes chart-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+[data-chart-reveal] .chart-appear {
+  opacity: 0;
+}
+[data-chart-reveal="true"] .chart-appear {
+  animation: chart-appear 420ms var(--ease-meridian) forwards;
+  /* Points resolve after the line has reached them. */
+  animation-delay: calc(340ms + var(--chart-index, 0) * 70ms);
+}
+@keyframes chart-appear {
+  to {
+    opacity: 1;
+  }
+}
+
+[data-chart-reveal] .chart-grow {
+  transform: scaleY(0);
+  transform-origin: bottom;
+}
+[data-chart-reveal="true"] .chart-grow {
+  animation: chart-grow 520ms var(--ease-meridian) forwards;
+  animation-delay: calc(var(--chart-index, 0) * 45ms);
+}
+@keyframes chart-grow {
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-chart-reveal] .chart-draw,
+  [data-chart-reveal="true"] .chart-draw {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+  [data-chart-reveal] .chart-appear,
+  [data-chart-reveal="true"] .chart-appear {
+    opacity: 1;
+    animation: none;
+  }
+  [data-chart-reveal] .chart-grow,
+  [data-chart-reveal="true"] .chart-grow {
+    transform: none;
+    animation: none;
+  }
 }
 
 /* ── Meridian utilities ───────────────────────────────────── */

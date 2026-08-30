@@ -1,4 +1,5 @@
 import { WELLBEING_MAX_SCORE } from "@/lib/scoring/wellbeing";
+import { ChartReveal } from "./analytics/ChartReveal";
 
 export interface TrendPoint {
   label: string;
@@ -19,6 +20,13 @@ export interface TrendPoint {
  *
  * Every point is also rendered as text beneath the chart, so the series is
  * readable without seeing the line at all.
+ *
+ * The line draws itself once, when the chart first comes into view. That is an
+ * enhancement of a chart that is already complete: the figures are in the SVG,
+ * the accessible description carries the whole series, and under
+ * `prefers-reduced-motion` — or if the observer never fires — the finished
+ * state is what renders. See `ChartReveal` and the chart-motion block in
+ * app/globals.css.
  */
 export function PulseTrend({
   points,
@@ -48,8 +56,20 @@ export function PulseTrend({
   const threshold = points[points.length - 1]!.threshold;
   const gridScores = [0, Math.round(max / 4), Math.round(max / 2), Math.round((max * 3) / 4), max];
 
+  // The dash animation needs a length to count down from. Measuring the real
+  // path would need a DOM; the polyline's own segment lengths are known here,
+  // and an over-estimate simply starts the draw slightly earlier.
+  const pathLength = points.reduce((total, point, index) => {
+    if (index === 0) return total;
+    const previous = points[index - 1]!;
+    const dx = x(index) - x(index - 1);
+    const dy = y(point.score) - y(previous.score);
+    return total + Math.hypot(dx, dy);
+  }, 0);
+
   return (
-    <figure className="flex flex-col gap-3">
+    <ChartReveal>
+      <figure className="flex flex-col gap-3">
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="h-auto w-full"
@@ -109,10 +129,16 @@ export function PulseTrend({
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
+          className="chart-draw"
+          style={{ "--chart-length": pathLength } as React.CSSProperties}
         />
 
         {points.map((point, index) => (
-          <g key={`${point.label}-${index}`}>
+          <g
+            key={`${point.label}-${index}`}
+            className="chart-appear"
+            style={{ "--chart-index": index } as React.CSSProperties}
+          >
             <circle
               cx={x(index)}
               cy={y(point.score)}
@@ -143,6 +169,7 @@ export function PulseTrend({
           </g>
         ))}
       </svg>
-    </figure>
+      </figure>
+    </ChartReveal>
   );
 }

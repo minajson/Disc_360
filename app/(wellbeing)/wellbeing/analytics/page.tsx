@@ -483,7 +483,7 @@ async function CompareSection({
           </h2>
           <p className="mt-1.5 text-sm leading-relaxed text-slate">
             {tab === "functions"
-              ? "Read from this organisation's own Department / Function catalogue. This is not the same thing as a DISC360 team — a person belongs to one of each."
+              ? "Read from this organisation's own Department / Function catalogue. A person's department is not the same thing as the campaign they answered — they belong to one of each."
               : `Median ${scoreLabel.toLowerCase()}${
                   threshold !== null ? " and the share at or above the threshold" : ""
                 }, by group.`}

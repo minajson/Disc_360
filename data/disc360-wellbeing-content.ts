@@ -19,7 +19,7 @@ import type { IndexMovement } from "../lib/scoring/disc360-wellbeing.ts";
  * ─────────────────────────────────────────────────────────────────────
  */
 
-export const DISC_WELLBEING_PRODUCT_NAME = "DISC360 Wellbeing Pulse";
+export const DISC_WELLBEING_PRODUCT_NAME = "Wellbeing Pulse";
 export const DISC_WELLBEING_DESCRIPTOR = "Workplace wellbeing reflection";
 
 /** Shown wherever an index can be seen. */

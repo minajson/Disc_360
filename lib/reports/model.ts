@@ -690,14 +690,14 @@ export function buildDiscWellbeingReport(input: DiscWellbeingReportInput): Repor
       "Your individual answers and your index are private to you. Your manager, your facilitator and platform administrators cannot see them.",
       "Group reporting only ever uses figures for groups large enough that no one in them can be identified.",
       "This result is never combined with, compared against or added to any other assessment.",
-      `DISC360 Wellbeing Pulse V1 · questionnaire version ${input.questionnaireVersion} · scoring version ${input.scoringVersion}.`,
+      `Wellbeing Pulse V1 · questionnaire version ${input.questionnaireVersion} · scoring version ${input.scoringVersion}.`,
     ],
   });
 
   return {
     product: "wellbeing",
     participantName: input.participantName,
-    productLabel: "DISC360 Wellbeing Pulse",
+    productLabel: "Wellbeing Pulse",
     eyebrow: "Private report",
     headline: `Wellbeing Index ${input.wellbeingIndex}`,
     summary: input.indexMeaning,

@@ -9,6 +9,7 @@ import {
 } from "../lib/wellbeing/language.ts";
 import * as content from "./wellbeing-content.ts";
 import * as discContent from "./disc360-wellbeing-content.ts";
+import { SUPPORT_PARTICIPANT_COPY, SUPPORT_UNIVERSAL_NOTE } from "./support-content.ts";
 import {
   DISC360_WELLBEING_DIMENSIONS,
   DISC360_WELLBEING_INSTRUCTION,
@@ -44,6 +45,70 @@ function flatten(module: Record<string, unknown>): Record<string, string> {
 
 const allCopy = () => flatten(content as unknown as Record<string, unknown>);
 const allDiscCopy = () => flatten(discContent as unknown as Record<string, unknown>);
+
+/* ── confidential support ───────────────────────────────────────────── */
+
+test("ALL support copy passes the safety-language screen", () => {
+  const failures = SUPPORT_PARTICIPANT_COPY.map((text) => ({
+    text,
+    violations: screenWellbeingCopy(text),
+  })).filter((entry) => entry.violations.length > 0);
+
+  assert.deepEqual(
+    failures,
+    [],
+    `unsafe support copy:\n${failures
+      .map((entry) => `${entry.text} → ${entry.violations.map((v) => v.term).join(", ")}`)
+      .join("\n")}`,
+  );
+});
+
+test("support copy never says who the service is for", () => {
+  // The whole point of the card is that it is for everybody. Any wording that
+  // qualifies the audience — by score, by role, by need — reintroduces exactly
+  // the inference the card exists to prevent.
+  for (const text of SUPPORT_PARTICIPANT_COPY) {
+    assert.doesNotMatch(
+      text,
+      /if (your|you) (score|result|answers)|because (your|you)|(high|elevated|concerning) (score|result)/i,
+      `support copy must not condition access on a result: "${text}"`,
+    );
+  }
+});
+
+test("support availability is stated as universal, in words", () => {
+  assert.match(SUPPORT_UNIVERSAL_NOTE, /everyone/i);
+  assert.match(SUPPORT_UNIVERSAL_NOTE, /whatever this check-in showed/i);
+});
+
+test("the support card is never conditioned on a score anywhere in the code", () => {
+  // The rule that matters is not in the copy, it is in the render. `hasSupport`
+  // takes the organisation's configuration and nothing else; the card's own
+  // module must never reach for a threshold, a score or an outcome.
+  const loader = readFileSync(new URL("../lib/wellbeing/support.ts", import.meta.url), "utf8");
+  const card = readFileSync(
+    new URL("../components/wellbeing/result/SupportCard.tsx", import.meta.url),
+    "utf8",
+  );
+  // Comments explain WHY the card ignores a score, so they name one. The
+  // executable half must not.
+  const strip = (source: string) =>
+    source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  for (const source of [strip(loader), strip(card)]) {
+    for (const forbidden of [
+      "atOrAboveThreshold",
+      "totalScore",
+      "indexScore",
+      "threshold",
+    ]) {
+      assert.ok(
+        !source.includes(forbidden),
+        `support must not depend on ${forbidden} — it is available at every score`,
+      );
+    }
+  }
+});
 
 /* ── the screen itself ──────────────────────────────────────────────── */
 

@@ -568,11 +568,21 @@ export const WHO5: InstrumentMetadata = {
   ],
 };
 
-/* ── DISC360 Wellbeing Pulse V1 ─────────────────────────────────────── */
+/* ── Wellbeing Pulse V1 (internal key `disc360_wellbeing_v1`) ───────── */
 
+/**
+ * NAMED "Wellbeing Pulse", KEYED `disc360_wellbeing_v1`.
+ *
+ * The two do not match, deliberately. The key is written into every stored
+ * session, result and campaign row and into two migrations' check
+ * constraints; renaming it would be a data migration performed for the sake of
+ * a string nobody sees. The NAME is what participants and facilitators read,
+ * and it carried the other product's brand into a confidential health
+ * questionnaire, so it is the half that changed.
+ */
 export const DISC360_WELLBEING_V1: InstrumentMetadata = {
   key: "disc360_wellbeing_v1",
-  name: "DISC360 Wellbeing Pulse",
+  name: "Wellbeing Pulse",
   descriptor: "Workplace wellbeing reflection",
   publisher: "DISC360",
   purpose: "Workplace wellbeing monitoring and reflection",
@@ -581,7 +591,7 @@ export const DISC360_WELLBEING_V1: InstrumentMetadata = {
   scoringVersion: "1.0.0",
   scoringEngine: "lib/scoring/disc360-wellbeing.ts",
   primaryScoreLabel: "Wellbeing Index",
-  metricName: "DISC360 Wellbeing Index",
+  metricName: "Wellbeing Index",
   primaryScoreMin: 0,
   primaryScoreMax: 100,
   scoreDirection: "higher_is_stronger_wellbeing",
@@ -795,7 +805,7 @@ export function sharesScale(a: InstrumentKey, b: InstrumentKey): boolean {
   return scoreScaleId(a) === scoreScaleId(b);
 }
 
-/** "DISC360 Wellbeing Index · 72 / 100" — the unambiguous form beside a figure. */
+/** "Wellbeing Index · 72 / 100" — the unambiguous form beside a figure. */
 export function scoreDisplay(key: InstrumentKey, value: number | string): string {
   const instrument = INSTRUMENTS[key];
   return `${instrument.metricName} · ${value} / ${instrument.primaryScoreMax}`;

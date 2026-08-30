@@ -36,12 +36,21 @@ import {
   MOVEMENT_CAVEAT,
   MOVEMENT_LABEL,
   movementDetail,
+  NEXT_STEP_BODY,
+  NEXT_STEP_HEADING,
+  NEXT_STEP_WITH_SUPPORT,
   outcomeCopy,
   RESULT_HEADING,
+  RESULT_PRIVACY_BODY,
+  RESULT_PRIVACY_HEADING,
   SCORE_LABEL,
   SCORE_MEANING,
+  UNDERSTAND_RESULT_LABEL,
   participantDisclaimerFor,
 } from "@/data/wellbeing-content";
+import { Disclosure } from "@/components/wellbeing/result/Disclosure";
+import { SupportCard } from "@/components/wellbeing/result/SupportCard";
+import { hasSupport, loadOrganisationSupport } from "@/lib/wellbeing/support";
 import {
   DISC_DIMENSION_HEADING,
   DISC_DIMENSION_LEAD,
@@ -69,13 +78,34 @@ const fullDate = (iso: string) =>
 /**
  * The participant's own result.
  *
- * Dispatches on the instrument. The two result experiences share the shell,
- * the privacy model and the report actions, and share no numbers: a GHQ result
- * is a 0–12 count against a configured threshold, a DISC360 Wellbeing result
- * is a 0–100 index with six dimensions and no threshold at all.
+ * ─────────────────────────────────────────────────────────────────────
+ * THE ORDER, AND WHY IT IS THIS ORDER.
  *
- * Calm by construction in both cases. Nothing organisational appears — no
+ *   A · the score, with its scale, its questionnaire and its date
+ *   B · what it means — a few sentences, the rest behind a disclosure
+ *   C · your next step
+ *   D · confidential support
+ *   E · who can see this
+ *   F · download, email, history
+ *
+ * The page used to open with a heading and then several paragraphs of
+ * responsible explanation before the participant could see their own figure.
+ * On a phone that is a wall of prose standing between somebody and the one
+ * thing they came for. None of the explanation was wrong and none of it has
+ * been cut — it moved behind "Understand my result", which is where a person
+ * who wants it will look and where a person who wants their score will not
+ * have to scroll past it.
+ *
+ * Dispatches on the questionnaire. The three result experiences share the
+ * shell, the privacy model and the report actions, and share no numbers: a GHQ
+ * result is a count against a configured threshold, WHO-5 is a transformed
+ * percentage against a published cut-off it sits ABOVE when things are going
+ * well, and Wellbeing Pulse V1 is a 0–100 index with six dimensions and no
+ * threshold at all.
+ *
+ * Calm by construction in all three. Nothing organisational appears — no
  * cohort median, no team average, no percentile.
+ * ─────────────────────────────────────────────────────────────────────
  */
 export default async function WellbeingResultPage({
   params,
@@ -86,10 +116,36 @@ export default async function WellbeingResultPage({
   const loaded = await loadOwnWellbeingResult(resultId);
   if (!loaded) notFound();
 
-  const { record, history, instrument } = loaded;
+  const { record, history, instrument, context, organizationId } = loaded;
   const upToHere = history.chronological.filter(
     (entry) => entry.completedAt <= record.completedAt,
   );
+
+  // Read through the participant's OWN client. This is one of the few
+  // wellbeing rows that genuinely belongs to them, and RLS is the right place
+  // for the question. Nothing is written by looking.
+  const support = await loadOrganisationSupport(context.supabase, organizationId);
+  const supportOffered = hasSupport(support);
+
+  /*
+   * ───────────────────────────────────────────────────────────────────
+   * PROMINENCE, NOT PRESENCE.
+   *
+   * `prominent` decides how heavily the support card is drawn and nothing
+   * else. The card renders for every participant of an organisation that has
+   * configured a route, at every score — see data/support-content.ts.
+   *
+   * The flag reads each instrument in its OWN direction: GHQ counts upward
+   * toward difficulty, so its noteworthy side is at or above the threshold;
+   * WHO-5 counts upward toward wellbeing, so its noteworthy side is BELOW the
+   * cut-off. Applying one rule to both would give a WHO-5 participant a
+   * quieter card exactly when the instrument says otherwise.
+   * ───────────────────────────────────────────────────────────────────
+   */
+  const prominentSupport =
+    record.instrumentKey === "who5"
+      ? record.threshold !== null && (record.indexScore ?? 0) < record.threshold
+      : record.atOrAboveThreshold === true;
 
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 sm:py-14">
@@ -97,6 +153,7 @@ export default async function WellbeingResultPage({
         {fullDate(record.completedAt)} · {instrument.name}
       </p>
 
+      {/* ── A · the result, and B · what it means ─────────────────── */}
       {record.instrumentKey === "disc360_wellbeing_v1" ? (
         <DiscWellbeingResult record={record} upToHere={upToHere} />
       ) : record.instrumentKey === "who5" ? (
@@ -105,13 +162,42 @@ export default async function WellbeingResultPage({
         <GhqResult record={record} upToHere={upToHere} />
       )}
 
-      <section className="mt-8 flex flex-col gap-5">
+      {/* ── C · your next step ────────────────────────────────────── */}
+      <section className="pulse-card mt-6 flex flex-col gap-3 p-6 sm:p-9">
+        <h2 className="font-display text-h3 font-semibold">{NEXT_STEP_HEADING}</h2>
+        <p className="text-[0.98rem] leading-relaxed text-ink">{NEXT_STEP_BODY}</p>
+        {supportOffered && (
+          <p className="text-[0.95rem] leading-relaxed text-slate">{NEXT_STEP_WITH_SUPPORT}</p>
+        )}
+      </section>
+
+      {/* ── D · confidential support, at every score ──────────────── */}
+      {supportOffered && (
+        <div className="mt-6">
+          <SupportCard
+            support={support}
+            organisationName={record.organizationNameAtCompletion}
+            prominent={prominentSupport}
+          />
+        </div>
+      )}
+
+      {/* ── E · privacy ───────────────────────────────────────────── */}
+      <section className="mt-6 rounded-2xl border border-hairline bg-pulse-mist/50 px-5 py-5 sm:px-7">
+        <h2 className="font-display text-[1.02rem] font-semibold text-ink">
+          {RESULT_PRIVACY_HEADING}
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-slate">{RESULT_PRIVACY_BODY}</p>
+      </section>
+
+      {/* ── F · what you can do with this ─────────────────────────── */}
+      <section className="mt-6 flex flex-col gap-5">
         <ReportActions resultId={record.id} />
         <Link
           href="/wellbeing/history"
           className="pulse-focus w-fit rounded text-sm font-medium text-pulse underline underline-offset-4"
         >
-          See my full history →
+          See my full history and trends →
         </Link>
       </section>
 
@@ -166,12 +252,10 @@ function DiscWellbeingResult({
           rawScore={record.totalScore}
           rawMax={DISC_WELLBEING_MAX_RAW}
         />
-        <div className="flex flex-col gap-3 border-t border-[rgba(31,78,95,0.14)] pt-6">
-          <p className="text-[0.95rem] leading-relaxed text-slate">{DISC_INDEX_MEANING}</p>
-          <p className="rounded-2xl bg-pulse-mist px-5 py-4 text-sm leading-relaxed text-slate">
-            {DISC_NO_BANDS_NOTE}
-          </p>
-        </div>
+        <Disclosure label={UNDERSTAND_RESULT_LABEL}>
+          <p className="text-[0.95rem] leading-relaxed text-ink">{DISC_INDEX_MEANING}</p>
+          <p className="text-sm leading-relaxed text-slate">{DISC_NO_BANDS_NOTE}</p>
+        </Disclosure>
       </section>
 
       <section className="pulse-card mt-6 flex flex-col gap-5 p-6 sm:p-9">
@@ -215,7 +299,9 @@ function DiscWellbeingResult({
             {indexMovementDetail(record.indexComparison.movement, record.indexComparison.delta)}
           </p>
           {sinceFirst && <p className="text-[0.95rem] text-ink">{sinceFirst}</p>}
-          <p className="text-sm leading-relaxed text-slate">{DISC_MOVEMENT_CAVEAT}</p>
+          <Disclosure label="What a change does and does not mean">
+            <p className="text-sm leading-relaxed text-slate">{DISC_MOVEMENT_CAVEAT}</p>
+          </Disclosure>
         </section>
       )}
 
@@ -277,16 +363,20 @@ function Who5Result({
           rawMax={WHO5_RAW_MAX}
         />
 
-        <div className="flex flex-col gap-3 border-t border-[rgba(31,78,95,0.14)] pt-6">
-          <p className="text-[0.95rem] leading-relaxed text-ink">{WHO5_SCORE_MEANING}</p>
-        </div>
-
+        {/* ── B · what it means, in two sentences ──────────────── */}
         <div className="flex flex-col gap-3 border-t border-[rgba(31,78,95,0.14)] pt-6">
           <h2 className="font-display text-h3 font-semibold">{outcome.headline}</h2>
           <p className="text-[0.95rem] leading-relaxed text-ink">{outcome.body}</p>
+        </div>
+
+        <Disclosure label={UNDERSTAND_RESULT_LABEL}>
+          {/* Which direction the scale runs is the single most important
+              thing to say about WHO-5, and the opposite of what it means on
+              GHQ. It leads the explanation for that reason. */}
+          <p className="text-[0.95rem] leading-relaxed text-ink">{WHO5_SCORE_MEANING}</p>
           {/* The cut-off never appears without saying whose it is. */}
           <p className="text-sm leading-relaxed text-slate">{WHO5_CUTOFF_SOURCE_NOTE}</p>
-        </div>
+        </Disclosure>
       </section>
 
       {record.indexComparison && (
@@ -297,7 +387,9 @@ function Who5Result({
           <p className="text-[0.95rem] leading-relaxed text-ink">
             {who5MovementDetail(record.indexComparison.movement, record.indexComparison.delta)}
           </p>
-          <p className="text-sm leading-relaxed text-slate">{WHO5_MOVEMENT_CAVEAT}</p>
+          <Disclosure label="What a change does and does not mean">
+            <p className="text-sm leading-relaxed text-slate">{WHO5_MOVEMENT_CAVEAT}</p>
+          </Disclosure>
         </section>
       )}
 
@@ -321,6 +413,9 @@ function Who5Result({
         </section>
       )}
 
+      {/* WHO-5's own next-step wording, kept because it is WHO-5's and not a
+          paraphrase of it. The shell's generic "Your next step" follows this
+          one; the two say different things and neither repeats the other. */}
       <section className="pulse-card mt-6 flex flex-col gap-3 p-6 sm:p-9">
         <h2 className="font-display text-h3 font-semibold">{WHO5_NEXT_STEPS_HEADING}</h2>
         <p className="text-[0.95rem] leading-relaxed text-ink">{WHO5_NEXT_STEPS_BODY}</p>
@@ -392,6 +487,7 @@ function GhqResult({
         </section>
       )}
 
+      {/* ── A · the score ──────────────────────────────────────── */}
       <section className="pulse-card mt-8 flex flex-col gap-7 p-6 sm:p-9">
         <ScoreScale
           score={record.totalScore}
@@ -401,15 +497,19 @@ function GhqResult({
           max={record.instrumentKey === "ghq28" ? 28 : WELLBEING_MAX_SCORE}
         />
 
+        {/* ── B · what it means, in two sentences ──────────────── */}
         <div className="flex flex-col gap-3 border-t border-[rgba(31,78,95,0.14)] pt-6">
           <h2 className="font-display text-h3 font-semibold">{outcome.headline}</h2>
           <p className="text-[0.98rem] leading-relaxed text-ink">{outcome.body}</p>
-          <p className="text-[0.95rem] leading-relaxed text-slate">{outcome.detail}</p>
         </div>
 
-        <p className="rounded-2xl bg-pulse-mist px-5 py-4 text-sm leading-relaxed text-slate">
-          {SCORE_MEANING}
-        </p>
+        {/* The rest of the responsible explanation, kept in full and kept
+            out of the way. Nothing here was cut — it stopped standing
+            between a participant and their own figure. */}
+        <Disclosure label={UNDERSTAND_RESULT_LABEL}>
+          <p className="text-[0.95rem] leading-relaxed text-ink">{outcome.detail}</p>
+          <p className="text-[0.95rem] leading-relaxed text-slate">{SCORE_MEANING}</p>
+        </Disclosure>
       </section>
 
       {record.comparison && (
@@ -420,7 +520,9 @@ function GhqResult({
           <p className="text-[0.95rem] leading-relaxed text-ink">
             {movementDetail(record.comparison.movement, record.comparison.delta)}
           </p>
-          <p className="text-sm leading-relaxed text-slate">{MOVEMENT_CAVEAT}</p>
+          <Disclosure label="What a change does and does not mean">
+            <p className="text-sm leading-relaxed text-slate">{MOVEMENT_CAVEAT}</p>
+          </Disclosure>
         </section>
       )}
 

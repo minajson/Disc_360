@@ -163,6 +163,47 @@ export const SCORE_MEANING =
   "recently. It runs from 0 to 12. A higher number means more areas felt harder than usual, " +
   "compared with how things normally are for you.";
 
+/* ── what happens next ──────────────────────────────────────────────── */
+
+/**
+ * The section that follows the score, on every instrument.
+ *
+ * ─────────────────────────────────────────────────────────────────────
+ * WHY IT SAYS "THERE IS NOTHING YOU HAVE TO DO".
+ *
+ * A screening result with a prescriptive next step reads as an instruction
+ * issued by an employer on the strength of a health questionnaire. This
+ * product cannot make a clinical judgement and must not act like it has: the
+ * one honest next step is the participant's own choice.
+ *
+ * It is also short on purpose. The mobile result was a wall of prose that a
+ * participant had to scroll through before finding out anything; whatever is
+ * long belongs behind "Understand my result", and what stays on the page has
+ * to earn its place.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+export const NEXT_STEP_HEADING = "Your next step";
+export const NEXT_STEP_BODY =
+  "There is nothing you have to do with this. Some people find it useful to notice what has " +
+  "felt harder than usual recently and what has helped; others would rather leave it here. " +
+  "Both are fine.";
+
+/** Added only where the organisation has a support route to point at. */
+export const NEXT_STEP_WITH_SUPPORT =
+  "If you would like to talk to someone, confidential support is available to you below.";
+
+/* ── privacy, on the result itself ──────────────────────────────────── */
+
+export const RESULT_PRIVACY_HEADING = "Who can see this";
+export const RESULT_PRIVACY_BODY =
+  "Only you. Your answers and your score are not visible to your manager, your facilitator or " +
+  "platform administrators. Reporting to your organisation uses combined figures across groups " +
+  "of people, and no group is reported unless it is large enough that nobody in it can be " +
+  "picked out.";
+
+/** The expander label. One phrase, so it is recognisable across instruments. */
+export const UNDERSTAND_RESULT_LABEL = "Understand my result";
+
 /* ── history and movement ───────────────────────────────────────────── */
 
 export const HISTORY_HEADING = "My Wellbeing History";

@@ -652,6 +652,14 @@ export interface OwnWellbeingResult {
   instrument: InstrumentMetadata;
   /** Only meaningful for instruments that carry a threshold. */
   policy: WellbeingPolicy;
+  /**
+   * The organisation this result was recorded against.
+   *
+   * Read from the row itself — the same read that confirms ownership — so the
+   * result page can resolve that organisation's own support routes without a
+   * second lookup and without trusting anything the client sent.
+   */
+  organizationId: string | null;
 }
 
 /**
@@ -698,5 +706,6 @@ export async function loadOwnWellbeingResult(
     history: history[found.key],
     instrument: INSTRUMENTS[found.key],
     policy,
+    organizationId: (row.organization_id as string | null) ?? null,
   };
 }
